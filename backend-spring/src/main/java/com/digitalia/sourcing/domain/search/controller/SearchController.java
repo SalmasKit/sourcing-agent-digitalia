@@ -33,8 +33,7 @@ public class SearchController {
     @Operation(summary = "Initiate a profiling search query asynchronously")
     public ResponseEntity<ApiResponse<SearchRequestDto>> createSearch(
             @Valid @RequestBody CreateSearchRequest request,
-            @AuthenticationPrincipal User user
-    ) {
+            @AuthenticationPrincipal User user) {
         SearchRequestDto responseDto = searchOrchestrationService.initiateSearch(request, user);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(responseDto, "Search request initiated successfully"));
@@ -45,8 +44,7 @@ public class SearchController {
     @Operation(summary = "List sourcing search requests")
     public ResponseEntity<ApiResponse<Page<SearchRequestDto>>> listSearches(
             @AuthenticationPrincipal User user,
-            @PageableDefault(size = 20) Pageable pageable
-    ) {
+            @PageableDefault(size = 20) Pageable pageable) {
         Page<SearchRequestDto> dtoPage = searchOrchestrationService.listSearchesForUser(user, pageable);
         return ResponseEntity.ok(ApiResponse.success(dtoPage, "Searches retrieved successfully"));
     }
@@ -56,8 +54,7 @@ public class SearchController {
     @Operation(summary = "Get detailed information about a single search request")
     public ResponseEntity<ApiResponse<SearchRequestDto>> getSearchDetails(
             @PathVariable UUID id,
-            @AuthenticationPrincipal User user
-    ) {
+            @AuthenticationPrincipal User user) {
         SearchRequestDto dto = searchOrchestrationService.getSearchDetails(id, user);
         return ResponseEntity.ok(ApiResponse.success(dto, "Search details retrieved successfully"));
     }

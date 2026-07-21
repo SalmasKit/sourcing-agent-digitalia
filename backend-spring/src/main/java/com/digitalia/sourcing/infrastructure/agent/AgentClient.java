@@ -1,5 +1,7 @@
 package com.digitalia.sourcing.infrastructure.agent;
 
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.digitalia.sourcing.shared.exception.AgentServiceException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +24,10 @@ public class AgentClient {
 
     private final WebClient agentWebClient;
 
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record AgentSearchRequest(String query, UUID searchRequestId) {}
 
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record AgentProfileResponse(
             String sourcePlatform,
             String sourceUrl,
@@ -37,6 +41,7 @@ public class AgentClient {
             Map<String, Object> scoreBreakdown
     ) {}
 
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record AgentSearchResponse(
             Map<String, Object> extractedCriteria,
             List<AgentProfileResponse> profiles

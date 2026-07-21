@@ -13,7 +13,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "search_requests")
 @Getter
-@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -27,7 +26,7 @@ public class SearchRequest extends AuditableEntity {
     private String rawDescription;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "extracted_criteria")
+    @Column(name = "extracted_criteria", columnDefinition = "JSONB")
     private Map<String, Object> extractedCriteria;
 
     @Enumerated(EnumType.STRING)
@@ -38,4 +37,17 @@ public class SearchRequest extends AuditableEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
+
+    public void markRunning() {
+        this.status = SearchStatus.RUNNING;
+    }
+
+    public void complete(Map<String, Object> extractedCriteria) {
+        this.extractedCriteria = extractedCriteria;
+        this.status = SearchStatus.COMPLETED;
+    }
+
+    public void fail() {
+        this.status = SearchStatus.FAILED;
+    }
 }
