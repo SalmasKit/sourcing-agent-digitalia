@@ -1,0 +1,29 @@
+info:
+  name: AI Search
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/searches"
+  body:
+    type: json
+    data: |
+      {
+        "rawDescription": "Recherche un Développeur Senior Java Spring Boot et React basé à Rabat avec au moins 5 ans d'expérience."
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 201 && res.body.data) {
+          bru.setEnvVar("searchId", res.body.data.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

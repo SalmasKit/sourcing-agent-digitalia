@@ -1,0 +1,33 @@
+opencollection: 1.0.0
+
+info:
+  name: BrunoCollection
+config:
+  proxy:
+    inherit: true
+    config:
+      protocol: http
+      hostname: ""
+      port: ""
+      auth:
+        username: ""
+        password: ""
+      bypassProxy: ""
+
+request:
+  auth:
+    type: bearer
+    token: "{{accessToken}}"
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 200 && res.body.data) {
+          bru.setEnvVar("accessToken", res.body.data.accessToken);
+          bru.setEnvVar("refreshToken", res.body.data.refreshToken);
+        }
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

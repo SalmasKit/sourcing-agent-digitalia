@@ -28,7 +28,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserRepository userRepository;
     private final CorsConfigurationSource corsConfigurationSource;
 
@@ -39,7 +38,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthFilter) throws Exception {
         http
                 // CORS is handled here — BEFORE authentication checks.
                 // This ensures preflight OPTIONS requests from the browser are

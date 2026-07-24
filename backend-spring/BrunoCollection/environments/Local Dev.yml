@@ -1,0 +1,12 @@
+name: Local Dev
+variables:
+  - name: baseUrl
+    value: http://localhost:8080
+  - name: accessToken
+    value: ""
+  - name: refreshToken
+    value: ""
+  - name: searchId
+    value: ""
+  - name: profileId
+    value: ""

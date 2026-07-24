@@ -1,0 +1,27 @@
+info:
+  name: Registration
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/register"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |
+      {
+        "email": "recruiter.salma@digitalia.com",
+        "password": "Password123!",
+        "fullName": "Salma Barrak",
+        "role": "RECRUITER"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

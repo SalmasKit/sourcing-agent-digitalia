@@ -6,6 +6,7 @@ import com.digitalia.sourcing.domain.auth.model.Role;
 import com.digitalia.sourcing.domain.auth.model.User;
 import com.digitalia.sourcing.domain.auth.repository.RefreshTokenRepository;
 import com.digitalia.sourcing.domain.auth.repository.UserRepository;
+import com.digitalia.sourcing.shared.exception.InvalidRefreshTokenException;
 import com.digitalia.sourcing.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -96,7 +97,7 @@ public class AuthService {
                             mapToDto(user)
                     );
                 })
-                .orElseThrow(() -> new IllegalArgumentException("Refresh token is not in database"));
+                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token is not in database"));
     }
 
     @Transactional
@@ -120,7 +121,7 @@ public class AuthService {
     private RefreshToken verifyExpiration(RefreshToken token) {
         if (token.isExpired() || token.isRevoked()) {
             refreshTokenRepository.delete(token);
-            throw new IllegalArgumentException("Refresh token was expired or revoked. Please sign in again.");
+            throw new InvalidRefreshTokenException("Refresh token was expired or revoked. Please sign in again.");
         }
         return token;
     }

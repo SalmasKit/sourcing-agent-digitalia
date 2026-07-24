@@ -1,0 +1,25 @@
+info:
+  name: Candidats List
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/searches/{{searchId}}/profiles?page=0&size=10&sort=score,desc"
+  params:
+    - name: page
+      value: "0"
+      type: query
+    - name: size
+      value: "10"
+      type: query
+    - name: sort
+      value: score,desc
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

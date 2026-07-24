@@ -8,7 +8,7 @@ spring:
       enabled: true
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:sourcing_db}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:sourcing_db}
     username: ${DB_USER:sourcing_user}
     password: ${DB_PASSWORD:sourcing_password}
     driver-class-name: org.postgresql.Driver
@@ -48,6 +48,9 @@ app:
   cors:
     allowed-origins:
       - ${FRONTEND_CORS_ORIGIN:http://localhost:5173}
+  rate-limit:
+    enabled: true
+    requests-per-minute: 60
 
 
 management:

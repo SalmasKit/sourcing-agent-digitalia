@@ -113,4 +113,73 @@ class AuthServiceTest {
         assertEquals("test@email.com", response.user().email());
         verify(authenticationManager, times(1)).authenticate(any());
     }
+
+    @Test
+    void refreshToken_shouldRotateTokenSuccessfully() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .email("test@email.com")
+                .fullName("Salma Barrak")
+                .role(Role.RECRUITER)
+                .enabled(true)
+                .build();
+
+        RefreshToken oldToken = RefreshToken.builder()
+                .id(UUID.randomUUID())
+                .user(user)
+                .tokenHash("hashed-token")
+                .expiryDate(java.time.Instant.now().plusSeconds(3600))
+                .revoked(false)
+                .build();
+
+        RefreshToken newToken = RefreshToken.builder()
+                .id(UUID.randomUUID())
+                .user(user)
+                .tokenHash("new-hashed-token")
+                .rawToken("new-raw-refresh-token")
+                .expiryDate(java.time.Instant.now().plusSeconds(3600))
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(oldToken));
+        when(jwtService.generateToken(user)).thenReturn("new-access-token");
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenReturn(newToken);
+
+        LoginResponse response = authService.refreshToken("raw-token");
+
+        assertNotNull(response);
+        assertEquals("new-access-token", response.accessToken());
+        assertEquals("new-raw-refresh-token", response.refreshToken());
+        verify(refreshTokenRepository, times(1)).deleteByTokenHash(anyString());
+    }
+
+    @Test
+    void refreshToken_shouldThrowExceptionWhenTokenNotFound() {
+        when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.empty());
+
+        assertThrows(com.digitalia.sourcing.shared.exception.InvalidRefreshTokenException.class,
+                () -> authService.refreshToken("non-existent-token"));
+    }
+
+    @Test
+    void refreshToken_shouldThrowExceptionWhenTokenExpired() {
+        User user = User.builder().build();
+        RefreshToken expiredToken = RefreshToken.builder()
+                .user(user)
+                .expiryDate(java.time.Instant.now().minusSeconds(3600))
+                .revoked(false)
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(expiredToken));
+
+        assertThrows(com.digitalia.sourcing.shared.exception.InvalidRefreshTokenException.class,
+                () -> authService.refreshToken("expired-token"));
+        verify(refreshTokenRepository, times(1)).delete(expiredToken);
+    }
+
+    @Test
+    void logout_shouldDeleteTokenByHash() {
+        authService.logout("raw-token-to-logout");
+
+        verify(refreshTokenRepository, times(1)).deleteByTokenHash(anyString());
+    }
 }
