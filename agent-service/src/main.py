@@ -3,7 +3,15 @@ main.py — FastAPI entrypoint for Digitalia Sourcing Agent Service.
 """
 import logging
 import sys
+import os
 from contextlib import asynccontextmanager
+
+# Allow running as `python main.py` from inside src/ OR
+# as `python -m src.main` from agent-service/ root.
+_here = os.path.dirname(os.path.abspath(__file__))
+_root = os.path.dirname(_here)  # agent-service/
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 
 import uvicorn
 from fastapi import FastAPI
