@@ -1,25 +1,39 @@
-﻿# Java / Spring Boot
+# Java / Spring Boot
 target/
 *.class
 .mvn/
 !.mvn/wrapper/maven-wrapper.jar
 
-# Python
+# Python & Testing
 __pycache__/
 *.pyc
 .venv/
 venv/
 *.egg-info/
+.pytest_cache/
+.coverage
 
 # Node / React
 node_modules/
 dist/
-.env
+build/
 
-# IDE
+# Private documentation
+*.md
+!README.md.example
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Logs & Temporary files
+*.log
+*.tmp
+
+# IDE & OS
 .idea/
 .vscode/
 *.iml
-
-# Docker
-.env.local
+.DS_Store
+Thumbs.db
