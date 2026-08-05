@@ -38,6 +38,7 @@ class AgentClientTest {
     private WebClient.RequestBodySpec requestBodySpec;
 
     @Mock
+    @SuppressWarnings("rawtypes")
     private WebClient.RequestHeadersSpec requestHeadersSpec;
 
     @Mock
@@ -209,6 +210,7 @@ class AgentClientTest {
     void executeSearch_onErrorMap_shouldWrapGenericException() {
         stubWebClientChain();
 
+        @SuppressWarnings("unused")
         AtomicReference<Function<Throwable, Throwable>> capturedMapper = new AtomicReference<>();
 
         when(responseSpec.onStatus(any(Predicate.class), any(Function.class))).thenReturn(responseSpec);
@@ -223,6 +225,7 @@ class AgentClientTest {
         RuntimeException networkError = new RuntimeException("Connection refused");
 
         // Build a Mono that the real onErrorMap operator would wrap
+        @SuppressWarnings("unused")
         Mono<AgentClient.AgentSearchResponse> probed = agentClient.executeSearch("Java Dev", UUID.randomUUID());
 
         // Swap the bodyToMono stub so the error fires immediately on second subscription
@@ -233,6 +236,7 @@ class AgentClientTest {
         // retry on RuntimeException), so we use AgentServiceException to skip retry.
         // We directly test the onErrorMap lambda by wrapping the production-built Mono
         // with withVirtualTime so retries don't actually wait.
+        @SuppressWarnings("unused")
         AtomicReference<Throwable> captured = new AtomicReference<>();
         // Reset to AgentServiceException so retry filter skips retrying it,
         // and onErrorMap passes it through — we verify the instanceof=true branch separately.

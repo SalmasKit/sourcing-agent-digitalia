@@ -1,7 +1,5 @@
 package com.digitalia.sourcing.domain.search.controller;
 
-import com.digitalia.sourcing.domain.auth.model.Role;
-import com.digitalia.sourcing.domain.auth.model.User;
 import com.digitalia.sourcing.domain.auth.service.JwtService;
 import com.digitalia.sourcing.domain.search.dto.CreateSearchRequest;
 import com.digitalia.sourcing.domain.search.dto.SearchRequestDto;

@@ -6,7 +6,6 @@ import com.digitalia.sourcing.domain.profile.dto.ProfileSummaryDto;
 import com.digitalia.sourcing.domain.profile.service.ProfileService;
 import com.digitalia.sourcing.infrastructure.security.JwtAuthenticationFilter;
 import com.digitalia.sourcing.shared.exception.GlobalExceptionHandler;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;

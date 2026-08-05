@@ -1,6 +1,5 @@
 package com.digitalia.sourcing.domain.search.service;
 
-import com.digitalia.sourcing.domain.profile.model.Profile;
 import com.digitalia.sourcing.domain.profile.repository.ProfileRepository;
 import com.digitalia.sourcing.domain.search.model.SearchRequest;
 import com.digitalia.sourcing.domain.search.model.SearchStatus;
@@ -20,7 +19,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)

@@ -8,7 +8,6 @@ import com.digitalia.sourcing.domain.profile.model.Profile;
 import com.digitalia.sourcing.domain.profile.repository.ProfileRepository;
 import com.digitalia.sourcing.domain.search.model.SearchRequest;
 import com.digitalia.sourcing.domain.search.repository.SearchRequestRepository;
-import com.digitalia.sourcing.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,7 +20,6 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
