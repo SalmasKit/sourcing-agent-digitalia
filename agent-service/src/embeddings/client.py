@@ -39,8 +39,8 @@ async def compute_similarity(text_a: str, text_b: str) -> float:
     loop = asyncio.get_event_loop()
 
     def _encode():
-        embeddings = model.encode([text_a, text_b], normalize_embeddings=True)
-        return _cosine_similarity(embeddings[0], embeddings[1])
+        embeddings = model.encode([text_a, text_b], convert_to_numpy=True, normalize_embeddings=True)
+        return _cosine_similarity(np.asarray(embeddings[0]), np.asarray(embeddings[1]))
 
     return await loop.run_in_executor(None, _encode)
 
