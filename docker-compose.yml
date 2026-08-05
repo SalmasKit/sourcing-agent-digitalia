@@ -16,5 +16,24 @@ services:
       timeout: 5s
       retries: 5
 
+  agent-service:
+    build:
+      context: ./agent-service
+      dockerfile: Dockerfile
+    container_name: sourcing-agent-service
+    ports:
+      - "8001:8001"
+    environment:
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8001
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=llama-3.3-70b-versatile
+      - USE_MOCK_DATA=true
+      - DATABASE_URL=postgresql+asyncpg://sourcing_user:sourcing_password@postgres:5432/sourcing_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+
