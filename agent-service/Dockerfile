@@ -8,7 +8,7 @@ COPY src/ ./src/
 
 # Install python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir .
+    pip install --no-cache-dir --timeout 100 --retries 10 .
 
 EXPOSE 8001
 
