@@ -65,7 +65,7 @@ function DashboardContent() {
     const saved = localStorage.getItem('digitalia_search_history');
     if (saved) { try { return JSON.parse(saved); } catch(e) {} }
     return [
-      { query: 'Senior Java & Spring Boot in Paris', date: '04/08 10:30', resultsCount: 4 },
+      { query: 'Senior Java & Spring Boot in Casablanca', date: '04/08 10:30', resultsCount: 4 },
       { query: 'Frontend UI/UX React Specialist', date: '04/08 09:15', resultsCount: 3 }
     ];
   });
@@ -109,21 +109,21 @@ function DashboardContent() {
         id: 'job-1',
         title: 'Senior Java & Cloud Engineer',
         description: 'Looking for a Java developer with microservices and containerization expertise.',
-        location: 'Paris, France',
+        location: 'Casablanca, Morocco',
         skills: ['Java', 'Spring Boot', 'Docker']
       },
       {
         id: 'job-2',
         title: 'Frontend UI/UX Specialist',
         description: 'Focused on high-performance React design systems and accessible client apps.',
-        location: 'Lyon, France',
+        location: 'Rabat, Morocco',
         skills: ['React', 'TypeScript', 'Tailwind CSS']
       },
       {
         id: 'job-3',
         title: 'DevOps & Infrastructure Architect',
         description: 'Kubernetes orchestration, automated CI/CD pipelines, and cloud platform setups.',
-        location: 'Bordeaux, France',
+        location: 'Tangier, Morocco',
         skills: ['Docker', 'Kubernetes', 'Terraform']
       }
     ];
@@ -142,15 +142,13 @@ function DashboardContent() {
   const [autoCycleInterval, setAutoCycleInterval] = useState(null);
   const [thumbnailScrollInterval, setThumbnailScrollInterval] = useState(null);
 
-  // Initialize with initial dataset
+  // Initialize with real search for the first job on load
   useEffect(() => {
-    const initial = getInitialCandidates();
-    // Default filter for the first seeded job
-    const matched = initial.filter(c => 
-      c.skills.some(s => ['Java', 'Spring Boot', 'Docker'].includes(s))
-    );
-    setCandidates(matched.length ? matched : initial);
-    setShortlist(initial.filter(c => c.shortlisted));
+    if (jobDescriptions && jobDescriptions.length > 0) {
+      const defaultJob = jobDescriptions[0];
+      const queryStr = defaultJob.description || `${defaultJob.title} ${(defaultJob.skills || []).join(' ')} ${defaultJob.location || ''}`.trim();
+      handleSearch(queryStr, { location: defaultJob.location, tech: defaultJob.skills }, defaultJob.id);
+    }
   }, []);
 
   const triggerToast = (msg) => {
@@ -201,45 +199,11 @@ function DashboardContent() {
     }
   };
 
-  const handleSelectJob = (job) => {
+  const handleSelectJob = async (job) => {
     if (!job) return;
     setSelectedJobId(job.id);
-    setIsSearching(true);
-    setAgentStep(1);
-
-    const t1 = setTimeout(() => setAgentStep(2), 250);
-    const t2 = setTimeout(() => setAgentStep(3), 500);
-    const t3 = setTimeout(() => setAgentStep(4), 750);
-
-    setTimeout(() => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      setIsSearching(false);
-
-      const all = getInitialCandidates();
-
-      // Extract search terms from title, description, and skills
-      const terms = [
-        ...(job.title || '').toLowerCase().split(/\s+/),
-        ...(job.description || '').toLowerCase().split(/\s+/),
-        ...((job.skills || []).map(s => s.toLowerCase()))
-      ].filter(t => t.length > 2);
-
-      const matched = all.filter(c => {
-        const fullText = (c.fullName + ' ' + c.headline + ' ' + c.summary + ' ' + (c.skills || []).join(' ')).toLowerCase();
-        return terms.some(term => fullText.includes(term));
-      });
-
-      const displayCandidates = matched.length > 0 ? matched : all;
-      setCandidates(displayCandidates);
-      setCarouselIndex(0);
-
-      const matchedMsg = lang === 'FR'
-        ? `${displayCandidates.length} profils sourcés pour "${job.title}"`
-        : `Sourced ${displayCandidates.length} profiles for "${job.title}"`;
-      triggerToast(matchedMsg);
-    }, 1000);
+    const queryStr = job.description || `${job.title} ${(job.skills || []).join(' ')} ${job.location || ''}`.trim();
+    await handleSearch(queryStr, { location: job.location, tech: job.skills }, job.id);
   };
 
   const handleCreateJob = (newJob) => {

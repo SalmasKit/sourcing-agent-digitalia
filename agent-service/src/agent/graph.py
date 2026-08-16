@@ -4,11 +4,12 @@ graph.py — LangGraph StateGraph pipeline for the sourcing agent.
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, cast
 
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langgraph.graph import StateGraph, END
+from langgraph.graph.state import CompiledStateGraph
 
 from src.agent.state import SourcingState
 from src.agent.prompts import CRITERIA_EXTRACTION_SYSTEM, CRITERIA_EXTRACTION_USER
@@ -70,7 +71,7 @@ async def interpret_request(state: SourcingState) -> SourcingState:
             HumanMessage(content=CRITERIA_EXTRACTION_USER.format(query=state["raw_query"])),
         ]
         response = await llm.ainvoke(messages)
-        criteria = _parse_json_from_llm(response.content.strip())
+        criteria = _parse_json_from_llm(cast(str, response.content).strip())
 
         if not criteria or not isinstance(criteria, dict):
             raise ValueError("Invalid criteria format from LLM")
@@ -138,10 +139,34 @@ async def format_output(state: SourcingState) -> SourcingState:
     strong_matches = [p for p in scored if p.get("match_score", 0) >= 80]
     avg_score = round(sum(p.get("match_score", 0) for p in scored) / len(scored)) if scored else 0
 
+    formatted_profiles = []
+    for p in scored:
+        formatted_p = {
+            **p,
+            "source_platform": p.get("source", "linkedin"),
+            "source_url": p.get("linkedin_url", ""),
+            "full_name": p.get("full_name"),
+            "headline": p.get("headline"),
+            "location": p.get("location"),
+            "skills": {"skills": p.get("skills", [])} if isinstance(p.get("skills"), list) else p.get("skills", {}),
+            "experience_years": p.get("experience_years"),
+            "raw_data": p,
+            "score": p.get("match_score", 0),
+            "score_breakdown": {
+                "skill": p.get("skill_match_score", 0),
+                "experience": p.get("experience_score", 0),
+                "location": p.get("location_score", 0),
+                "embedding": p.get("embedding_score", 0),
+            },
+        }
+        formatted_profiles.append(formatted_p)
+
     final_output = {
         "job_id": state.get("job_id"),
+        "search_request_id": state.get("job_id"),
         "query": state.get("raw_query"),
         "criteria": state.get("criteria", {}),
+        "extracted_criteria": state.get("criteria", {}),
         "summary": {
             "total_profiles": len(scored),
             "strong_matches": len(strong_matches),
@@ -149,7 +174,7 @@ async def format_output(state: SourcingState) -> SourcingState:
             "top_candidate": scored[0].get("full_name") if scored else None,
             "top_score": scored[0].get("match_score") if scored else None,
         },
-        "profiles": scored,
+        "profiles": formatted_profiles,
     }
 
     return {
@@ -158,8 +183,8 @@ async def format_output(state: SourcingState) -> SourcingState:
     }
 
 
-def build_sourcing_graph() -> StateGraph:
-    graph = StateGraph(SourcingState)
+def build_sourcing_graph() -> CompiledStateGraph:  # type: ignore[type-arg]
+    graph: StateGraph = StateGraph(SourcingState)  # type: ignore[type-arg]
     graph.add_node("interpret_request", interpret_request)
     graph.add_node("search_profiles", search_node)
     graph.add_node("score_profiles", score_node)
@@ -200,6 +225,6 @@ def _build_fallback_criteria(query: str) -> dict:
         "job_title": "Software Engineer",
         "required_skills": detected if detected else ["Java"],
         "seniority": "Senior" if "senior" in query_lower else "Any",
-        "location": "Paris" if "paris" in query_lower else "Any",
+        "location": "Casablanca" if "casablanca" in query_lower else "Any",
         "contract_type": "CDI",
     }

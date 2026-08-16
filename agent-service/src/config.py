@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # Data source
     serpapi_api_key: str = ""
-    use_mock_data: bool = True
+    use_mock_data: bool = False
 
     # Embeddings
     embedding_model: str = "all-MiniLM-L6-v2"
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
 
     @property
     def effective_use_mock(self) -> bool:
-        return self.use_mock_data or not self.has_serpapi
+        return self.use_mock_data
 
 
 @lru_cache

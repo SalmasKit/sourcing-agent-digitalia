@@ -2,15 +2,47 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy dependency files
+# ── Layer 1: all packages except numpy ──────────────────────────────────────
+# Each wheel here is < 3 MB; --timeout 300 / --retries 10 handles WSL2 stalls.
+# This layer is cached independently, so a numpy failure won't evict it.
+RUN pip install --no-cache-dir \
+    --timeout 300 \
+    --retries 10 \
+    "setuptools>=61.0" \
+    "wheel" \
+    "fastapi>=0.115.0" \
+    "uvicorn[standard]>=0.30.0" \
+    "langchain>=0.3.0" \
+    "langchain-core>=0.3.0" \
+    "langchain-groq>=0.2.0" \
+    "langgraph>=0.2.0" \
+    "fastmcp>=2.0.0" \
+    "httpx>=0.27.0" \
+    "requests>=2.32.0" \
+    "pydantic>=2.7.0" \
+    "pydantic-settings>=2.3.0" \
+    "python-dotenv>=1.0.0" \
+    "asyncpg>=0.29.0" \
+    "sqlalchemy[asyncio]>=2.0.30" \
+    "orjson>=3.10.0"
+
+# ── Layer 2: numpy alone (16.7 MB binary – the slow one) ────────────────────
+# Isolated in its own layer so Docker caches it once it succeeds.
+# --timeout 600 = 10-min stall tolerance; --retries 10 = up to 10 restarts.
+RUN pip install --no-cache-dir \
+    --timeout 600 \
+    --retries 10 \
+    "numpy>=1.26.0"
+
+# ── Layer 3: project source ──────────────────────────────────────────────────
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
-# Install PyTorch CPU lightweight build first to avoid downloading 2GB CUDA wheels
-RUN pip install --no-cache-dir --default-timeout=1000 torch --index-url https://download.pytorch.org/whl/cpu
-
-# Install remaining package dependencies
-RUN pip install --no-cache-dir --default-timeout=1000 --retries 10 .
+RUN pip install --no-cache-dir \
+    --timeout 120 \
+    --retries 5 \
+    --no-build-isolation \
+    .
 
 EXPOSE 8001
 

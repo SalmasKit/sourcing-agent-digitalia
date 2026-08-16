@@ -22,7 +22,7 @@ def test_models_endpoint():
 
 def test_search_endpoint():
     payload = {
-        "query": "Senior Java Developer à Paris",
+        "query": "Senior Java Developer à Casablanca",
         "max_results": 4
     }
     response = client.post("/api/search", json=payload)

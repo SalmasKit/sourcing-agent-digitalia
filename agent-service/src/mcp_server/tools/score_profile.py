@@ -129,7 +129,14 @@ async def score_profile(
                 )),
             ]
             response = await llm.ainvoke(messages)
-            raw = response.content.strip()
+            content = response.content
+            if isinstance(content, list):
+                raw = "".join(
+                    block.get("text", "") if isinstance(block, dict) else str(block)
+                    for block in content
+                ).strip()
+            else:
+                raw = content.strip()
             json_match = re.search(r"\{.*\}", raw, re.DOTALL)
             if json_match:
                 llm_data = json.loads(json_match.group())
@@ -170,5 +177,5 @@ async def score_profile(
 
 async def score_profiles_batch(profiles: list[dict], criteria: dict) -> list[dict]:
     import asyncio
-    scored = await asyncio.gather(*[score_profile(p, criteria) for p in profiles])
+    scored = await asyncio.gather(*[score_profile(p, criteria, use_llm_rationale=False) for p in profiles])
     return sorted(scored, key=lambda p: p.get("match_score", 0), reverse=True)

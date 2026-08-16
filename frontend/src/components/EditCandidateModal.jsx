@@ -35,7 +35,7 @@ export const EditCandidateModal = ({ isOpen, onClose, onSave, candidate = null }
     } else {
       setFullName('');
       setHeadline('');
-      setLocation('Paris, France (Hybrid)');
+      setLocation('Casablanca, Morocco (Hybrid)');
       setExperienceYears(5);
       setMatchScore(90);
       setSummary('');

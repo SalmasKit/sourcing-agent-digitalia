@@ -19,6 +19,7 @@ router = APIRouter()
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=3, description="Natural language sourcing query")
     job_id: str | None = Field(default=None, description="Optional Job Description ID")
+    search_request_id: str | None = Field(default=None, description="Optional Search Request ID from Spring Boot")
     max_results: int = Field(default=8, ge=1, le=20)
 
 
@@ -47,10 +48,12 @@ async def health_check() -> HealthResponse:
 
 
 @router.post("/api/search", tags=["Sourcing"])
+@router.post("/api/v1/agent/search", tags=["Sourcing"])
 async def run_search(request: SearchRequest) -> dict:
-    logger.info(f"[API] Search query: {request.query[:80]}")
+    job_identifier = request.search_request_id or request.job_id
+    logger.info(f"[API] Search query: {request.query[:80]} (ID: {job_identifier})")
     try:
-        result = await run_sourcing_agent(raw_query=request.query, job_id=request.job_id)
+        result = await run_sourcing_agent(raw_query=request.query, job_id=job_identifier)
         if "profiles" in result:
             result["profiles"] = result["profiles"][:request.max_results]
         return result

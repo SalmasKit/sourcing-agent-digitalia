@@ -17,37 +17,29 @@ services:
       retries: 5
 
   agent-service:
-    build:
-      context: ./agent-service
-      dockerfile: Dockerfile
+    image: sourcing-agent-service:latest
+    pull_policy: never
     container_name: sourcing-agent-service
     ports:
       - "8001:8001"
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     environment:
       - APP_HOST=0.0.0.0
       - APP_PORT=8001
       - GROQ_API_KEY=${GROQ_API_KEY:-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}
       - GROQ_MODEL=llama-3.3-70b-versatile
       - SERPAPI_API_KEY=${SERPAPI_API_KEY:-764f96b248869869aab38b3b6bb408cb6541f6659539c53912598683b5fdb5be}
-      - USE_MOCK_DATA=true
+      - USE_MOCK_DATA=false
       - DATABASE_URL=postgresql+asyncpg://sourcing_user:sourcing_password@postgres:5432/sourcing_db
     depends_on:
       postgres:
         condition: service_healthy
 
   backend-spring:
-    build:
-      context: ./backend-spring
-      dockerfile: Dockerfile
+    image: sourcing-backend-spring:latest
+    pull_policy: never
     container_name: sourcing-backend-spring
     ports:
       - "8080:8080"
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -63,15 +55,11 @@ services:
         condition: service_started
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: sourcing-frontend:latest
+    pull_policy: never
     container_name: sourcing-frontend
     ports:
       - "5173:80"
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     depends_on:
       - backend-spring
 

@@ -49,7 +49,7 @@ export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editing
     setTimeout(() => {
       const safeSkills = String(skills || '').trim();
       const skillsList = safeSkills ? safeSkills : 'Java, Spring Boot, Microservices';
-      const locText = location === 'All Locations' ? 'France (Hybrid/Remote)' : location;
+      const locText = location === 'All Locations' ? 'Morocco (Hybrid/Remote)' : location;
 
       const generated = isFR ? [
         `Recherche un profil ${seniority} ${safeTitle} basé(e) à ${locText} (${contractType}).`,
@@ -199,9 +199,9 @@ export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editing
                 className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl p-2.5 font-semibold outline-none focus:border-brand-primary"
               >
                 <option value="All Locations">All Locations</option>
-                <option value="Paris, France">Paris, France</option>
-                <option value="Lyon, France">Lyon, France</option>
-                <option value="Bordeaux, France">Bordeaux, France</option>
+                <option value="Casablanca, Morocco">Casablanca, Morocco</option>
+                <option value="Rabat, Morocco">Rabat, Morocco</option>
+                <option value="Tangier, Morocco">Tangier, Morocco</option>
                 <option value="Remote">Remote</option>
               </select>
             </div>

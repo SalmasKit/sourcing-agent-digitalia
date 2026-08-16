@@ -23,11 +23,11 @@ export const SearchConsole = ({ onSearch, isSearching, selectedJob }) => {
   }, [selectedJob?.id]);
 
   const QUICK_PROMPTS = lang === 'FR' ? [
-    selectedJob ? `Expert ${selectedJob.title} avec 5+ ans d'expérience` : "Ingénieurs Java & Spring Boot Senior à Paris",
+    selectedJob ? `Expert ${selectedJob.title} avec 5+ ans d'expérience` : "Ingénieurs Java & Spring Boot Senior à Casablanca",
     selectedJob ? `Candidat disponible immédiatement pour ${selectedJob.title}` : "Développeurs Full-Stack React & TypeScript",
     selectedJob ? `Expertise ${selectedJob.skills?.join(', ') || 'technique'} éprouvée` : "DevOps / SRE avec Docker & Kubernetes"
   ] : [
-    selectedJob ? `Senior ${selectedJob.title} with 5+ years experience` : "Senior Java & Spring Boot Engineers in Paris",
+    selectedJob ? `Senior ${selectedJob.title} with 5+ years experience` : "Senior Java & Spring Boot Engineers in Casablanca",
     selectedJob ? `Immediately available candidate for ${selectedJob.title}` : "Full-Stack React & TypeScript Developers",
     selectedJob ? `Proven ${selectedJob.skills?.join(', ') || 'technical'} expertise` : "DevOps / SRE with Docker & Kubernetes"
   ];
@@ -176,9 +176,9 @@ export const SearchConsole = ({ onSearch, isSearching, selectedJob }) => {
               className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-lg p-2 font-semibold focus:border-brand-primary outline-none transition-all"
             >
               <option value="All Locations">{t('allLocations')}</option>
-              <option value="Paris, France">Paris, France</option>
-              <option value="Lyon, France">Lyon, France</option>
-              <option value="Bordeaux, France">Bordeaux, France</option>
+              <option value="Casablanca, Morocco">Casablanca, Morocco</option>
+              <option value="Rabat, Morocco">Rabat, Morocco</option>
+              <option value="Tangier, Morocco">Tangier, Morocco</option>
               <option value="Remote">Remote</option>
             </select>
           </div>

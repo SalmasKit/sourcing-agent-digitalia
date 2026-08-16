@@ -21,8 +21,8 @@ async def search_profiles(criteria: dict[str, Any], limit: int = 8) -> list[dict
     try:
         return await _serpapi_search(criteria, limit)
     except Exception as exc:
-        logger.warning(f"SerpAPI search failed ({exc}), falling back to mock profiles")
-        return search_mock_profiles(criteria, limit)
+        logger.error(f"SerpAPI search error: {exc}")
+        return []
 
 
 async def _serpapi_search(criteria: dict, limit: int) -> list[dict]:
@@ -43,7 +43,7 @@ async def _serpapi_search(criteria: dict, limit: int) -> list[dict]:
                 "engine": "google",
                 "num": min(limit * 2, 20),
                 "hl": "fr",
-                "gl": "fr",
+                "gl": "ma",
             },
         )
         response.raise_for_status()
