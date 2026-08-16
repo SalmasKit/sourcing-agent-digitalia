@@ -1,0 +1,40 @@
+name: Python Agent Service CI
+
+on:
+  push:
+    paths:
+      - 'agent-service/**'
+      - '.github/workflows/agent-ci.yml'
+  pull_request:
+    paths:
+      - 'agent-service/**'
+      - '.github/workflows/agent-ci.yml'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        cd agent-service
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+
+    - name: Run Ruff Linter
+      run: |
+        cd agent-service
+        ruff check src
+
+    - name: Run Pytest
+      run: |
+        cd agent-service
+        pytest
