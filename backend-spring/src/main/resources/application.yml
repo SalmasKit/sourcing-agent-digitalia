@@ -43,7 +43,7 @@ app:
     access-token-expiration-ms: 900000 # 15 minutes
     refresh-token-expiration-ms: 604800000 # 7 days
   agent:
-    url: ${AGENT_SERVICE_URL:http://localhost:8000}
+    url: ${AGENT_SERVICE_URL:http://localhost:8001}
     timeout-ms: 60000 # 60 seconds for agent search query
   cors:
     allowed-origins:

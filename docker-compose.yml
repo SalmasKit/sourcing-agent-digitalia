@@ -28,12 +28,43 @@ services:
       - APP_PORT=8001
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GROQ_MODEL=llama-3.3-70b-versatile
+      - SERPAPI_API_KEY=${SERPAPI_API_KEY}
       - USE_MOCK_DATA=true
       - DATABASE_URL=postgresql+asyncpg://sourcing_user:sourcing_password@postgres:5432/sourcing_db
     depends_on:
       postgres:
         condition: service_healthy
 
+  backend-spring:
+    build:
+      context: ./backend-spring
+      dockerfile: Dockerfile
+    container_name: sourcing-backend-spring
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=sourcing_db
+      - DB_USER=sourcing_user
+      - DB_PASSWORD=sourcing_password
+      - AGENT_SERVICE_URL=http://agent-service:8001
+      - FRONTEND_CORS_ORIGIN=http://localhost:5173
+    depends_on:
+      postgres:
+        condition: service_healthy
+      agent-service:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sourcing-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend-spring
+
 volumes:
   postgres_data:
-
