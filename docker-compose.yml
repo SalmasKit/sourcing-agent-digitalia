@@ -26,9 +26,9 @@ services:
     environment:
       - APP_HOST=0.0.0.0
       - APP_PORT=8001
-      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY:-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}
       - GROQ_MODEL=llama-3.3-70b-versatile
-      - SERPAPI_API_KEY=${SERPAPI_API_KEY}
+      - SERPAPI_API_KEY=${SERPAPI_API_KEY:-764f96b248869869aab38b3b6bb408cb6541f6659539c53912598683b5fdb5be}
       - USE_MOCK_DATA=true
       - DATABASE_URL=postgresql+asyncpg://sourcing_user:sourcing_password@postgres:5432/sourcing_db
     depends_on:

@@ -2,18 +2,13 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Copy dependencies and source code
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
 
-COPY pyproject.toml README.md .
-COPY .env.example .env
-
+# Install python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
-
-COPY src/ ./src/
 
 EXPOSE 8001
 
