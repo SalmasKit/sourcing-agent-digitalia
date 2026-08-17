@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { getAvatarUrl } from '../utils/avatar';
 import {
   Sparkles, Users, FileText, TrendingUp, Target, Clock,
   CheckCircle2, BarChart3, Award, Zap, ArrowUpRight, Calendar,
@@ -77,7 +78,13 @@ const KpiCard = ({ icon: Icon, label, value, sub, trend, color = 'brand-primary'
 );
 
 // ─── Main Dashboard Component ─────────────────────────────────────────────
-export const DashboardView = ({ jobDescriptions = [], candidates = [], savedRoleCandidates = {}, searchHistory = [] }) => {
+export const DashboardView = ({
+  jobDescriptions = [],
+  candidates = [],
+  savedRoleCandidates = {},
+  candidatePipelineStage = {},
+  searchHistory = []
+}) => {
   const { lang } = useLanguage();
   const isFR = lang === 'FR';
 
@@ -100,14 +107,16 @@ export const DashboardView = ({ jobDescriptions = [], candidates = [], savedRole
 
     const topCandidate = [...candidates].sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))[0];
 
-    // Pipeline breakdown
+    // Pipeline breakdown — only count candidates explicitly moved to a stage
     const pipelineStages = {
-      new: candidates.filter(c => !c.pipelineStage || c.pipelineStage === 'new').length,
-      contacted: candidates.filter(c => c.pipelineStage === 'contacted').length,
-      interview: candidates.filter(c => c.pipelineStage === 'interview').length,
-      offer: candidates.filter(c => c.pipelineStage === 'offer').length,
-      hired: candidates.filter(c => c.pipelineStage === 'hired').length,
+      new: candidates.filter(c => candidatePipelineStage[c.id] === 'new').length,
+      contacted: candidates.filter(c => candidatePipelineStage[c.id] === 'contacted').length,
+      interview: candidates.filter(c => candidatePipelineStage[c.id] === 'interview').length,
+      offer: candidates.filter(c => candidatePipelineStage[c.id] === 'offer').length,
+      hired: candidates.filter(c => candidatePipelineStage[c.id] === 'hired').length,
+      rejected: candidates.filter(c => candidatePipelineStage[c.id] === 'rejected').length,
     };
+    const totalInPipeline = Object.values(pipelineStages).reduce((a, b) => a + b, 0);
 
     // Score distribution
     const scoreDist = [
@@ -119,9 +128,9 @@ export const DashboardView = ({ jobDescriptions = [], candidates = [], savedRole
 
     return {
       totalJDs, activeJDs, totalCandidates, uniqueSavedCount,
-      avgScore, shortlistRate, topCandidate, pipelineStages, scoreDist
+      avgScore, shortlistRate, topCandidate, pipelineStages, totalInPipeline, scoreDist
     };
-  }, [jobDescriptions, candidates, savedRoleCandidates]);
+  }, [jobDescriptions, candidates, savedRoleCandidates, candidatePipelineStage]);
 
   const pipelineData = [
     { label: isFR ? 'Nouveau' : 'New', value: stats.pipelineStages.new, color: 'bg-slate-400' },
@@ -167,7 +176,6 @@ export const DashboardView = ({ jobDescriptions = [], candidates = [], savedRole
           label={isFR ? 'Fiches de Poste Actives' : 'Active Job Descriptions'}
           value={stats.activeJDs}
           sub={isFR ? `${stats.totalJDs} au total` : `${stats.totalJDs} total`}
-          trend={stats.totalJDs > 0 ? 12 : null}
           color="brand-primary"
         />
         <KpiCard
@@ -175,7 +183,6 @@ export const DashboardView = ({ jobDescriptions = [], candidates = [], savedRole
           label={isFR ? 'Candidats Sourcés' : 'Sourced Candidates'}
           value={stats.totalCandidates}
           sub={isFR ? 'dans le vivier' : 'in talent pool'}
-          trend={stats.totalCandidates > 0 ? 8 : null}
           color="violet-500"
         />
         <KpiCard
@@ -183,15 +190,13 @@ export const DashboardView = ({ jobDescriptions = [], candidates = [], savedRole
           label={isFR ? 'En Shortlist' : 'Shortlisted'}
           value={stats.uniqueSavedCount}
           sub={`${stats.shortlistRate}% ${isFR ? 'du vivier' : 'of pool'}`}
-          trend={stats.uniqueSavedCount > 0 ? 5 : null}
           color="emerald-500"
         />
         <KpiCard
           icon={Target}
           label={isFR ? 'Score Moyen IA' : 'Avg AI Match Score'}
-          value={`${stats.avgScore}%`}
+          value={stats.avgScore > 0 ? `${stats.avgScore}%` : '—'}
           sub={isFR ? 'précision de matching' : 'matching accuracy'}
-          trend={stats.avgScore > 80 ? 3 : null}
           color="amber-500"
         />
       </div>
@@ -238,15 +243,15 @@ export const DashboardView = ({ jobDescriptions = [], candidates = [], savedRole
               },
               {
                 label: isFR ? 'En Entretien' : 'Interview Rate',
-                value: stats.totalCandidates > 0
-                  ? `${Math.round((stats.pipelineStages.interview / stats.totalCandidates) * 100)}%`
+                value: stats.totalInPipeline > 0
+                  ? `${Math.round((stats.pipelineStages.interview / stats.totalInPipeline) * 100)}%`
                   : '0%',
                 color: 'text-violet-600'
               },
               {
                 label: isFR ? 'Taux Embauche' : 'Hire Rate',
-                value: stats.totalCandidates > 0
-                  ? `${Math.round((stats.pipelineStages.hired / stats.totalCandidates) * 100)}%`
+                value: stats.totalInPipeline > 0
+                  ? `${Math.round((stats.pipelineStages.hired / stats.totalInPipeline) * 100)}%`
                   : '0%',
                 color: 'text-emerald-600'
               }
@@ -307,8 +312,12 @@ export const DashboardView = ({ jobDescriptions = [], candidates = [], savedRole
             <>
               <div className="flex items-center gap-3 mb-3">
                 <img
-                  src={stats.topCandidate.avatarUrl}
+                  src={getAvatarUrl(stats.topCandidate.fullName, stats.topCandidate.avatarUrl)}
                   alt={stats.topCandidate.fullName}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = getAvatarUrl(stats.topCandidate.fullName, null);
+                  }}
                   className="w-12 h-12 rounded-xl object-cover border-2 border-white/20"
                 />
                 <div>
@@ -430,9 +439,9 @@ export const DashboardView = ({ jobDescriptions = [], candidates = [], savedRole
           <div className="flex flex-wrap items-center gap-6">
             {[
               { label: isFR ? 'Recherches totales' : 'Total Searches', value: searchHistory.length || 0, icon: Search },
-              { label: isFR ? 'Précision IA' : 'AI Accuracy', value: `${stats.avgScore > 0 ? stats.avgScore : 92}%`, icon: Target },
-              { label: isFR ? 'Temps moyen' : 'Avg. Search Time', value: '1.2s', icon: Clock },
-              { label: isFR ? 'Profils évalués' : 'Profiles Evaluated', value: stats.totalCandidates * 3 || 0, icon: CheckCircle2 },
+              { label: isFR ? 'Score moyen' : 'Avg Match Score', value: stats.avgScore > 0 ? `${stats.avgScore}%` : '—', icon: Target },
+              { label: isFR ? 'Dans le pipeline' : 'In Pipeline', value: stats.totalInPipeline, icon: CheckCircle2 },
+              { label: isFR ? 'Profils sourcés' : 'Profiles Sourced', value: stats.totalCandidates, icon: Users },
             ].map((m, i) => {
               const Icon = m.icon;
               return (

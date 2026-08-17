@@ -92,14 +92,17 @@ async def score_profile(
         exp_score = max(0, int(candidate_exp / min_exp * 70))
 
     # 4. Location score
-    req_loc = (criteria.get("location") or "").lower()
-    cand_loc = (profile.get("location") or "").lower()
-    if not req_loc or req_loc in ("any", "remote"):
-        location_score = 90
-    elif req_loc in cand_loc or "remote" in cand_loc:
+    req_loc = (criteria.get("location") or "").strip().lower()
+    cand_loc = (profile.get("location") or "").strip().lower()
+
+    if not req_loc or req_loc in ("any", "all locations", "morocco", "maroc"):
         location_score = 95
+    elif req_loc in cand_loc or cand_loc in req_loc:
+        location_score = 100
+    elif "remote" in cand_loc or "remote" in req_loc:
+        location_score = 90
     else:
-        location_score = 40
+        location_score = 75
 
     # Base weighted score
     base_score = int(

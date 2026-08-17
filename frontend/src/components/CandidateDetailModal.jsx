@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { getAvatarUrl } from '../utils/avatar';
 import { X, MapPin, Briefcase, Mail, Globe, ExternalLink, GraduationCap, CheckCircle2, Bookmark, BookmarkCheck, Sparkles, Send, DollarSign, Calendar, Edit, Trash2 } from 'lucide-react';
 
 export const CandidateDetailModal = ({ candidate, onClose, onToggleShortlist, isShortlisted, onEdit, onDelete, onAddNote }) => {
@@ -33,8 +34,12 @@ export const CandidateDetailModal = ({ candidate, onClose, onToggleShortlist, is
         <div className="p-6 bg-slate-900 text-white flex items-start justify-between relative">
           <div className="flex items-center space-x-4">
             <img
-              src={candidate.avatarUrl}
+              src={getAvatarUrl(candidate.fullName, candidate.avatarUrl)}
               alt={candidate.fullName}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = getAvatarUrl(candidate.fullName, null);
+              }}
               className="w-16 h-16 rounded-xl object-cover border-2 border-slate-700 shadow-md"
             />
             <div>

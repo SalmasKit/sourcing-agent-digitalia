@@ -221,10 +221,11 @@ def _build_fallback_criteria(query: str) -> dict:
     query_lower = query.lower()
     skills = ["java", "spring boot", "python", "react", "typescript", "docker", "kubernetes", "aws"]
     detected = [s.title() for s in skills if s in query_lower]
+
     return {
         "job_title": "Software Engineer",
         "required_skills": detected if detected else ["Java"],
         "seniority": "Senior" if "senior" in query_lower else "Any",
-        "location": "Casablanca" if "casablanca" in query_lower else "Any",
+        "location": "Morocco",
         "contract_type": "CDI",
     }

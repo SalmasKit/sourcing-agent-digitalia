@@ -127,7 +127,7 @@ export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editing
         <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <h3 className="font-extrabold text-slate-900 text-sm font-jakarta flex items-center gap-2">
             <FileText className="w-4.5 h-4.5 text-brand-primary" />
-            <span>{editingJob ? (isFR ? 'Modifier la Fiche de Poste' : 'Edit Job Description') : t('newJobDesc')}</span>
+            <span>{editingJob ? t('editJobDescTitle') : t('newJobDesc')}</span>
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-655 p-1 rounded-lg cursor-pointer">
             <X className="w-4.5 h-4.5" />

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { getAvatarUrl } from '../utils/avatar';
 import { FileText, Download, Trash2, Eye, MapPin, Plus, BookmarkCheck, BookmarkX } from 'lucide-react';
 
 export const ShortlistPanel = ({
@@ -154,8 +155,12 @@ export const ShortlistPanel = ({
                         >
                           <div className="flex items-center space-x-3 min-w-0">
                             <img
-                              src={candidate.avatarUrl}
+                              src={getAvatarUrl(candidate.fullName, candidate.avatarUrl)}
                               alt={candidate.fullName}
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = getAvatarUrl(candidate.fullName, null);
+                              }}
                               className="w-10 h-10 rounded-xl object-cover border border-slate-200"
                             />
                             <div className="min-w-0">

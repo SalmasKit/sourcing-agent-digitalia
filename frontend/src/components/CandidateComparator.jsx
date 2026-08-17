@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { X, ArrowRightLeft, CheckCircle2, Award, MapPin, Briefcase, Sparkles, Mail, Globe, ExternalLink } from 'lucide-react';
+import { getAvatarUrl } from '../utils/avatar';
+import { X, ArrowRightLeft, CheckCircle, Award, MapPin, Briefcase, Sparkles, Mail, Globe, ExternalLink } from 'lucide-react';
 
 export const CandidateComparator = ({ isOpen, onClose, candidates = [], initialSelectedIds = [] }) => {
   const { lang } = useLanguage();
@@ -88,8 +89,12 @@ export const CandidateComparator = ({ isOpen, onClose, candidates = [], initialS
                 {/* Header card info */}
                 <div className="text-center space-y-2 pb-4 border-b border-slate-200/60">
                   <img
-                    src={candidate.avatarUrl}
+                    src={getAvatarUrl(candidate.fullName, candidate.avatarUrl)}
                     alt={candidate.fullName}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = getAvatarUrl(candidate.fullName, null);
+                    }}
                     className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-xs mx-auto"
                   />
                   <div>

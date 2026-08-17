@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { getAvatarUrl } from '../utils/avatar';
 import { MapPin, Briefcase, BookmarkCheck, ChevronRight, Edit2, Trash2, Bookmark } from 'lucide-react';
 
 export const CandidateCard = ({
@@ -47,8 +48,12 @@ export const CandidateCard = ({
         <div className="flex items-start justify-between gap-4 mb-3.5">
           <div className="flex items-center space-x-3.5 min-w-0">
             <img
-              src={candidate.avatarUrl}
+              src={getAvatarUrl(candidate.fullName, candidate.avatarUrl)}
               alt={candidate.fullName}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = getAvatarUrl(candidate.fullName, null);
+              }}
               className="w-12 h-12 rounded-xl object-cover border border-slate-100 shadow-xs shrink-0"
             />
             <div className="min-w-0">

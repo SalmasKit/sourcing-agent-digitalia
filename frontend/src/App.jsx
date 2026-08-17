@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { Navbar } from './components/Navbar';
@@ -14,24 +14,58 @@ import { DashboardView } from './components/DashboardView';
 import { CandidateComparator } from './components/CandidateComparator';
 import { AuthModal } from './components/AuthModal';
 import { searchCandidatesApi, getInitialCandidates } from './services/api';
+import { getAvatarUrl } from './utils/avatar';
 import { Sparkles, Users, Filter, RefreshCw, LayoutGrid, Sliders, ChevronLeft, ChevronRight, BookmarkCheck, MapPin, Briefcase, Plus, Edit, Trash2, FileText, X, ArrowRightLeft } from 'lucide-react';
+
+// Synchronously clear old localStorage mock keys before any state initialization
+if (typeof window !== 'undefined' && !localStorage.getItem('digitalia_tables_cleared_v4')) {
+  localStorage.removeItem('digitalia_job_descriptions');
+  localStorage.removeItem('digitalia_saved_role_candidates');
+  localStorage.removeItem('digitalia_job_results');
+  localStorage.removeItem('digitalia_shortlist');
+  localStorage.removeItem('digitalia_pipeline_stages');
+  localStorage.removeItem('digitalia_search_history');
+  localStorage.setItem('digitalia_tables_cleared_v4', 'true');
+}
 
 function DashboardContent() {
   const { t, lang } = useLanguage();
-  const [activeTab, setActiveTab] = useState('sourcing');
-  const [candidates, setCandidates] = useState([]);
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem('digitalia_active_tab');
+    return saved || 'sourcing';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('digitalia_active_tab', activeTab);
+  }, [activeTab]);
+  // Per-job result cache: { [jobId]: [candidate, ...] }
+  const [jobResultsCache, setJobResultsCache] = useState(() => {
+    const saved = localStorage.getItem('digitalia_job_results');
+    if (saved) { try { return JSON.parse(saved); } catch(e) {} }
+    return {};
+  });
+
+  const [candidates, setCandidates] = useState(() => {
+    const cache = (() => {
+      const saved = localStorage.getItem('digitalia_job_results');
+      if (saved) { try { return JSON.parse(saved); } catch(e) {} }
+      return {};
+    })();
+    return cache['job-1'] || [];
+  });
   const [isSearching, setIsSearching] = useState(false);
   const [agentStep, setAgentStep] = useState(1);
-  const [shortlist, setShortlist] = useState([]);
+  const [shortlist, setShortlist] = useState(() => {
+    const saved = localStorage.getItem('digitalia_shortlist');
+    if (saved) { try { return JSON.parse(saved); } catch(e) {} }
+    return [];
+  });
 
   // Pipeline Kanban stage per candidate: { [candId]: 'new' | 'contacted' | 'interview' | 'offer' | 'hired' | 'rejected' }
   const [candidatePipelineStage, setCandidatePipelineStage] = useState(() => {
     const saved = localStorage.getItem('digitalia_pipeline_stages');
     if (saved) { try { return JSON.parse(saved); } catch(e) {} }
-    return {
-      'cand-102': 'contacted',
-      'cand-101': 'interview'
-    };
+    return {};
   });
 
   useEffect(() => {
@@ -64,15 +98,17 @@ function DashboardContent() {
   const [searchHistory, setSearchHistory] = useState(() => {
     const saved = localStorage.getItem('digitalia_search_history');
     if (saved) { try { return JSON.parse(saved); } catch(e) {} }
-    return [
-      { query: 'Senior Java & Spring Boot in Casablanca', date: '04/08 10:30', resultsCount: 4 },
-      { query: 'Frontend UI/UX React Specialist', date: '04/08 09:15', resultsCount: 3 }
-    ];
+    return [];
   });
 
   useEffect(() => {
     localStorage.setItem('digitalia_search_history', JSON.stringify(searchHistory));
   }, [searchHistory]);
+
+  // Persist per-job cache to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('digitalia_job_results', JSON.stringify(jobResultsCache));
+  }, [jobResultsCache]);
   // savedRoleCandidates: { [jobId]: [candidateId, ...] }
   const [savedRoleCandidates, setSavedRoleCandidates] = useState(() => {
     const saved = localStorage.getItem('digitalia_saved_role_candidates');
@@ -94,7 +130,8 @@ function DashboardContent() {
 
   // Job Descriptions / Profession profiles
   const [isJobModalOpen, setIsJobModalOpen] = useState(false);
-  const [selectedJobId, setSelectedJobId] = useState('job-1');
+  const [editingJob, setEditingJob] = useState(null);
+  const [selectedJobId, setSelectedJobId] = useState(null);
   const [jobDescriptions, setJobDescriptions] = useState(() => {
     const saved = localStorage.getItem('digitalia_job_descriptions');
     if (saved) {
@@ -104,30 +141,21 @@ function DashboardContent() {
         console.error('Failed to parse saved jobs:', e);
       }
     }
-    return [
-      {
-        id: 'job-1',
-        title: 'Senior Java & Cloud Engineer',
-        description: 'Looking for a Java developer with microservices and containerization expertise.',
-        location: 'Casablanca, Morocco',
-        skills: ['Java', 'Spring Boot', 'Docker']
-      },
-      {
-        id: 'job-2',
-        title: 'Frontend UI/UX Specialist',
-        description: 'Focused on high-performance React design systems and accessible client apps.',
-        location: 'Rabat, Morocco',
-        skills: ['React', 'TypeScript', 'Tailwind CSS']
-      },
-      {
-        id: 'job-3',
-        title: 'DevOps & Infrastructure Architect',
-        description: 'Kubernetes orchestration, automated CI/CD pipelines, and cloud platform setups.',
-        location: 'Tangier, Morocco',
-        skills: ['Docker', 'Kubernetes', 'Terraform']
-      }
-    ];
+    return [];
   });
+
+  // Ensure legacy mock data in localStorage is cleared once
+  useEffect(() => {
+    if (!localStorage.getItem('digitalia_mock_cleared_v2')) {
+      localStorage.removeItem('digitalia_job_descriptions');
+      localStorage.removeItem('digitalia_saved_role_candidates');
+      localStorage.removeItem('digitalia_job_results');
+      localStorage.removeItem('digitalia_shortlist');
+      localStorage.removeItem('digitalia_pipeline_stages');
+      localStorage.removeItem('digitalia_search_history');
+      localStorage.setItem('digitalia_mock_cleared_v2', 'true');
+    }
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('digitalia_job_descriptions', JSON.stringify(jobDescriptions));
@@ -137,17 +165,52 @@ function DashboardContent() {
     localStorage.setItem('digitalia_saved_role_candidates', JSON.stringify(savedRoleCandidates));
   }, [savedRoleCandidates]);
 
+  // Gather ALL known candidate objects across current search state, shortlist, and per-job caches
+  const allKnownCandidates = useMemo(() => {
+    const map = new Map();
+    candidates.forEach(c => map.set(c.id, c));
+    shortlist.forEach(c => map.set(c.id, c));
+    Object.values(jobResultsCache).forEach(list => {
+      if (Array.isArray(list)) list.forEach(c => map.set(c.id, c));
+    });
+    return Array.from(map.values());
+  }, [candidates, shortlist, jobResultsCache]);
+
+  // Compute ONLY saved/shortlisted candidates for the Kanban pipeline
+  const pipelineCandidates = useMemo(() => {
+    if (!jobDescriptions || jobDescriptions.length === 0) {
+      return [];
+    }
+
+    const activeJobIds = new Set(jobDescriptions.map(j => j.id));
+
+    // Get candidate IDs saved under existing active jobs
+    const activeSavedIds = new Set();
+    Object.entries(savedRoleCandidates).forEach(([jId, candIds]) => {
+      if (activeJobIds.has(jId) && Array.isArray(candIds)) {
+        candIds.forEach(id => activeSavedIds.add(id));
+      }
+    });
+
+    shortlist.forEach(c => activeSavedIds.add(c.id));
+
+    return allKnownCandidates.filter(c => activeSavedIds.has(c.id));
+  }, [allKnownCandidates, shortlist, savedRoleCandidates, jobDescriptions]);
+
   // References and intervals for auto-scrolling
   const thumbnailScrollRef = useRef(null);
   const [autoCycleInterval, setAutoCycleInterval] = useState(null);
   const [thumbnailScrollInterval, setThumbnailScrollInterval] = useState(null);
 
-  // Initialize with real search for the first job on load
+  // Auto-search on first load only if the default job has no cached results yet
   useEffect(() => {
     if (jobDescriptions && jobDescriptions.length > 0) {
       const defaultJob = jobDescriptions[0];
-      const queryStr = defaultJob.description || `${defaultJob.title} ${(defaultJob.skills || []).join(' ')} ${defaultJob.location || ''}`.trim();
-      handleSearch(queryStr, { location: defaultJob.location, tech: defaultJob.skills }, defaultJob.id);
+      const hasCache = (jobResultsCache[defaultJob.id] || []).length > 0;
+      if (!hasCache) {
+        const queryStr = defaultJob.description || `${defaultJob.title} ${(defaultJob.skills || []).join(' ')} ${defaultJob.location || ''}`.trim();
+        handleSearch(queryStr, { location: defaultJob.location, tech: defaultJob.skills }, defaultJob.id);
+      }
     }
   }, []);
 
@@ -158,7 +221,7 @@ function DashboardContent() {
 
   const handleSearch = async (query, filters, targetJobId) => {
     setIsSearching(true);
-    const activeJobId = targetJobId || selectedJobId || jobDescriptions[0]?.id;
+    const activeJobId = targetJobId || selectedJobId || (jobDescriptions[0] ? jobDescriptions[0].id : 'general-search');
     if (activeJobId && activeJobId !== selectedJobId) {
       setSelectedJobId(activeJobId);
     }
@@ -174,8 +237,13 @@ function DashboardContent() {
       setCandidates(results);
       setCarouselIndex(0);
 
+      // Save results under this job's cache entry
+      if (activeJobId) {
+        setJobResultsCache(prev => ({ ...prev, [activeJobId]: results }));
+      }
+
       const activeJob = jobDescriptions.find(j => j.id === activeJobId);
-      const jobLabel = activeJob ? activeJob.title : 'Selected Job';
+      const jobLabel = activeJob ? activeJob.title : (query || 'General Search');
 
       // Record to search history
       const now = new Date();
@@ -184,8 +252,8 @@ function DashboardContent() {
         ...prev,
         { query: query ? `[${jobLabel}] ${query}` : `Sourcing for ${jobLabel}`, date: timeStr, resultsCount: results.length }
       ]);
-      
-      const successMsg = lang === 'FR' 
+
+      const successMsg = lang === 'FR'
         ? `L'agent IA a sourcé ${results.length} candidats pour "${jobLabel}".`
         : `AI Agent sourced ${results.length} candidate profiles for "${jobLabel}".`;
       triggerToast(successMsg);
@@ -199,11 +267,20 @@ function DashboardContent() {
     }
   };
 
-  const handleSelectJob = async (job) => {
+  const handleSelectJob = (job) => {
     if (!job) return;
     setSelectedJobId(job.id);
-    const queryStr = job.description || `${job.title} ${(job.skills || []).join(' ')} ${job.location || ''}`.trim();
-    await handleSearch(queryStr, { location: job.location, tech: job.skills }, job.id);
+    setCarouselIndex(0);
+
+    const cached = jobResultsCache[job.id];
+    if (cached && cached.length > 0) {
+      // Restore cached results instantly — no API call
+      setCandidates(cached);
+    } else {
+      // First time sourcing this job — call the API
+      const queryStr = job.description || `${job.title} ${(job.skills || []).join(' ')} ${job.location || ''}`.trim();
+      handleSearch(queryStr, { location: job.location, tech: job.skills }, job.id);
+    }
   };
 
   const handleCreateJob = (newJob) => {
@@ -211,21 +288,39 @@ function DashboardContent() {
     handleSelectJob(newJob);
   };
 
+  const handleEditJob = (updatedJob) => {
+    setJobDescriptions(prev => prev.map(j => j.id === updatedJob.id ? updatedJob : j));
+    triggerToast(lang === 'FR' ? 'Fiche de poste mise à jour.' : 'Job description updated.');
+  };
+
   const handleDeleteJob = (e, jobId) => {
     e.stopPropagation();
     if (confirm(lang === 'FR' ? 'Voulez-vous supprimer cette fiche de poste ?' : 'Are you sure you want to delete this job description?')) {
       const updated = jobDescriptions.filter(j => j.id !== jobId);
       setJobDescriptions(updated);
-      triggerToast(lang === 'FR' ? 'Fiche de poste supprimée.' : 'Job description deleted.');
-      
-      if (selectedJobId === jobId) {
-        if (updated.length > 0) {
-          handleSelectJob(updated[0]);
-        } else {
-          setSelectedJobId(null);
-          setCandidates(getInitialCandidates());
-        }
+
+      // Clean up saved candidates & cache for this deleted job
+      setSavedRoleCandidates(prev => {
+        const next = { ...prev };
+        delete next[jobId];
+        return next;
+      });
+
+      setJobResultsCache(prev => {
+        const next = { ...prev };
+        delete next[jobId];
+        return next;
+      });
+
+      if (updated.length === 0) {
+        setShortlist([]);
+        setCandidates([]);
+        setSelectedJobId(null);
+      } else if (selectedJobId === jobId) {
+        handleSelectJob(updated[0]);
       }
+
+      triggerToast(lang === 'FR' ? 'Fiche de poste supprimée.' : 'Job description deleted.');
     }
   };
 
@@ -482,6 +577,15 @@ function DashboardContent() {
                     >
                       <span>{job.title}</span>
                       <button
+                        onClick={(e) => { e.stopPropagation(); setEditingJob(job); setIsJobModalOpen(true); }}
+                        className={`p-0.5 rounded-md hover:bg-black/10 transition-colors ${
+                          isSelected ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-brand-primary'
+                        }`}
+                        title="Edit Job Description"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
                         onClick={(e) => handleDeleteJob(e, job.id)}
                         className={`p-0.5 rounded-md hover:bg-black/10 transition-colors ${
                           isSelected ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-rose-600'
@@ -560,8 +664,7 @@ function DashboardContent() {
 
                 <button
                   onClick={() => {
-                    const initial = getInitialCandidates();
-                    setCandidates(initial);
+                    setCandidates([]);
                     setCarouselIndex(0);
                     setSelectedJobId(null);
                   }}
@@ -629,8 +732,12 @@ function DashboardContent() {
                         <div className="flex items-center justify-between mb-5">
                           <div className="flex items-center space-x-4">
                             <img 
-                              src={currentCandidate.avatarUrl} 
+                              src={getAvatarUrl(currentCandidate.fullName, currentCandidate.avatarUrl)} 
                               alt={currentCandidate.fullName} 
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = getAvatarUrl(currentCandidate.fullName, null);
+                              }}
                               className="w-16 h-16 rounded-2xl object-cover border border-slate-100 shadow-sm"
                             />
                             <div>
@@ -785,8 +892,12 @@ function DashboardContent() {
                           }`}
                         >
                           <img 
-                            src={candidate.avatarUrl} 
+                            src={getAvatarUrl(candidate.fullName, candidate.avatarUrl)} 
                             alt={candidate.fullName} 
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = getAvatarUrl(candidate.fullName, null);
+                            }}
                             className="w-10 h-10 rounded-lg object-cover"
                           />
                           <div className="flex-1 min-w-0">
@@ -821,8 +932,9 @@ function DashboardContent() {
         {/* Tab 2: Kanban Pipeline View */}
         {activeTab === 'pipeline' && (
           <KanbanPipeline
-            candidates={candidates}
+            candidates={pipelineCandidates}
             jobDescriptions={jobDescriptions}
+            savedRoleCandidates={savedRoleCandidates}
             candidatePipelineStage={candidatePipelineStage}
             onUpdateStage={handleUpdateCandidateStage}
             onViewDetails={setSelectedCandidate}
@@ -833,7 +945,7 @@ function DashboardContent() {
         {activeTab === 'shortlist' && (
           <ShortlistPanel
             jobDescriptions={jobDescriptions}
-            candidates={candidates}
+            candidates={allKnownCandidates}
             savedRoleCandidates={savedRoleCandidates}
             onViewDetails={setSelectedCandidate}
             onToggleSaveCandidateForJob={handleToggleSaveForJob}
@@ -842,12 +954,13 @@ function DashboardContent() {
           />
         )}
 
-        {/* Tab 3: Dashboard Analytics View */}
+        {/* Tab 4: Dashboard Analytics View */}
         {activeTab === 'dashboard' && (
           <DashboardView
             jobDescriptions={jobDescriptions}
-            candidates={candidates}
+            candidates={allKnownCandidates}
             savedRoleCandidates={savedRoleCandidates}
+            candidatePipelineStage={candidatePipelineStage}
             searchHistory={searchHistory}
           />
         )}
@@ -878,8 +991,10 @@ function DashboardContent() {
       {/* HR Job Description Modal */}
       <JobDescriptionModal
         isOpen={isJobModalOpen}
-        onClose={() => setIsJobModalOpen(false)}
+        onClose={() => { setIsJobModalOpen(false); setEditingJob(null); }}
         onCreate={handleCreateJob}
+        onEdit={handleEditJob}
+        editingJob={editingJob}
       />
 
       {/* Auth Modal */}

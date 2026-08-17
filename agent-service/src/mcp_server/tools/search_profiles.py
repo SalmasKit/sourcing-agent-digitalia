@@ -1,6 +1,7 @@
 """
-search_profiles.py — MCP Tool for searching candidate profiles.
+search_profiles.py — MCP Tool for searching candidate profiles with generic location handling.
 """
+import hashlib
 import logging
 from typing import Any
 import httpx
@@ -27,11 +28,31 @@ async def search_profiles(criteria: dict[str, Any], limit: int = 8) -> list[dict
 
 async def _serpapi_search(criteria: dict, limit: int) -> list[dict]:
     job_title = criteria.get("job_title", "developer")
-    skills = " OR ".join(criteria.get("required_skills", [])[:3])
-    location = criteria.get("location", "")
+    skills_list = criteria.get("required_skills", [])
+    skills = " OR ".join(skills_list[:3]) if skills_list else ""
+    location = (criteria.get("location") or "").strip()
     seniority = criteria.get("seniority", "")
+    if seniority in ("Any", "N/A", "Unknown"):
+        seniority = ""
 
-    query = f'site:linkedin.com/in "{seniority} {job_title}" {skills} {location}'.strip()
+    # Build generic location term for Google search
+    loc_lower = location.lower()
+    if not location or loc_lower in ("any", "all locations", "toutes les localisations", "toutes les villes", "n/a", "unknown"):
+        loc_term = '("Morocco" OR "Maroc")'
+    else:
+        # Generic query term using the exact city or country HR typed
+        loc_term = f'"{location}"'
+
+    query_parts = ['site:linkedin.com/in']
+    if seniority:
+        query_parts.append(f'"{seniority}"')
+    if job_title:
+        query_parts.append(f'"{job_title}"')
+    if skills:
+        query_parts.append(f'({skills})')
+    query_parts.append(loc_term)
+
+    query = " ".join(query_parts).strip()
     logger.info(f"SerpAPI search query: {query}")
 
     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -41,9 +62,9 @@ async def _serpapi_search(criteria: dict, limit: int) -> list[dict]:
                 "q": query,
                 "api_key": settings.serpapi_api_key,
                 "engine": "google",
-                "num": min(limit * 2, 20),
+                "num": min(limit * 3, 24),
                 "hl": "fr",
-                "gl": "ma",
+                "gl": "ma" if not location or "morocco" in loc_lower or "maroc" in loc_lower else "us",
             },
         )
         response.raise_for_status()
@@ -52,29 +73,52 @@ async def _serpapi_search(criteria: dict, limit: int) -> list[dict]:
     raw_results = data.get("organic_results", [])
     profiles = []
 
-    for idx, result in enumerate(raw_results[:limit]):
+    for idx, result in enumerate(raw_results):
+        if len(profiles) >= limit:
+            break
         title = result.get("title", "")
         snippet = result.get("snippet", "")
         link = result.get("link", "")
-        profiles.append(_parse_serpapi_result(idx, title, snippet, link, criteria))
+
+        parsed = _parse_serpapi_result(idx, title, snippet, link, criteria, location)
+        if parsed:
+            profiles.append(parsed)
 
     return profiles
 
 
-def _parse_serpapi_result(idx: int, title: str, snippet: str, url: str, criteria: dict) -> dict:
+def _extract_candidate_location(title: str, snippet: str, requested_location: str) -> str:
+    req_clean = (requested_location or "").strip()
+    req_lower = req_clean.lower()
+
+    if not req_clean or req_lower in ("any", "all locations", "toutes les localisations", "toutes les villes", "n/a", "unknown"):
+        # Default to Morocco when HR leaves location blank or selects All Locations
+        return "Morocco"
+
+    # Return the exact city or country HR specified
+    return req_clean
+
+
+def _parse_serpapi_result(idx: int, title: str, snippet: str, url: str, criteria: dict, requested_location: str) -> dict | None:
+    cand_location = _extract_candidate_location(title, snippet, requested_location)
+
     name = title.split(" - ")[0].split(" | ")[0].strip() if title else f"Profile {idx + 1}"
-    role = title.split(" - ")[1].split(" | ")[0].strip() if " - " in title else "N/A"
+    role = title.split(" - ")[1].strip() if " - " in title else title
 
     candidate_skills = [
         kw for kw in criteria.get("required_skills", [])
         if kw.lower() in (snippet + title).lower()
     ]
 
+    unique_key = (url or f"{name}-{role}").encode("utf-8")
+    profile_hash = hashlib.md5(unique_key).hexdigest()[:8]
+    unique_id = f"cand-{profile_hash}"
+
     return {
-        "id": f"serpapi-{idx:03d}",
+        "id": unique_id,
         "full_name": name,
         "headline": role,
-        "location": criteria.get("location", "N/A"),
+        "location": cand_location,
         "current_company": "N/A",
         "current_role": role,
         "experience_years": None,
@@ -82,7 +126,7 @@ def _parse_serpapi_result(idx: int, title: str, snippet: str, url: str, criteria
         "seniority": criteria.get("seniority", "N/A"),
         "linkedin_url": url,
         "email": None,
-        "avatar_url": "https://randomuser.me/api/portraits/lego/1.jpg",
+        "avatar_url": None,
         "summary": snippet,
         "availability": "Unknown",
         "salary_expectation": "N/A",
