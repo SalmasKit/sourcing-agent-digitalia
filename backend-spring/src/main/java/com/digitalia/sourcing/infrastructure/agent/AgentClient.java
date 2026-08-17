@@ -25,7 +25,11 @@ public class AgentClient {
     private final WebClient agentWebClient;
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    public record AgentSearchRequest(String query, UUID searchRequestId) {}
+    public record AgentSearchRequest(String query, UUID searchRequestId, int maxResults) {
+        public AgentSearchRequest(String query, UUID searchRequestId) {
+            this(query, searchRequestId, 20);
+        }
+    }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record AgentProfileResponse(

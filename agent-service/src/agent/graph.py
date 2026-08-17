@@ -101,7 +101,7 @@ async def interpret_request(state: SourcingState) -> SourcingState:
 async def search_node(state: SourcingState) -> SourcingState:
     logger.info("[Node 2] Searching profiles...")
     try:
-        profiles = await search_profiles(state["criteria"], limit=8)
+        profiles = await search_profiles(state["criteria"], limit=20)
         return {
             **state,
             "raw_profiles": profiles,
@@ -219,13 +219,29 @@ async def run_sourcing_agent(raw_query: str, job_id: str | None = None) -> dict:
 
 def _build_fallback_criteria(query: str) -> dict:
     query_lower = query.lower()
-    skills = ["java", "spring boot", "python", "react", "typescript", "docker", "kubernetes", "aws"]
-    detected = [s.title() for s in skills if s in query_lower]
+    skills_catalog = ["java", "spring boot", "python", "react", "typescript", "docker", "kubernetes", "aws", "node", "sql", "devops", "cloud", "c++", "c#", ".net"]
+    detected_skills = [s.title() for s in skills_catalog if s in query_lower]
+
+    loc = "Any"
+    loc_match = re.search(r"(?:in|à|basé\(e\) à|at)\s+([A-Za-z\s]+)", query, re.IGNORECASE)
+    if loc_match:
+        extracted_loc = loc_match.group(1).split("with")[0].split("(")[0].strip()
+        if extracted_loc and len(extracted_loc) > 1:
+            loc = extracted_loc
+
+    title = "Software Engineer"
+    title_match = re.search(r"(?:profil|for|role|title|hiring|seeking|looking for)\s+([A-Za-z0-9\s&/-]+)", query, re.IGNORECASE)
+    if title_match:
+        extracted_title = title_match.group(1).split("based")[0].split("basé")[0].split("in")[0].split("à")[0].strip()
+        if extracted_title and len(extracted_title) > 2:
+            title = extracted_title
+
+    sen = "Senior" if "senior" in query_lower else "Lead" if "lead" in query_lower else "Junior" if "junior" in query_lower else "Any"
 
     return {
-        "job_title": "Software Engineer",
-        "required_skills": detected if detected else ["Java"],
-        "seniority": "Senior" if "senior" in query_lower else "Any",
-        "location": "Morocco",
+        "job_title": title,
+        "required_skills": detected_skills if detected_skills else ["Software Engineer"],
+        "seniority": sen,
+        "location": loc,
         "contract_type": "CDI",
     }

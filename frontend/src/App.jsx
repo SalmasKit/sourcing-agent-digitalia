@@ -101,6 +101,9 @@ function DashboardContent() {
     return [];
   });
 
+  // Track last search so the refresh button can re-run it
+  const [lastSearch, setLastSearch] = useState(null);
+
   useEffect(() => {
     localStorage.setItem('digitalia_search_history', JSON.stringify(searchHistory));
   }, [searchHistory]);
@@ -221,6 +224,8 @@ function DashboardContent() {
 
   const handleSearch = async (query, filters, targetJobId) => {
     setIsSearching(true);
+    // Save last search so the refresh button can re-run it
+    setLastSearch({ query, filters, targetJobId });
     const activeJobId = targetJobId || selectedJobId || (jobDescriptions[0] ? jobDescriptions[0].id : 'general-search');
     if (activeJobId && activeJobId !== selectedJobId) {
       setSelectedJobId(activeJobId);
@@ -664,13 +669,23 @@ function DashboardContent() {
 
                 <button
                   onClick={() => {
-                    setCandidates([]);
-                    setCarouselIndex(0);
-                    setSelectedJobId(null);
+                    if (lastSearch) {
+                      handleSearch(lastSearch.query, lastSearch.filters, lastSearch.targetJobId);
+                    } else {
+                      const activeJob = jobDescriptions.find(j => j.id === selectedJobId) || jobDescriptions[0];
+                      const fallbackQuery = activeJob ? activeJob.title : '';
+                      const fallbackFilters = {
+                        location: activeJob?.location || 'All Locations',
+                        minExp: activeJob?.experienceMin || 0,
+                        tech: activeJob?.skills || []
+                      };
+                      handleSearch(fallbackQuery, fallbackFilters, activeJob?.id);
+                    }
                   }}
-                  className="flex items-center space-x-1 text-xs text-slate-500 hover:text-slate-955 font-bold px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer animate-none"
+                  title={lang === 'FR' ? 'Relancer la dernière recherche' : 'Re-run last search'}
+                  className="flex items-center space-x-1 text-xs text-slate-500 hover:text-brand-primary font-bold px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer animate-none transition-colors"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin text-brand-primary' : ''}`} />
                 </button>
               </div>
             </div>

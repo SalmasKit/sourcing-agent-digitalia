@@ -20,7 +20,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=3, description="Natural language sourcing query")
     job_id: str | None = Field(default=None, description="Optional Job Description ID")
     search_request_id: str | None = Field(default=None, description="Optional Search Request ID from Spring Boot")
-    max_results: int = Field(default=8, ge=1, le=20)
+    max_results: int = Field(default=20, ge=1, le=50)
 
 
 class ScoreRequest(BaseModel):

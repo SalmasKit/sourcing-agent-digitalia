@@ -18,7 +18,7 @@ async def search_candidate_profiles(
     required_skills: list[str],
     location: str = "Any",
     seniority: str = "Any",
-    limit: int = 8,
+    limit: int = 20,
 ) -> list[dict[str, Any]]:
     """Search candidate profiles matching criteria."""
     criteria = {

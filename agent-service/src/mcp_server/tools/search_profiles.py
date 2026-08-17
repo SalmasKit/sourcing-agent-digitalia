@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-async def search_profiles(criteria: dict[str, Any], limit: int = 8) -> list[dict]:
+async def search_profiles(criteria: dict[str, Any], limit: int = 20) -> list[dict]:
     """Search for candidate profiles based on criteria."""
     if settings.effective_use_mock:
         logger.info("🔧 Using mock candidate profiles")
@@ -27,27 +27,34 @@ async def search_profiles(criteria: dict[str, Any], limit: int = 8) -> list[dict
 
 
 async def _serpapi_search(criteria: dict, limit: int) -> list[dict]:
-    job_title = criteria.get("job_title", "developer")
+    raw_job_title = criteria.get("job_title", "developer")
     skills_list = criteria.get("required_skills", [])
-    skills = " OR ".join(skills_list[:3]) if skills_list else ""
+    skills = " OR ".join(f'"{s}"' if " " in s else s for s in skills_list[:3]) if skills_list else ""
     location = (criteria.get("location") or "").strip()
-    seniority = criteria.get("seniority", "")
-    if seniority in ("Any", "N/A", "Unknown"):
-        seniority = ""
+    raw_seniority = criteria.get("seniority", "")
+
+    # Clean seniority keyword (remove parens like "Senior (5-8 ans)")
+    seniority = ""
+    if raw_seniority and raw_seniority not in ("Any", "N/A", "Unknown"):
+        sen_clean = raw_seniority.split("(")[0].split("/")[0].strip()
+        if sen_clean in ("Junior", "Mid-Level", "Senior", "Lead", "Architect"):
+            seniority = sen_clean
+
+    # Clean job title (remove restrictive quotes and noise)
+    clean_title = raw_job_title.replace('"', '').replace('&', ' ').replace('/', ' ').strip()
 
     # Build generic location term for Google search
     loc_lower = location.lower()
     if not location or loc_lower in ("any", "all locations", "toutes les localisations", "toutes les villes", "n/a", "unknown"):
         loc_term = '("Morocco" OR "Maroc")'
     else:
-        # Generic query term using the exact city or country HR typed
-        loc_term = f'"{location}"'
+        loc_term = f'"{location}"' if " " in location else location
 
     query_parts = ['site:linkedin.com/in']
-    if seniority:
-        query_parts.append(f'"{seniority}"')
-    if job_title:
-        query_parts.append(f'"{job_title}"')
+    if seniority and seniority.lower() not in clean_title.lower():
+        query_parts.append(seniority)
+    if clean_title:
+        query_parts.append(clean_title)
     if skills:
         query_parts.append(f'({skills})')
     query_parts.append(loc_term)
@@ -55,34 +62,49 @@ async def _serpapi_search(criteria: dict, limit: int) -> list[dict]:
     query = " ".join(query_parts).strip()
     logger.info(f"SerpAPI search query: {query}")
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        response = await client.get(
-            "https://serpapi.com/search",
-            params={
-                "q": query,
-                "api_key": settings.serpapi_api_key,
-                "engine": "google",
-                "num": min(limit * 3, 24),
-                "hl": "fr",
-                "gl": "ma" if not location or "morocco" in loc_lower or "maroc" in loc_lower else "us",
-            },
-        )
-        response.raise_for_status()
-        data = response.json()
-
-    raw_results = data.get("organic_results", [])
     profiles = []
+    seen_urls = set()
+    start_offset = 0
 
-    for idx, result in enumerate(raw_results):
-        if len(profiles) >= limit:
-            break
-        title = result.get("title", "")
-        snippet = result.get("snippet", "")
-        link = result.get("link", "")
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        while len(profiles) < limit and start_offset <= 50:
+            response = await client.get(
+                "https://serpapi.com/search",
+                params={
+                    "q": query,
+                    "api_key": settings.serpapi_api_key,
+                    "engine": "google",
+                    "num": 20,
+                    "start": start_offset,
+                    "hl": "fr",
+                    "gl": "ma" if not location or "morocco" in loc_lower or "maroc" in loc_lower else "us",
+                },
+            )
+            if response.status_code != 200:
+                logger.error(f"SerpAPI status {response.status_code}: {response.text[:200]}")
+                break
 
-        parsed = _parse_serpapi_result(idx, title, snippet, link, criteria, location)
-        if parsed:
-            profiles.append(parsed)
+            data = response.json()
+            raw_results = data.get("organic_results", [])
+            if not raw_results:
+                break
+
+            for result in raw_results:
+                if len(profiles) >= limit:
+                    break
+                title = result.get("title", "")
+                snippet = result.get("snippet", "")
+                link = result.get("link", "")
+
+                if not link or link in seen_urls:
+                    continue
+                seen_urls.add(link)
+
+                parsed = _parse_serpapi_result(len(profiles), title, snippet, link, criteria, location)
+                if parsed:
+                    profiles.append(parsed)
+
+            start_offset += 20
 
     return profiles
 

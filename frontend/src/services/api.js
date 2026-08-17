@@ -211,81 +211,76 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
     fullPrompt += ` with ${filters.minExp}+ years experience`;
   }
 
-  try {
-    // 1. Try Spring Boot orchestration backend first
-    const { data } = await apiClient.post('/searches', {
-      rawDescription: fullPrompt,
-    });
-    const searchObj = data.data || data;
-    if (searchObj && searchObj.id) {
-      // Poll for saved profiles from Spring Boot after agent completes execution
-      await new Promise((r) => setTimeout(r, 2500));
-      try {
-        const profilesRes = await apiClient.get(`/searches/${searchObj.id}/profiles`);
-        const pData = profilesRes.data?.data?.content || profilesRes.data?.content || [];
-        if (pData.length > 0) {
-          return pData.map(p => {
-            const name = p.fullName || 'Candidate';
-            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0284c7&color=fff&bold=true`;
-            const uniqueId = p.id && !p.id.startsWith('serpapi-')
-              ? p.id
-              : `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Math.abs(name.split('').reduce((a, c) => a + c.charCodeAt(0), 0))}`;
-            return {
-              id: uniqueId,
-              fullName: name,
-              headline: p.headline,
-              location: p.location,
-              experienceYears: p.experienceYears,
-              matchScore: Math.round(p.score || 80),
-              summary: p.headline || p.fullName,
-              skills: Array.isArray(p.skills) ? p.skills : (p.skills?.skills || []),
-              linkedin: p.sourceUrl,
-              source: p.sourcePlatform,
-              avatarUrl: p.avatarUrl || p.avatar_url || defaultAvatar,
-            };
-          });
-        }
-      } catch (pErr) {
-        console.warn('Could not fetch stored profiles from backend, trying direct agent endpoint:', pErr.message);
-      }
-    }
-  } catch (backendError) {
-    console.warn('Backend /searches endpoint failed or unauthenticated, invoking agent-service directly:', backendError.message);
-  }
-
-  // 2. Direct agent-service call for real-time live SerpAPI sourcing
+  // 1. Direct agent-service call for real-time live SerpAPI sourcing (returns 20 candidates)
   try {
     const response = await axios.post('http://localhost:8001/api/search', {
       query: fullPrompt,
-      max_results: 8,
+      max_results: 20,
     });
     const agentData = response.data;
     const profiles = agentData?.profiles || [];
-    return profiles.map(p => {
-      const name = p.full_name || 'Candidate';
-      const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0284c7&color=fff&bold=true`;
-      const uniqueId = p.id && !p.id.startsWith('serpapi-')
-        ? p.id
-        : `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Math.abs(name.split('').reduce((a, c) => a + c.charCodeAt(0), 0))}`;
-      return {
-        id: uniqueId,
-        fullName: name,
-        headline: p.headline,
-        location: p.location,
-        experienceYears: p.experience_years || 5,
-        matchScore: p.match_score || p.score || 80,
-        summary: p.summary || p.headline,
-        skills: Array.isArray(p.skills) ? p.skills : (p.skills?.skills || []),
-        linkedin: p.linkedin_url || p.source_url,
-        avatarUrl: p.avatar_url || defaultAvatar,
-        verifiedMatchReasons: p.match_rationale || [],
-        source: p.source || 'serpapi',
-      };
-    });
+
+    // Notify Spring Boot backend in background to record search request
+    apiClient.post('/searches', { rawDescription: fullPrompt }).catch(() => {});
+
+    if (profiles.length > 0) {
+      return profiles.map(p => {
+        const name = p.full_name || 'Candidate';
+        const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0284c7&color=fff&bold=true`;
+        const uniqueId = p.id && !p.id.startsWith('serpapi-')
+          ? p.id
+          : `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Math.abs(name.split('').reduce((a, c) => a + c.charCodeAt(0), 0))}`;
+        return {
+          id: uniqueId,
+          fullName: name,
+          headline: p.headline,
+          location: p.location,
+          experienceYears: p.experience_years || 5,
+          matchScore: p.match_score || p.score || 80,
+          summary: p.summary || p.headline,
+          skills: Array.isArray(p.skills) ? p.skills : (p.skills?.skills || []),
+          linkedin: p.linkedin_url || p.source_url,
+          avatarUrl: p.avatar_url || defaultAvatar,
+          verifiedMatchReasons: p.match_rationale || [],
+          source: p.source || 'serpapi',
+        };
+      });
+    }
   } catch (agentErr) {
-    console.error('Direct agent-service call failed:', agentErr.message);
-    return [];
+    console.warn('Direct agent-service call failed, trying Spring Boot backend:', agentErr.message);
   }
+
+  // 2. Fallback to Spring Boot orchestration backend if agent-service direct call is unavailable
+  try {
+    const { data } = await apiClient.post('/searches', { rawDescription: fullPrompt });
+    const searchObj = data.data || data;
+    if (searchObj && searchObj.id) {
+      await new Promise((r) => setTimeout(r, 2500));
+      const profilesRes = await apiClient.get(`/searches/${searchObj.id}/profiles?size=20`);
+      const pData = profilesRes.data?.data?.content || profilesRes.data?.content || [];
+      return pData.map(p => {
+        const name = p.fullName || 'Candidate';
+        const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0284c7&color=fff&bold=true`;
+        return {
+          id: p.id || `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+          fullName: name,
+          headline: p.headline,
+          location: p.location,
+          experienceYears: p.experienceYears,
+          matchScore: Math.round(p.score || 80),
+          summary: p.headline || p.fullName,
+          skills: Array.isArray(p.skills) ? p.skills : (p.skills?.skills || []),
+          linkedin: p.sourceUrl,
+          source: p.sourcePlatform,
+          avatarUrl: p.avatarUrl || p.avatar_url || defaultAvatar,
+        };
+      });
+    }
+  } catch (backendError) {
+    console.error('Backend search fallback failed:', backendError.message);
+  }
+
+  return [];
 };
 
 export default apiClient;
