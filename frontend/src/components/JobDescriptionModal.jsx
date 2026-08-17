@@ -49,7 +49,7 @@ export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editing
     setTimeout(() => {
       const safeSkills = String(skills || '').trim();
       const skillsList = safeSkills ? safeSkills : 'Java, Spring Boot, Microservices';
-      const locText = location === 'All Locations' ? 'Morocco (Hybrid/Remote)' : location;
+      const locText = (location && location !== 'All Locations') ? location : (isFR ? 'Toutes localisations' : 'All Locations');
 
       const generated = isFR ? [
         `Recherche un profil ${seniority} ${safeTitle} basé(e) à ${locText} (${contractType}).`,
@@ -193,17 +193,13 @@ export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editing
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                 {isFR ? 'Localisation Cible' : 'Target Location'}
               </label>
-              <select
+              <input
+                type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl p-2.5 font-semibold outline-none focus:border-brand-primary"
-              >
-                <option value="All Locations">All Locations</option>
-                <option value="Casablanca, Morocco">Casablanca, Morocco</option>
-                <option value="Rabat, Morocco">Rabat, Morocco</option>
-                <option value="Tangier, Morocco">Tangier, Morocco</option>
-                <option value="Remote">Remote</option>
-              </select>
+                placeholder="e.g. Casablanca, Rabat, Paris, France, All Locations..."
+                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl p-2.5 font-semibold outline-none focus:border-brand-primary placeholder:text-slate-400"
+              />
             </div>
 
             <div>

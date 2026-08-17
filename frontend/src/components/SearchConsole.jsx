@@ -170,42 +170,13 @@ export const SearchConsole = ({ onSearch, isSearching, selectedJob }) => {
               <MapPin className="w-3.5 h-3.5 text-brand-primary/70" />
               {t('targetLocation')}
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                list="location-suggestions"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Casablanca, Morocco, France, All Locations..."
-                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-lg p-2 font-semibold focus:border-brand-primary outline-none transition-all placeholder:text-slate-400"
-              />
-              <datalist id="location-suggestions">
-                <option value="All Locations" />
-                <option value="Casablanca, Morocco" />
-                <option value="Rabat, Morocco" />
-                <option value="Tangier, Morocco" />
-                <option value="Marrakech, Morocco" />
-                <option value="Agadir, Morocco" />
-                <option value="Fes, Morocco" />
-                <option value="Remote" />
-              </datalist>
-            </div>
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {['All Locations', 'Casablanca', 'Rabat', 'Tangier', 'Remote'].map((locChip) => (
-                <button
-                  key={locChip}
-                  type="button"
-                  onClick={() => setLocation(locChip === 'All Locations' ? 'All Locations' : locChip === 'Remote' ? 'Remote' : `${locChip}, Morocco`)}
-                  className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-all cursor-pointer ${
-                    location.includes(locChip)
-                      ? 'bg-brand-primary/15 text-brand-primary border border-brand-primary/30'
-                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  }`}
-                >
-                  {locChip}
-                </button>
-              ))}
-            </div>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Casablanca, Rabat, Paris, France, All Locations..."
+              className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-lg p-2 font-semibold focus:border-brand-primary outline-none transition-all placeholder:text-slate-400"
+            />
           </div>
 
           {/* Min Experience */}
