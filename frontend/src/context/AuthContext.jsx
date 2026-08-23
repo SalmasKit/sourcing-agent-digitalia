@@ -3,14 +3,6 @@ import { loginApi, registerApi, logoutApi, storage } from '../services/api';
 
 const AuthContext = createContext(null);
 
-// Default guest user shown when no session exists
-const GUEST_USER = {
-  id: 'usr-guest',
-  name: 'Sarah Connor',
-  email: 'sarah.connor@digitalia.io',
-  role: 'Head of Technical Sourcing'
-};
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser]       = useState(null);
   const [token, setToken]     = useState(null);
@@ -25,16 +17,17 @@ export const AuthProvider = ({ children }) => {
       setToken(savedToken);
       setUser(savedUser);
     } else {
-      setUser(GUEST_USER);
+      setToken(null);
+      setUser(null);
     }
     setLoading(false);
   }, []);
 
   // ── Listen for automatic session expiry (triggered by Axios interceptor) ─
   const handleSessionExpired = useCallback(() => {
+    storage.clearSession();
     setToken(null);
-    setUser(GUEST_USER);
-    // Optionally show a toast / modal here
+    setUser(null);
     console.warn('[Auth] Session expired — user has been signed out.');
   }, []);
 
@@ -46,30 +39,25 @@ export const AuthProvider = ({ children }) => {
   // ── Login ────────────────────────────────────────────────────────────────
   const login = async (email, password) => {
     const data = await loginApi(email, password);
-    if (data?.token) {
+    if (data?.token && data?.user) {
       setToken(data.token);
       setUser(data.user);
-      // storage.setSession already called inside loginApi for real backend;
-      // handle mock path (no server) as well:
-      if (!storage.getAccessToken()) {
-        storage.setSession(data.token, data.refreshToken ?? '', data.user);
-      }
+      storage.setSession(data.token, data.refreshToken ?? '', data.user);
       return true;
     }
     return false;
   };
 
   // ── Register ─────────────────────────────────────────────────────────────
-  const register = async (name, email, password) => {
-    const data = await registerApi(name, email, password);
-    // Mock path returns token directly; real backend requires a subsequent login
-    if (data?.token) {
+  const register = async (name, email, password, role = 'RECRUITER') => {
+    const data = await registerApi(name, email, password, role);
+    if (data?.token && data?.user) {
       setToken(data.token);
       setUser(data.user);
       storage.setSession(data.token, data.refreshToken ?? '', data.user);
       return true;
     }
-    // If real backend returned only user, auto-login
+    // If backend returned user object without token, auto-login or set user
     if (data?.user) {
       return login(email, password);
     }
@@ -80,7 +68,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     await logoutApi(); // calls POST /auth/logout + clears localStorage
     setToken(null);
-    setUser(GUEST_USER);
+    setUser(null);
   };
 
   return (
@@ -97,3 +85,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

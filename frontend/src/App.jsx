@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { Navbar } from './components/Navbar';
 import { SearchConsole } from './components/SearchConsole';
@@ -13,6 +13,7 @@ import { KanbanPipeline } from './components/KanbanPipeline';
 import { DashboardView } from './components/DashboardView';
 import { CandidateComparator } from './components/CandidateComparator';
 import { AuthModal } from './components/AuthModal';
+import AuthPage from './components/AuthPage';
 import { searchCandidatesApi, getInitialCandidates } from './services/api';
 import { getAvatarUrl } from './utils/avatar';
 import { Sparkles, Users, Filter, RefreshCw, LayoutGrid, Sliders, ChevronLeft, ChevronRight, BookmarkCheck, MapPin, Briefcase, Plus, Edit, Trash2, FileText, X, ArrowRightLeft } from 'lucide-react';
@@ -1032,11 +1033,30 @@ function DashboardContent() {
   );
 }
 
+function AppContent() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center space-y-4 text-white">
+        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-xs font-bold tracking-wide text-slate-400">Loading Digitalia Platform...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  return <DashboardContent />;
+}
+
 export default function App() {
   return (
     <LanguageProvider>
       <AuthProvider>
-        <DashboardContent />
+        <AppContent />
       </AuthProvider>
     </LanguageProvider>
   );

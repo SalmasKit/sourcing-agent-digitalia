@@ -7,6 +7,7 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [role, setRole] = useState('RECRUITER');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,7 +24,7 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
       if (isLogin) {
         await login(email, password);
       } else {
-        await register(name, email, password);
+        await register(name, email, password, role);
       }
       setLoading(false);
       onSuccess?.();
@@ -84,20 +85,35 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
           )}
 
           {!isLogin && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Jean Dupont"
-                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-600"
-                />
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Jean Dupont"
+                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-600"
+                  />
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Account Role</label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-600"
+                >
+                  <option value="RECRUITER">Technical Recruiter (RECRUITER)</option>
+                  <option value="HR_ADMIN">HR Administrator (HR_ADMIN)</option>
+                  <option value="SUPER_ADMIN">Super Administrator (SUPER_ADMIN)</option>
+                </select>
+              </div>
+            </>
           )}
 
           <div>

@@ -90,31 +90,44 @@ export const Navbar = ({ activeTab, setActiveTab, onOpenAuth, shortlistCount = 0
               {lang === 'EN' ? 'EN' : 'FR'}
             </button>
 
-            {/* Profile Avatar & Sign Out */}
+            {/* Profile Avatar, Role Badge & Sign Out */}
             {user ? (
-              <div className="flex items-center space-x-2.5">
+              <div className="flex items-center space-x-3 pl-2 border-l border-slate-200/80">
                 <div 
-                  className="w-8 h-8 rounded-lg bg-brand-light-blue text-brand-primary flex items-center justify-center font-black text-xs"
-                  title={`${user.name} - ${user.role}`}
+                  className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-primary to-blue-600 text-white flex items-center justify-center font-extrabold text-xs shadow-sm"
+                  title={`${user.fullName || user.name} (${user.role})`}
                 >
-                  {user.name.charAt(0)}
+                  {(user.fullName || user.name || 'U').charAt(0).toUpperCase()}
                 </div>
-                {token ? (
-                  <button
-                    onClick={logout}
-                    title="Sign Out"
-                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all cursor-pointer"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={onOpenAuth}
-                    className="text-xs font-bold text-brand-primary cursor-pointer"
-                  >
-                    {t('signIn')}
-                  </button>
-                )}
+
+                <div className="hidden sm:flex flex-col">
+                  <span className="text-xs font-bold text-slate-800 leading-tight">
+                    {user.fullName || user.name}
+                  </span>
+                  <div className="flex items-center space-x-1 mt-0.5">
+                    {user.role === 'HR_ADMIN' ? (
+                      <span className="px-1.5 py-0.2 text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200 rounded-md">
+                        HR Admin
+                      </span>
+                    ) : user.role === 'SUPER_ADMIN' ? (
+                      <span className="px-1.5 py-0.2 text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 rounded-md">
+                        Super Admin
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.2 text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200 rounded-md">
+                        Recruiter
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={logout}
+                  title={lang === 'FR' ? 'Déconnexion' : 'Sign Out'}
+                  className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all cursor-pointer flex items-center space-x-1"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
             ) : (
               <button
