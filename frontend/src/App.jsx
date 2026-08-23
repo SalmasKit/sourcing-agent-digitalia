@@ -11,6 +11,7 @@ import { JobDescriptionModal } from './components/JobDescriptionModal';
 import { ShortlistPanel } from './components/ShortlistPanel';
 import { KanbanPipeline } from './components/KanbanPipeline';
 import { DashboardView } from './components/DashboardView';
+import { RecruiterNotesView } from './components/RecruiterNotesView';
 import { CandidateComparator } from './components/CandidateComparator';
 import { AuthModal } from './components/AuthModal';
 import AuthPage from './components/AuthPage';
@@ -46,7 +47,7 @@ function DashboardContent() {
 
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem(`digitalia_user_${userKey}_active_tab`);
-    return saved || 'sourcing';
+    return saved || 'dashboard';
   });
 
   useEffect(() => {
@@ -475,7 +476,47 @@ function DashboardContent() {
       return c;
     }));
 
+    // Also persist note into the jobResultsCache for the active job
+    setJobResultsCache(prev => {
+      const next = { ...prev };
+      const jobId = selectedJobId;
+      if (jobId && Array.isArray(next[jobId])) {
+        next[jobId] = next[jobId].map(c => {
+          if (c.id === candidateId) {
+            return { ...c, notes: [...(c.notes || []), newNote] };
+          }
+          return c;
+        });
+      }
+      return next;
+    });
+
     triggerToast(lang === 'FR' ? 'Note enregistrée.' : 'Note saved.');
+  };
+
+  const handleDeleteNote = (candidateId, noteId) => {
+    const removeNote = (c) =>
+      c.id === candidateId
+        ? { ...c, notes: (c.notes || []).filter(n => n.id !== noteId) }
+        : c;
+
+    setCandidates(prev => prev.map(removeNote));
+    setShortlist(prev => prev.map(removeNote));
+    setJobResultsCache(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(jobId => {
+        if (Array.isArray(next[jobId])) {
+          next[jobId] = next[jobId].map(removeNote);
+        }
+      });
+      return next;
+    });
+    setSelectedCandidate(prev =>
+      prev && prev.id === candidateId
+        ? { ...prev, notes: (prev.notes || []).filter(n => n.id !== noteId) }
+        : prev
+    );
+    triggerToast(lang === 'FR' ? 'Note supprimée.' : 'Note deleted.');
   };
 
   const nextCarousel = () => {
@@ -545,6 +586,7 @@ function DashboardContent() {
         setActiveTab={setActiveTab}
         onOpenAuth={() => setIsAuthOpen(true)}
         shortlistCount={shortlist.length}
+        notesCount={allKnownCandidates.filter(c => c.notes && c.notes.length > 0).reduce((s, c) => s + c.notes.length, 0)}
         isBackendOnline={isBackendOnline}
       />
 
@@ -563,23 +605,27 @@ function DashboardContent() {
         {activeTab === 'sourcing' && (
           <>
             {/* 1. Job Description Selection Header */}
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 mb-6 shadow-xs">
-              <div className="flex items-center justify-between gap-4 mb-3.5">
-                <div>
-                  <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
-                    <FileText className="w-3.5 h-3.5 text-brand-primary" />
-                    {t('jobDescriptions')}
-                  </span>
-                  <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
-                    {lang === 'FR' 
-                      ? 'Sélectionnez la fiche de poste à sourcer pour personnaliser la recherche'
-                      : 'Select a job description to anchor and customize candidate sourcing'}
-                  </p>
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 mb-6 shadow-2xs">
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0 border border-teal-100">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 font-jakarta flex items-center gap-2">
+                      {t('jobDescriptions')}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                      {lang === 'FR' 
+                        ? 'Sélectionnez la fiche de poste à sourcer pour personnaliser la recherche'
+                        : 'Select a job description to anchor and customize candidate sourcing'}
+                    </p>
+                  </div>
                 </div>
 
                 <button
                   onClick={() => setIsJobModalOpen(true)}
-                  className="flex items-center space-x-1.5 bg-brand-light-blue text-brand-primary hover:bg-brand-primary hover:text-white text-[10px] font-bold px-3 py-2 rounded-xl border border-brand-mid-blue/20 transition-all cursor-pointer shrink-0"
+                  className="flex items-center space-x-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all cursor-pointer shrink-0 shadow-2xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{t('newJobDesc')}</span>
@@ -594,30 +640,30 @@ function DashboardContent() {
                     <div
                       key={job.id}
                       onClick={() => handleSelectJob(job)}
-                      className={`flex items-center space-x-2 text-xs font-bold px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer ${
+                      className={`flex items-center space-x-2 text-xs font-bold px-3.5 py-2 rounded-xl border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-brand-primary text-white border-brand-primary shadow-xs ring-2 ring-brand-primary/20'
-                          : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200/90 hover:bg-slate-100'
                       }`}
                     >
-                      <span>{job.title}</span>
+                      <span className="font-jakarta">{job.title}</span>
                       <button
                         onClick={(e) => { e.stopPropagation(); setEditingJob(job); setIsJobModalOpen(true); }}
-                        className={`p-0.5 rounded-md hover:bg-black/10 transition-colors ${
-                          isSelected ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-brand-primary'
+                        className={`p-0.5 rounded-md transition-colors ${
+                          isSelected ? 'text-slate-300 hover:text-white' : 'text-slate-400 hover:text-slate-900'
                         }`}
                         title="Edit Job Description"
                       >
-                        <Edit className="w-3.5 h-3.5" />
+                        <Edit className="w-3 h-3" />
                       </button>
                       <button
                         onClick={(e) => handleDeleteJob(e, job.id)}
-                        className={`p-0.5 rounded-md hover:bg-black/10 transition-colors ${
-                          isSelected ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-rose-600'
+                        className={`p-0.5 rounded-md transition-colors ${
+                          isSelected ? 'text-slate-300 hover:text-rose-300' : 'text-slate-400 hover:text-rose-600'
                         }`}
                         title="Delete Job Description"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="w-3 h-3" />
                       </button>
                     </div>
                   );
@@ -639,21 +685,25 @@ function DashboardContent() {
 
             {/* Candidate Directory Section Header */}
             <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 font-jakarta flex items-center gap-2">
-                  <Users className="w-4 h-4 text-brand-primary" />
-                  {t('talentProfiles')}
-                </h3>
-                <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
-                  {t('showingProfiles', { count: candidates.length })}
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center shrink-0 border border-teal-100">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 font-jakarta">
+                    {t('talentProfiles')}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                    {t('showingProfiles', { count: candidates.length })}
+                  </p>
+                </div>
               </div>
 
               {/* View Switches & Comparator */}
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setIsComparatorOpen(true)}
-                  className="flex items-center space-x-1.5 bg-sky-50 text-sky-700 hover:bg-sky-600 hover:text-white border border-sky-200 text-xs font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-2xs"
+                  className="flex items-center space-x-1.5 bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200/80 text-xs font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-2xs"
                   title="Compare candidates side by side"
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -665,7 +715,7 @@ function DashboardContent() {
                     onClick={() => setViewMode('carousel')}
                     className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       viewMode === 'carousel'
-                        ? 'bg-white text-sky-600 shadow-xs'
+                        ? 'bg-white text-teal-700 shadow-2xs'
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
                     title="Interactive Slider Mode"
@@ -677,7 +727,7 @@ function DashboardContent() {
                     onClick={() => setViewMode('grid')}
                     className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       viewMode === 'grid'
-                        ? 'bg-white text-sky-600 shadow-xs'
+                        ? 'bg-white text-teal-700 shadow-2xs'
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
                     title="Grid Mode"
@@ -703,9 +753,9 @@ function DashboardContent() {
                     }
                   }}
                   title={lang === 'FR' ? 'Relancer la dernière recherche' : 'Re-run last search'}
-                  className="flex items-center space-x-1 text-xs text-slate-500 hover:text-brand-primary font-bold px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer animate-none transition-colors"
+                  className="flex items-center space-x-1 text-xs text-slate-600 hover:text-teal-700 font-bold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin text-brand-primary' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin text-teal-700' : ''}`} />
                 </button>
               </div>
             </div>
@@ -713,13 +763,13 @@ function DashboardContent() {
             {/* Candidate Rendering Section */}
             {candidates.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 p-8 shadow-xs">
-                <Filter className="w-10 h-10 text-slate-355 mx-auto mb-3" />
+                <Filter className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                 <h4 className="text-sm font-bold text-slate-700 font-jakarta">{t('noCandidatesMatched')}</h4>
-                <p className="text-xs text-slate-455 mt-1">{t('noCandidatesDesc')}</p>
+                <p className="text-xs text-slate-500 mt-1">{t('noCandidatesDesc')}</p>
               </div>
             ) : viewMode === 'grid' ? (
               /* GRID MODE */
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                 {candidates.map((candidate) => (
                   <CandidateCard
                     key={candidate.id}
@@ -740,14 +790,14 @@ function DashboardContent() {
               <div className="space-y-6">
                 
                 {/* Main Featured Candidate Panel */}
-                <div className="bg-white rounded-3xl border border-slate-200/85 p-8 shadow-[0_12px_40px_-20px_rgba(0,64,193,0.05)] relative overflow-hidden flex flex-col md:flex-row gap-8 items-stretch">
+                <div className="bg-white rounded-2xl border border-slate-200/90 p-7 shadow-2xs relative overflow-hidden flex flex-col md:flex-row gap-7 items-stretch">
                   
                   {/* Slider Control Arrows */}
                   <button 
                     onClick={prevCarousel}
                     onMouseEnter={() => startAutoCycle('prev')}
                     onMouseLeave={stopAutoCycle}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-slate-50 hover:scale-105 border border-slate-200 p-2.5 rounded-full shadow-md text-slate-655 hover:text-brand-primary transition-all z-10 cursor-pointer hidden md:flex items-center justify-center"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-slate-50 hover:scale-105 border border-slate-200 p-2.5 rounded-full shadow-sm text-slate-600 hover:text-teal-700 transition-all z-10 cursor-pointer hidden md:flex items-center justify-center"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
@@ -755,7 +805,7 @@ function DashboardContent() {
                     onClick={nextCarousel}
                     onMouseEnter={() => startAutoCycle('next')}
                     onMouseLeave={stopAutoCycle}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-slate-50 hover:scale-105 border border-slate-200 p-2.5 rounded-full shadow-md text-slate-655 hover:text-brand-primary transition-all z-10 cursor-pointer hidden md:flex items-center justify-center"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-slate-50 hover:scale-105 border border-slate-200 p-2.5 rounded-full shadow-sm text-slate-600 hover:text-teal-700 transition-all z-10 cursor-pointer hidden md:flex items-center justify-center"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
@@ -773,16 +823,16 @@ function DashboardContent() {
                                 e.target.onerror = null;
                                 e.target.src = getAvatarUrl(currentCandidate.fullName, null);
                               }}
-                              className="w-16 h-16 rounded-2xl object-cover border border-slate-100 shadow-sm"
+                              className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-2xs"
                             />
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="text-lg font-black text-slate-900 font-jakarta">{currentCandidate.fullName}</h4>
-                                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-md border border-emerald-200">
+                                <h4 className="text-lg font-extrabold text-slate-900 font-jakarta">{currentCandidate.fullName}</h4>
+                                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-md border border-emerald-200 font-mono">
                                   {currentCandidate.matchScore}% Match
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-400 font-bold mt-1">{currentCandidate.headline}</p>
+                              <p className="text-xs text-slate-500 font-medium mt-1">{currentCandidate.headline}</p>
                             </div>
                           </div>
 
@@ -790,7 +840,7 @@ function DashboardContent() {
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => handleOpenEditCandidate(currentCandidate)}
-                              className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-brand-primary cursor-pointer border border-slate-200"
+                              className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-teal-700 cursor-pointer border border-slate-200"
                               title={t('editCandidate')}
                             >
                               <Edit className="w-3.5 h-3.5" />
@@ -805,18 +855,18 @@ function DashboardContent() {
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-4 text-xs font-bold text-slate-550 mb-5">
-                          <span className="flex items-center gap-1 bg-slate-50 border border-slate-200/50 px-3 py-1.5 rounded-xl">
-                            <MapPin className="w-4 h-4 text-brand-primary" />
+                        <div className="flex flex-wrap gap-3 text-xs font-semibold text-slate-600 mb-5">
+                          <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                            <MapPin className="w-3.5 h-3.5 text-teal-700" />
                             {currentCandidate.location}
                           </span>
-                          <span className="flex items-center gap-1 bg-slate-50 border border-slate-200/50 px-3 py-1.5 rounded-xl">
-                            <Briefcase className="w-4 h-4 text-brand-primary" />
+                          <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                            <Briefcase className="w-3.5 h-3.5 text-teal-700" />
                             {currentCandidate.experienceYears} {t('yearsExp')}
                           </span>
                         </div>
 
-                        <p className="text-xs text-slate-605 leading-relaxed mb-6">
+                        <p className="text-xs text-slate-600 leading-relaxed mb-6">
                           {currentCandidate.summary}
                         </p>
 
@@ -824,7 +874,7 @@ function DashboardContent() {
                           {currentCandidate.skills.map((skill, idx) => (
                             <span 
                               key={idx} 
-                              className="text-[10px] font-bold bg-indigo-50/60 text-brand-primary px-3 py-1.5 rounded-lg border border-brand-light-blue/50"
+                              className="text-[10px] font-medium font-mono bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md border border-slate-200"
                             >
                               {skill}
                             </span>
@@ -843,7 +893,7 @@ function DashboardContent() {
                             className={`flex items-center space-x-2 text-xs font-bold px-5 py-2.5 rounded-xl border transition-all cursor-pointer ${
                               (savedRoleCandidates[selectedJobId] || []).includes(currentCandidate.id)
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-white text-slate-605 border-slate-200 hover:bg-slate-50'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                             }`}
                           >
                             {(savedRoleCandidates[selectedJobId] || []).includes(currentCandidate.id) ? (
@@ -859,12 +909,12 @@ function DashboardContent() {
                             )}
                           </button>
                         ) : (
-                          <span className="text-[10px] text-slate-300 italic font-semibold">Select a role to save</span>
+                          <span className="text-[10px] text-slate-400 italic font-medium">Select a role to save</span>
                         )}
 
                         <button
                           onClick={() => setSelectedCandidate(currentCandidate)}
-                          className="bg-brand-primary hover:bg-brand-deep-blue text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all cursor-pointer"
+                          className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all cursor-pointer shadow-2xs"
                         >
                           {t('viewProfile')}
                         </button>
@@ -874,23 +924,23 @@ function DashboardContent() {
 
                   {/* Right Column: AI Insights */}
                   {currentCandidate && (
-                    <div className="w-full md:w-80 bg-slate-50 border border-slate-200/50 rounded-2xl p-5 flex flex-col justify-between">
+                    <div className="w-full md:w-80 bg-slate-50 border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between">
                       <div>
-                        <h5 className="text-[10px] font-black text-brand-primary uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-brand-accent animate-pulse" />
-                          AI Suite Suitability Report
+                        <h5 className="text-[10px] font-black text-teal-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-teal-600 animate-pulse" />
+                          AI Suitability Report
                         </h5>
                         <ul className="space-y-3">
                           {currentCandidate.verifiedMatchReasons?.slice(0, 3).map((reason, idx) => (
                             <li key={idx} className="text-[11px] text-slate-600 leading-normal flex items-start gap-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-brand-primary shrink-0 mt-1.5" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-teal-600 shrink-0 mt-1.5" />
                               <span>{reason}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
 
-                      <div className="bg-brand-light-blue/20 rounded-xl p-3 border border-brand-mid-blue/10 text-[10px] text-brand-deep-blue font-bold mt-4">
+                      <div className="bg-teal-50/80 rounded-xl p-3 border border-teal-100 text-[10px] text-teal-800 font-bold mt-4">
                         Candidate ranks in top {100 - currentCandidate.matchScore}% of target search category.
                       </div>
                     </div>
@@ -905,7 +955,7 @@ function DashboardContent() {
                   <div 
                     onMouseEnter={() => startThumbnailScroll('left')}
                     onMouseLeave={stopThumbnailScroll}
-                    className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-slate-50 to-transparent flex items-center justify-start pl-1 text-slate-455 hover:text-brand-primary z-20 cursor-w-resize"
+                    className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-slate-50 to-transparent flex items-center justify-start pl-1 text-slate-400 hover:text-slate-700 z-20 cursor-w-resize"
                   >
                     <ChevronLeft className="w-5 h-5 opacity-60" />
                   </div>
@@ -922,8 +972,8 @@ function DashboardContent() {
                           onClick={() => setCarouselIndex(idx)}
                           className={`flex items-center space-x-3 bg-white p-3 rounded-xl border transition-all duration-200 text-left min-w-[200px] cursor-pointer shrink-0 ${
                             isSelected
-                              ? 'ring-2 ring-brand-primary border-brand-primary shadow-xs'
-                              : 'border-slate-200/80 hover:border-slate-350'
+                              ? 'ring-2 ring-slate-900 border-slate-900 shadow-2xs'
+                              : 'border-slate-200/80 hover:border-slate-300'
                           }`}
                         >
                           <img 
@@ -933,14 +983,14 @@ function DashboardContent() {
                               e.target.onerror = null;
                               e.target.src = getAvatarUrl(candidate.fullName, null);
                             }}
-                            className="w-10 h-10 rounded-lg object-cover"
+                            className="w-10 h-10 rounded-lg object-cover border border-slate-100"
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-bold text-slate-900 truncate leading-tight">
+                            <div className="text-xs font-bold text-slate-900 truncate leading-tight font-jakarta">
                               {candidate.fullName}
                             </div>
-                            <div className="text-[10px] text-slate-455 font-bold mt-0.5 truncate">
-                              {candidate.matchScore}% • {candidate.experienceYears} Years
+                            <div className="text-[10px] text-slate-500 font-bold mt-0.5 truncate font-mono">
+                              {candidate.matchScore}% • {candidate.experienceYears} Yrs
                             </div>
                           </div>
                         </button>
@@ -952,7 +1002,7 @@ function DashboardContent() {
                   <div 
                     onMouseEnter={() => startThumbnailScroll('right')}
                     onMouseLeave={stopThumbnailScroll}
-                    className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-slate-50 to-transparent flex items-center justify-end pr-1 text-slate-455 hover:text-brand-primary z-20 cursor-e-resize"
+                    className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-slate-50 to-transparent flex items-center justify-end pr-1 text-slate-400 hover:text-slate-700 z-20 cursor-e-resize"
                   >
                     <ChevronRight className="w-5 h-5 opacity-60" />
                   </div>
@@ -998,6 +1048,17 @@ function DashboardContent() {
             savedRoleCandidates={savedRoleCandidates}
             candidatePipelineStage={candidatePipelineStage}
             searchHistory={searchHistory}
+          />
+        )}
+
+        {/* Tab 5: Recruiter Notes */}
+        {activeTab === 'notes' && (
+          <RecruiterNotesView
+            candidates={allKnownCandidates}
+            onViewCandidate={(candidate) => {
+              setSelectedCandidate(candidate);
+            }}
+            onDeleteNote={handleDeleteNote}
           />
         )}
 

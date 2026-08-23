@@ -1,9 +1,68 @@
-import React, { useState, useEffect } from 'react';
-import { useLanguage } from '../context/LanguageContext';
-import { X, FileText, Plus, Sparkles, CheckCircle2, RefreshCw, Wand2, Edit3, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, FileText, Plus, Sparkles, CheckCircle2, RefreshCw, Wand2 } from 'lucide-react';
 
-export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editingJob = null }) => {
-  const { lang, t } = useLanguage();
+const COPY = {
+  EN: {
+    editTitle: 'Edit job description',
+    newTitle: 'New job description',
+    professionTitle: 'Job title',
+    titlePh: 'e.g. Senior Backend Engineer',
+    seniority: 'Seniority level',
+    seniorityOpts: ['Junior (0\u20132 yrs)', 'Mid-level (2\u20135 yrs)', 'Senior (5\u20138 yrs)', 'Lead / Architect (8+ yrs)'],
+    contractType: 'Contract type',
+    contractOpts: ['Permanent (CDI)', 'Fixed-term (CDD)', 'Freelance / Contract', 'Remote full-time'],
+    location: 'Target location',
+    locationPh: 'e.g. Casablanca, Rabat, remote, all locations',
+    skills: 'Required tech (comma-separated)',
+    skillsPh: 'e.g. React, Node.js, AWS',
+    helpDraft: 'Need help drafting the prompt?',
+    generate: 'Generate prompt with AI',
+    generating: 'Generating\u2026',
+    reviewTitle: 'AI agent generated prompt',
+    reviewTag: 'Review required',
+    cancel: 'Cancel',
+    approve: 'Approve and apply',
+    descLabel: 'Job description / sourcing prompt',
+    descPh: 'Detailed responsibilities, expected tech stack, and ideal candidate profile\u2026',
+    saveChanges: 'Save changes',
+    createAndSource: 'Create and start sourcing',
+  },
+  FR: {
+    editTitle: 'Modifier la fiche de poste',
+    newTitle: 'Nouvelle fiche de poste',
+    professionTitle: 'Intitul\u00e9 du poste',
+    titlePh: 'ex. Ing\u00e9nieur Backend Senior',
+    seniority: 'Niveau de s\u00e9niorit\u00e9',
+    seniorityOpts: ['Junior (0\u20132 ans)', 'Interm\u00e9diaire (2\u20135 ans)', 'Senior (5\u20138 ans)', 'Lead / Architecte (8+ ans)'],
+    contractType: 'Type de contrat',
+    contractOpts: ['CDI', 'CDD', 'Freelance / Prestation', 'T\u00e9l\u00e9travail temps plein'],
+    location: 'Localisation cible',
+    locationPh: 'ex. Casablanca, Rabat, t\u00e9l\u00e9travail, toutes localisations',
+    skills: 'Comp\u00e9tences requises (s\u00e9par\u00e9es par virgules)',
+    skillsPh: 'ex. React, Node.js, AWS',
+    helpDraft: 'Besoin d\u2019aide pour r\u00e9diger ?',
+    generate: 'G\u00e9n\u00e9rer le prompt par IA',
+    generating: 'G\u00e9n\u00e9ration\u2026',
+    reviewTitle: 'Prompt g\u00e9n\u00e9r\u00e9 par l\u2019agent IA',
+    reviewTag: 'V\u00e9rification requise',
+    cancel: 'Annuler',
+    approve: 'Approuver et appliquer',
+    descLabel: 'Description du poste / prompt de sourcing',
+    descPh: 'D\u00e9tail des responsabilit\u00e9s, stack technique attendue, profil id\u00e9al\u2026',
+    saveChanges: 'Enregistrer les modifications',
+    createAndSource: 'Cr\u00e9er et lancer le sourcing',
+  },
+};
+
+export function JobDescriptionModal({
+  isOpen = true,
+  onClose = () => { },
+  onCreate = () => { },
+  onEdit = () => { },
+  editingJob = null,
+  lang = 'EN',
+}) {
+  const t = COPY[lang];
   const isFR = lang === 'FR';
 
   const [title, setTitle] = useState('');
@@ -11,28 +70,38 @@ export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editing
   const [location, setLocation] = useState('All Locations');
   const [skills, setSkills] = useState('');
   const [seniority, setSeniority] = useState('Senior');
-  const [contractType, setContractType] = useState('CDI / Permanent');
-  
-  // AI Generator state
+  const [contractType, setContractType] = useState('Permanent (CDI)');
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPromptPreview, setGeneratedPromptPreview] = useState(null);
   const [showPromptConfirm, setShowPromptConfirm] = useState(false);
+  const fontsLoaded = useRef(false);
+
+  useEffect(() => {
+    if (fontsLoaded.current) return;
+    fontsLoaded.current = true;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href =
+      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
+    document.head.appendChild(link);
+  }, []);
 
   useEffect(() => {
     if (editingJob) {
-      setTitle(typeof editingJob.title === 'string' ? editingJob.title : String(editingJob.title || ''));
-      setDescription(typeof editingJob.description === 'string' ? editingJob.description : String(editingJob.description || ''));
+      setTitle(String(editingJob.title || ''));
+      setDescription(String(editingJob.description || ''));
       setLocation(editingJob.location || 'All Locations');
-      setSkills(Array.isArray(editingJob.skills) ? editingJob.skills.join(', ') : (typeof editingJob.skills === 'string' ? editingJob.skills : ''));
+      setSkills(Array.isArray(editingJob.skills) ? editingJob.skills.join(', ') : (editingJob.skills || ''));
       setSeniority(editingJob.seniority || 'Senior');
-      setContractType(editingJob.contractType || 'CDI / Permanent');
+      setContractType(editingJob.contractType || 'Permanent (CDI)');
     } else {
       setTitle('');
       setDescription('');
       setLocation('All Locations');
       setSkills('');
       setSeniority('Senior');
-      setContractType('CDI / Permanent');
+      setContractType('Permanent (CDI)');
     }
     setGeneratedPromptPreview(null);
     setShowPromptConfirm(false);
@@ -40,28 +109,19 @@ export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editing
 
   if (!isOpen) return null;
 
-  // AI Prompt Generation simulation based on user inputs
   const handleGeneratePrompt = () => {
     const safeTitle = String(title || '').trim();
     if (!safeTitle) return;
     setIsGenerating(true);
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       const safeSkills = String(skills || '').trim();
-      const skillsList = safeSkills ? safeSkills : 'Java, Spring Boot, Microservices';
-      const locText = (location && location !== 'All Locations') ? location : (isFR ? 'Toutes localisations' : 'All Locations');
+      const skillsList = safeSkills || (isFR ? 'React, Node.js, AWS' : 'React, Node.js, AWS');
+      const locText = location && location !== 'All Locations' ? location : (isFR ? 'Toutes localisations' : 'All locations');
 
-      const generated = isFR ? [
-        `Recherche un profil ${seniority} ${safeTitle} basé(e) à ${locText} (${contractType}).`,
-        `Le candidat idéal possède une expertise approfondie en ${skillsList}.`,
-        `Missions principales : conception et architecture d'applications haute performance, livraison CI/CD, et collaboration agile en équipe plurisdisciplinaire.`,
-        `Profil recherché : esprit d'initiative, maîtrise des bonnes pratiques de clean code et capacité à mentorat des profils plus juniors.`
-      ].join(' ') : [
-        `Looking for a ${seniority} ${safeTitle} based in ${locText} (${contractType}).`,
-        `The ideal candidate possesses deep expertise in ${skillsList}.`,
-        `Key responsibilities: designing high-performance architectures, automated CI/CD deployments, and agile collaboration.`,
-        `Expected candidate profile: strong initiative, clean code practices, and ability to mentor junior engineers.`
-      ];
+      const generated = isFR
+        ? `Recherche un profil ${seniority} ${safeTitle} bas\u00e9(e) \u00e0 ${locText} (${contractType}). Le candidat id\u00e9al poss\u00e8de une expertise approfondie en ${skillsList}. Missions principales\u00a0: conception et architecture d'applications haute performance, livraison CI/CD, et collaboration agile en \u00e9quipe pluridisciplinaire. Profil recherch\u00e9\u00a0: esprit d'initiative, ma\u00eetrise des bonnes pratiques de clean code et capacit\u00e9 \u00e0 encadrer des profils plus juniors.`
+        : `Looking for a ${seniority} ${safeTitle} based in ${locText} (${contractType}). The ideal candidate has deep expertise in ${skillsList}. Key responsibilities: designing high-performance architectures, automated CI/CD deployments, and agile collaboration. Expected profile: strong initiative, clean code practices, and the ability to mentor junior engineers.`;
 
       setGeneratedPromptPreview(generated);
       setShowPromptConfirm(true);
@@ -70,9 +130,7 @@ export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editing
   };
 
   const handleConfirmPrompt = () => {
-    if (generatedPromptPreview) {
-      setDescription(String(generatedPromptPreview));
-    }
+    if (generatedPromptPreview) setDescription(String(generatedPromptPreview));
     setShowPromptConfirm(false);
   };
 
@@ -82,33 +140,27 @@ export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editing
     if (!safeTitle) return;
 
     let safeDesc = String(description || '').trim();
-    if (!safeDesc && generatedPromptPreview) {
-      safeDesc = String(generatedPromptPreview).trim();
-    }
+    if (!safeDesc && generatedPromptPreview) safeDesc = String(generatedPromptPreview).trim();
     if (!safeDesc) {
       const safeSkills = String(skills || '').trim();
       safeDesc = isFR
-        ? `Recherche un profil ${seniority} ${safeTitle} à ${location} avec compétences en ${safeSkills || 'technologies clés'}.`
+        ? `Recherche un profil ${seniority} ${safeTitle} \u00e0 ${location} avec comp\u00e9tences en ${safeSkills || 'technologies cl\u00e9s'}.`
         : `Sourcing for ${seniority} ${safeTitle} in ${location} with expertise in ${safeSkills || 'key technologies'}.`;
     }
 
-    const safeSkillsStr = String(skills || '');
     const jobData = {
       id: editingJob ? editingJob.id : `job-${Date.now()}`,
       title: safeTitle,
       description: safeDesc,
       location: location || 'All Locations',
-      skills: safeSkillsStr.split(',').map(s => s.trim()).filter(Boolean),
+      skills: String(skills || '').split(',').map((s) => s.trim()).filter(Boolean),
       seniority,
       contractType,
-      status: editingJob ? editingJob.status : 'active'
+      status: editingJob ? editingJob.status : 'active',
     };
 
-    if (editingJob && onEdit) {
-      onEdit(jobData);
-    } else if (onCreate) {
-      onCreate(jobData);
-    }
+    if (editingJob) onEdit(jobData);
+    else onCreate(jobData);
 
     setTitle('');
     setDescription('');
@@ -120,195 +172,190 @@ export const JobDescriptionModal = ({ isOpen, onClose, onCreate, onEdit, editing
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full overflow-hidden animate-fadeIn">
-        
-        {/* Header */}
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h3 className="font-extrabold text-slate-900 text-sm font-jakarta flex items-center gap-2">
-            <FileText className="w-4.5 h-4.5 text-brand-primary" />
-            <span>{editingJob ? t('editJobDescTitle') : t('newJobDesc')}</span>
-          </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-655 p-1 rounded-lg cursor-pointer">
-            <X className="w-4.5 h-4.5" />
+    <div className="dg-root dgj-overlay">
+      <style>{`
+        .dg-root {
+          --dg-paper: #F6F7F9; --dg-surface: #FFFFFF; --dg-sunken: #EFF1F4;
+          --dg-border: #E3E6EB; --dg-border-strong: #CBD2DC;
+          --dg-ink-900: #10151F; --dg-ink-700: #38414F; --dg-ink-500: #6B7280; --dg-ink-400: #96A0AC;
+          --dg-teal-700: #0A5C68; --dg-teal-600: #0E7C8C; --dg-teal-500: #128FA0; --dg-teal-100: #E1F2F3;
+          --dg-green-700: #1F6E4A; --dg-green-600: #278F5E; --dg-green-100: #E3F5EC;
+          --font-display: 'Space Grotesk', 'Inter', sans-serif;
+          --font-body: 'Inter', system-ui, sans-serif;
+          --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+          font-family: var(--font-body); color: var(--dg-ink-900);
+        }
+        .dg-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+
+        .dgj-overlay {
+          position: fixed; inset: 0; z-index: 50; overflow-y: auto;
+          background: rgba(16,21,31,0.55); backdrop-filter: blur(3px);
+          display: flex; align-items: center; justify-content: center; padding: 20px;
+        }
+        .dgj-modal {
+          background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 20px;
+          max-width: 580px; width: 100%; overflow: hidden;
+          box-shadow: 0 30px 70px -30px rgba(16,21,31,0.4);
+        }
+
+        .dgj-header { padding: 18px 22px; border-bottom: 1px solid var(--dg-border); display: flex; align-items: center; justify-content: space-between; background: var(--dg-paper); }
+        .dgj-header-title { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+        .dgj-close { background: none; border: none; color: var(--dg-ink-400); cursor: pointer; padding: 6px; border-radius: 8px; }
+        .dgj-close:hover { color: var(--dg-ink-700); background: var(--dg-sunken); }
+
+        .dgj-form { padding: 22px; max-height: 78vh; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+        .dgj-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+        .dgj-label { display: block; font-size: 10px; font-weight: 700; color: var(--dg-ink-500); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+        .dgj-input, .dgj-select, .dgj-textarea {
+          width: 100%; box-sizing: border-box; background: var(--dg-paper); border: 1px solid var(--dg-border);
+          border-radius: 10px; padding: 10px 12px; font-size: 12.5px; font-weight: 500; color: var(--dg-ink-900);
+          outline: none; font-family: var(--font-body); transition: border-color .15s ease, background .15s ease;
+        }
+        .dgj-input:focus, .dgj-select:focus, .dgj-textarea:focus { border-color: var(--dg-teal-500); background: var(--dg-surface); }
+        .dgj-textarea { resize: none; line-height: 1.5; }
+        .dgj-select { cursor: pointer; }
+
+        .dgj-ai-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .dgj-ai-hint { font-size: 11px; font-weight: 600; color: var(--dg-ink-400); }
+        .dgj-ai-btn {
+          display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700;
+          background: var(--dg-ink-900); color: #fff; border: none; border-radius: 10px;
+          padding: 8px 14px; cursor: pointer; transition: background .15s ease;
+        }
+        .dgj-ai-btn:hover { background: #232C3A; }
+        .dgj-ai-btn:disabled { opacity: 0.5; cursor: default; }
+        .dgj-spin { animation: dgjspin 0.9s linear infinite; }
+        @keyframes dgjspin { to { transform: rotate(360deg); } }
+
+        .dgj-review { background: var(--dg-teal-100); border: 1px solid rgba(14,124,140,0.22); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .dgj-review-head { display: flex; align-items: center; justify-content: space-between; }
+        .dgj-review-title { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--dg-teal-700); }
+        .dgj-review-tag { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dg-teal-700); background: var(--dg-surface); border: 1px solid rgba(14,124,140,0.25); padding: 3px 8px; border-radius: 7px; }
+        .dgj-review-textarea {
+          width: 100%; box-sizing: border-box; background: var(--dg-surface); border: 1px solid rgba(14,124,140,0.25);
+          border-radius: 12px; padding: 12px; font-size: 12px; color: var(--dg-ink-700); line-height: 1.6;
+          outline: none; resize: none; font-family: var(--font-body);
+        }
+        .dgj-review-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+        .dgj-review-cancel {
+          font-size: 11.5px; font-weight: 700; color: var(--dg-ink-500); background: var(--dg-surface);
+          border: 1px solid var(--dg-border); border-radius: 10px; padding: 7px 14px; cursor: pointer;
+        }
+        .dgj-review-cancel:hover { background: var(--dg-sunken); }
+        .dgj-review-approve {
+          display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: #fff;
+          background: var(--dg-green-600); border: none; border-radius: 10px; padding: 7px 15px; cursor: pointer;
+        }
+        .dgj-review-approve:hover { background: var(--dg-green-700); }
+
+        .dgj-submit {
+          width: 100%; padding: 13px 0; border: none; border-radius: 12px;
+          background: var(--dg-ink-900); color: #fff; font-size: 13px; font-weight: 700;
+          display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+          transition: background .15s ease;
+        }
+        .dgj-submit:hover { background: #232C3A; }
+
+        @media (max-width: 520px) {
+          .dgj-row2 { grid-template-columns: 1fr; }
+        }
+      `}</style>
+
+      <div className="dgj-modal">
+        <div className="dgj-header">
+          <span className="dgj-header-title dg-display">
+            <FileText size={16} color="var(--dg-teal-600)" />
+            {editingJob ? t.editTitle : t.newTitle}
+          </span>
+          <button className="dgj-close" onClick={onClose} aria-label="Close">
+            <X size={17} />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          
-          {/* Title */}
+        <form className="dgj-form" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-              {t('professionTitle')} *
-            </label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Senior Java & Cloud Architect"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold outline-none focus:border-brand-primary focus:bg-white transition-all"
-            />
+            <label className="dgj-label">{t.professionTitle} *</label>
+            <input className="dgj-input" type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.titlePh} />
           </div>
 
-          {/* Seniority & Contract Type */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="dgj-row2">
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                {isFR ? 'Séniorité' : 'Seniority Level'}
-              </label>
-              <select
-                value={seniority}
-                onChange={(e) => setSeniority(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl p-2.5 font-semibold outline-none focus:border-brand-primary"
-              >
-                <option value="Junior">Junior (0-2 ans)</option>
-                <option value="Mid-Level">Mid-Level (2-5 ans)</option>
-                <option value="Senior">Senior (5-8 ans)</option>
-                <option value="Lead / Architect">Lead / Architect (8+ ans)</option>
+              <label className="dgj-label">{t.seniority}</label>
+              <select className="dgj-select" value={seniority} onChange={(e) => setSeniority(e.target.value)}>
+                {t.seniorityOpts.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
               </select>
             </div>
-
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                {isFR ? 'Type de Contrat' : 'Contract Type'}
-              </label>
-              <select
-                value={contractType}
-                onChange={(e) => setContractType(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl p-2.5 font-semibold outline-none focus:border-brand-primary"
-              >
-                <option value="CDI / Permanent">CDI / Permanent</option>
-                <option value="CDD / Fixed-term">CDD / Fixed-term</option>
-                <option value="Freelance / Contract">Freelance / Contract</option>
-                <option value="Remote Full-time">Remote Full-time</option>
+              <label className="dgj-label">{t.contractType}</label>
+              <select className="dgj-select" value={contractType} onChange={(e) => setContractType(e.target.value)}>
+                {t.contractOpts.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
               </select>
             </div>
           </div>
 
-          {/* Location & Skills */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="dgj-row2">
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                {isFR ? 'Localisation Cible' : 'Target Location'}
-              </label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Casablanca, Rabat, Paris, France, All Locations..."
-                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl p-2.5 font-semibold outline-none focus:border-brand-primary placeholder:text-slate-400"
-              />
+              <label className="dgj-label">{t.location}</label>
+              <input className="dgj-input" type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t.locationPh} />
             </div>
-
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                {isFR ? 'Compétences Requises' : 'Required Tech (Comma-Separated)'}
-              </label>
-              <input
-                type="text"
-                value={skills}
-                onChange={(e) => setSkills(e.target.value)}
-                placeholder="e.g. Spring Boot, Docker, AWS"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold outline-none focus:border-brand-primary"
-              />
+              <label className="dgj-label">{t.skills}</label>
+              <input className="dgj-input" type="text" value={skills} onChange={(e) => setSkills(e.target.value)} placeholder={t.skillsPh} />
             </div>
           </div>
 
-          {/* AI Generator Action Button */}
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-[10px] font-bold text-slate-400">
-              {isFR ? 'Besoin d\'aide pour rédiger ?' : 'Need help drafting the prompt?'}
-            </span>
-            <button
-              type="button"
-              onClick={handleGeneratePrompt}
-              disabled={isGenerating || !title.trim()}
-              className="flex items-center space-x-1.5 bg-gradient-to-r from-brand-primary to-brand-deep-blue text-white text-[11px] font-bold px-3.5 py-1.5 rounded-xl shadow-xs hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
-            >
+          <div className="dgj-ai-row">
+            <span className="dgj-ai-hint">{t.helpDraft}</span>
+            <button type="button" className="dgj-ai-btn" onClick={handleGeneratePrompt} disabled={isGenerating || !title.trim()}>
               {isGenerating ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>{isFR ? 'Génération IA...' : 'Generating...'}</span>
-                </>
+                <><RefreshCw size={13} className="dgj-spin" /><span>{t.generating}</span></>
               ) : (
-                <>
-                  <Wand2 className="w-3.5 h-3.5 text-brand-light-blue" />
-                  <span>{isFR ? 'Générer le Prompt par IA' : 'Generate Prompt with AI'}</span>
-                </>
+                <><Wand2 size={13} /><span>{t.generate}</span></>
               )}
             </button>
           </div>
 
-          {/* AI Generated Prompt Confirmation Box */}
           {showPromptConfirm && generatedPromptPreview && (
-            <div className="bg-brand-light-blue/30 border border-brand-mid-blue/40 rounded-2xl p-4 space-y-3 animate-fadeIn">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2 text-brand-primary font-bold text-xs">
-                  <Sparkles className="w-4 h-4 animate-pulse text-brand-accent" />
-                  <span>{isFR ? 'Prompt Généré par l\'Agent IA' : 'AI Agent Generated Prompt'}</span>
-                </div>
-                <span className="text-[9px] font-black uppercase text-brand-primary bg-white px-2 py-0.5 rounded-md border border-brand-mid-blue/30">
-                  {isFR ? 'Vérification requise' : 'Review Required'}
-                </span>
+            <div className="dgj-review">
+              <div className="dgj-review-head">
+                <span className="dgj-review-title"><Sparkles size={14} />{t.reviewTitle}</span>
+                <span className="dgj-review-tag">{t.reviewTag}</span>
               </div>
-
-              {/* Editable generated prompt area */}
               <textarea
+                className="dgj-review-textarea"
                 rows="4"
                 value={generatedPromptPreview}
                 onChange={(e) => setGeneratedPromptPreview(e.target.value)}
-                className="w-full bg-white border border-brand-mid-blue/30 rounded-xl p-3 text-xs font-medium text-slate-700 leading-relaxed outline-none focus:ring-2 focus:ring-brand-primary/20"
               />
-
-              <div className="flex items-center justify-end space-x-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowPromptConfirm(false)}
-                  className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 bg-white border border-slate-200 rounded-xl cursor-pointer"
-                >
-                  {isFR ? 'Annuler' : 'Cancel'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmPrompt}
-                  className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-1.5 rounded-xl shadow-xs cursor-pointer transition-all"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{isFR ? 'Approuver & Appliquer' : 'Approve & Apply Prompt'}</span>
+              <div className="dgj-review-actions">
+                <button type="button" className="dgj-review-cancel" onClick={() => setShowPromptConfirm(false)}>{t.cancel}</button>
+                <button type="button" className="dgj-review-approve" onClick={handleConfirmPrompt}>
+                  <CheckCircle2 size={13} /><span>{t.approve}</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Main Description Textarea */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-              {t('jobDescriptionText')} / Sourcing Prompt
-            </label>
+            <label className="dgj-label">{t.descLabel}</label>
             <textarea
+              className="dgj-textarea"
               rows="4"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Detailed responsibilities, expected tech stack, and ideal candidate profile..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold outline-none focus:border-brand-primary focus:bg-white resize-none transition-all"
+              placeholder={t.descPh}
             />
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            className="w-full bg-brand-primary hover:bg-brand-deep-blue text-white font-bold py-3 rounded-xl text-xs shadow-sm transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{editingJob ? (isFR ? 'Enregistrer les Modifications' : 'Save Changes') : t('createAndSource')}</span>
+          <button type="submit" className="dgj-submit">
+            <Plus size={15} />
+            <span>{editingJob ? t.saveChanges : t.createAndSource}</span>
           </button>
-
         </form>
-
       </div>
     </div>
   );
-};
+}
 
+export default JobDescriptionModal;

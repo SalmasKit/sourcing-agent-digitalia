@@ -1,259 +1,319 @@
-import React, { useState } from 'react';
-import { useLanguage } from '../context/LanguageContext';
-import { getAvatarUrl } from '../utils/avatar';
-import { X, MapPin, Briefcase, Mail, Globe, ExternalLink, GraduationCap, CheckCircle2, Bookmark, BookmarkCheck, Sparkles, Send, DollarSign, Calendar, Edit, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  X, MapPin, Briefcase, Mail, Globe, ExternalLink, GraduationCap,
+  CheckCircle2, Bookmark, BookmarkCheck, Sparkles, Send, DollarSign, Calendar, Edit, Trash2
+} from 'lucide-react';
 
-export const CandidateDetailModal = ({ candidate, onClose, onToggleShortlist, isShortlisted, onEdit, onDelete, onAddNote }) => {
-  const { t } = useLanguage();
-  const [notes, setNotes] = useState('');
+import { useLanguage } from '../context/LanguageContext';
+import { getAvatarUrl as getAvatarUrlUtil } from '../utils/avatar';
+
+function getAvatarUrl(name, avatarUrl) {
+  return getAvatarUrlUtil(name, avatarUrl);
+}
+
+function scoreTone(score) {
+  if (score >= 90) return 'green';
+  if (score >= 80) return 'teal';
+  return 'bronze';
+}
+
+const T = {
+  matchScore: 'match',
+  yearsExp: 'yrs exp.',
+  expectation: 'Expectation:',
+  availability: 'Availability:',
+  editCandidate: 'Edit',
+  deleteCandidate: 'Remove',
+  inShortlist: 'Shortlisted',
+  addToShortlist: 'Add to shortlist',
+  professionalOverview: 'Professional overview',
+  aiEvaluation: 'AI match evaluation',
+  verifiedSkills: 'Verified skills',
+  education: 'Education',
+  contacts: 'Contacts',
+  recruiterNotes: 'Recruiter notes',
+  addNotePlaceholder: 'Add a note about this candidate',
+  saveNote: 'Save',
+  closeProfile: 'Close',
+};
+
+export function CandidateDetailModal({
+  candidate = null,
+  onClose = () => { },
+  onToggleShortlist = () => { },
+  isShortlisted = false,
+  onEdit = () => { },
+  onDelete = () => { },
+  onAddNote = () => { },
+}) {
+  const [note, setNote] = useState('');
+  const fontsLoaded = useRef(false);
+
+  useEffect(() => {
+    if (fontsLoaded.current) return;
+    fontsLoaded.current = true;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href =
+      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
+    document.head.appendChild(link);
+  }, []);
 
   if (!candidate) return null;
 
   const handleAddNote = (e) => {
     e.preventDefault();
-    if (!notes.trim()) return;
-    onAddNote(candidate.id, notes);
-    setNotes('');
+    if (!note.trim()) return;
+    onAddNote(candidate.id, note);
+    setNote('');
   };
 
-  const handleEditClick = () => {
-    onEdit(candidate);
-    onClose();
-  };
+  const handleEditClick = () => { onEdit(candidate); onClose(); };
+  const handleDeleteClick = () => { onDelete(candidate.id); onClose(); };
 
-  const handleDeleteClick = () => {
-    onDelete(candidate.id);
-    onClose();
-  };
+  const tone = scoreTone(candidate.matchScore);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-        
-        {/* Modal Header */}
-        <div className="p-6 bg-slate-900 text-white flex items-start justify-between relative">
-          <div className="flex items-center space-x-4">
+    <div className="dg-root dgm-overlay">
+      <style>{`
+        .dg-root {
+          --dg-paper: #F6F7F9; --dg-surface: #FFFFFF; --dg-sunken: #EFF1F4;
+          --dg-border: #E3E6EB; --dg-border-strong: #CBD2DC;
+          --dg-ink-900: #10151F; --dg-ink-700: #38414F; --dg-ink-500: #6B7280; --dg-ink-400: #96A0AC;
+          --dg-teal-700: #0A5C68; --dg-teal-600: #0E7C8C; --dg-teal-100: #E1F2F3;
+          --dg-bronze-700: #8A4B0C; --dg-bronze-600: #B4650F; --dg-bronze-100: #FBEEDD;
+          --dg-green-700: #1F6E4A; --dg-green-600: #278F5E; --dg-green-100: #E3F5EC;
+          --dg-danger: #B3261E; --dg-danger-bg: #FBEAE9;
+          --font-display: 'Space Grotesk', 'Inter', sans-serif;
+          --font-body: 'Inter', system-ui, sans-serif;
+          --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+          font-family: var(--font-body); color: var(--dg-ink-900);
+        }
+        .dg-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+
+        .dgm-overlay {
+          position: fixed; inset: 0; z-index: 50; overflow-y: auto;
+          background: rgba(16,21,31,0.55); backdrop-filter: blur(3px);
+          display: flex; align-items: center; justify-content: center; padding: 20px;
+        }
+        .dgm-modal {
+          background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 20px;
+          max-width: 720px; width: 100%; max-height: 90vh; overflow: hidden;
+          display: flex; flex-direction: column;
+          box-shadow: 0 30px 70px -30px rgba(16,21,31,0.4);
+        }
+
+        .dgm-header { background: var(--dg-ink-900); color: #fff; padding: 24px; position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+        .dgm-header-person { display: flex; align-items: center; gap: 16px; min-width: 0; }
+        .dgm-avatar { width: 62px; height: 62px; border-radius: 14px; object-fit: cover; border: 1px solid rgba(255,255,255,0.18); flex-shrink: 0; }
+        .dgm-name-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+        .dgm-name { font-size: 18px; font-weight: 700; margin: 0; }
+        .dgm-match-pill {
+          font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 3px 10px;
+          border-radius: 999px; border: 1px solid;
+        }
+        .dgm-match-green { color: #B7EBD0; background: rgba(39,143,94,0.25); border-color: rgba(39,143,94,0.5); }
+        .dgm-match-teal { color: #9FE0E8; background: rgba(14,124,140,0.28); border-color: rgba(14,124,140,0.5); }
+        .dgm-match-bronze { color: #F0C88A; background: rgba(180,101,15,0.25); border-color: rgba(180,101,15,0.5); }
+        .dgm-headline { font-size: 12px; color: rgba(255,255,255,0.6); font-weight: 500; margin-top: 3px; }
+        .dgm-meta { display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: rgba(255,255,255,0.55); margin-top: 8px; }
+        .dgm-meta-item { display: flex; align-items: center; gap: 5px; }
+        .dgm-close { background: none; border: none; color: rgba(255,255,255,0.55); cursor: pointer; padding: 6px; border-radius: 8px; flex-shrink: 0; }
+        .dgm-close:hover { color: #fff; background: rgba(255,255,255,0.1); }
+
+        .dgm-body { padding: 22px 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px; }
+
+        .dgm-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: var(--dg-paper); border: 1px solid var(--dg-border); border-radius: 14px; }
+        .dgm-toolbar-facts { display: flex; align-items: center; gap: 18px; font-size: 11.5px; color: var(--dg-ink-700); font-weight: 500; flex-wrap: wrap; }
+        .dgm-toolbar-fact { display: flex; align-items: center; gap: 6px; }
+        .dgm-toolbar-fact strong { font-weight: 700; color: var(--dg-ink-900); }
+        .dgm-toolbar-actions { display: flex; align-items: center; gap: 8px; }
+
+        .dgm-btn {
+          display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600;
+          padding: 8px 12px; border-radius: 10px; border: 1px solid var(--dg-border);
+          background: var(--dg-surface); color: var(--dg-ink-700); cursor: pointer;
+          transition: background .15s ease, border-color .15s ease, color .15s ease;
+        }
+        .dgm-btn:hover { background: var(--dg-sunken); border-color: var(--dg-border-strong); }
+        .dgm-btn-danger:hover { color: var(--dg-danger); background: var(--dg-danger-bg); border-color: rgba(179,38,30,0.25); }
+        .dgm-btn-shortlist { background: var(--dg-ink-900); color: #fff; border-color: var(--dg-ink-900); }
+        .dgm-btn-shortlist:hover { background: #232C3A; border-color: #232C3A; }
+        .dgm-btn-shortlisted { background: var(--dg-green-100); color: var(--dg-green-700); border-color: rgba(31,110,74,0.25); }
+        .dgm-btn-shortlisted:hover { background: var(--dg-green-100); border-color: rgba(31,110,74,0.25); }
+
+        .dgm-section-label { font-size: 10.5px; font-weight: 700; color: var(--dg-ink-400); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+        .dgm-box { background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 14px; padding: 14px 16px; font-size: 12.5px; color: var(--dg-ink-700); line-height: 1.6; }
+
+        .dgm-ai-box { background: var(--dg-teal-100); border: 1px solid rgba(14,124,140,0.2); border-radius: 14px; padding: 16px; }
+        .dgm-ai-title { font-size: 13px; font-weight: 700; color: var(--dg-teal-700); display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+        .dgm-ai-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+        .dgm-ai-item { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--dg-ink-900); line-height: 1.55; }
+
+        .dgm-skills { display: flex; flex-wrap: wrap; gap: 7px; }
+        .dgm-skill { font-family: var(--font-mono); font-size: 11px; font-weight: 500; background: var(--dg-sunken); color: var(--dg-ink-700); border: 1px solid var(--dg-border); padding: 5px 10px; border-radius: 9px; }
+
+        .dgm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .dgm-info-card { background: var(--dg-paper); border: 1px solid var(--dg-border); border-radius: 14px; padding: 14px 16px; }
+        .dgm-info-label { font-size: 10.5px; font-weight: 700; color: var(--dg-ink-400); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        .dgm-info-value { font-size: 12.5px; font-weight: 600; color: var(--dg-ink-900); }
+        .dgm-contact-row { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 500; color: var(--dg-ink-700); }
+        .dgm-contact-row + .dgm-contact-row { margin-top: 6px; }
+        .dgm-contact-link { color: var(--dg-teal-700); text-decoration: none; }
+        .dgm-contact-link:hover { text-decoration: underline; }
+
+        .dgm-notes-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+        .dgm-note { background: var(--dg-bronze-100); border: 1px solid rgba(180,101,15,0.2); border-radius: 10px; padding: 10px 12px; font-size: 11.5px; color: var(--dg-ink-900); margin-bottom: 8px; }
+        .dgm-note-time { font-size: 10px; color: var(--dg-ink-400); margin-top: 4px; }
+        .dgm-note-form { display: flex; gap: 8px; }
+        .dgm-note-input {
+          flex: 1; background: var(--dg-paper); border: 1px solid var(--dg-border); border-radius: 10px;
+          font-size: 12px; padding: 10px 12px; color: var(--dg-ink-900); outline: none;
+          transition: border-color .15s ease, background .15s ease;
+        }
+        .dgm-note-input:focus { border-color: var(--dg-teal-500, var(--dg-teal-600)); background: var(--dg-surface); }
+        .dgm-note-submit {
+          display: flex; align-items: center; gap: 6px; background: var(--dg-ink-900); color: #fff;
+          border: none; border-radius: 10px; padding: 0 16px; font-size: 12px; font-weight: 600; cursor: pointer;
+        }
+        .dgm-note-submit:hover { background: #232C3A; }
+
+        .dgm-footer { padding: 14px 24px; border-top: 1px solid var(--dg-border); background: var(--dg-paper); display: flex; justify-content: flex-end; }
+        .dgm-footer-btn { padding: 9px 18px; border-radius: 12px; border: 1px solid var(--dg-border-strong); background: var(--dg-surface); color: var(--dg-ink-700); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+        .dgm-footer-btn:hover { background: var(--dg-sunken); }
+
+        @media (max-width: 640px) {
+          .dgm-grid2 { grid-template-columns: 1fr; }
+        }
+      `}</style>
+
+      <div className="dgm-modal">
+        <div className="dgm-header">
+          <div className="dgm-header-person">
             <img
+              className="dgm-avatar"
               src={getAvatarUrl(candidate.fullName, candidate.avatarUrl)}
               alt={candidate.fullName}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = getAvatarUrl(candidate.fullName, null);
-              }}
-              className="w-16 h-16 rounded-xl object-cover border-2 border-slate-700 shadow-md"
+              onError={(e) => { e.target.onerror = null; e.target.src = getAvatarUrl(candidate.fullName, null); }}
             />
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-xl font-extrabold text-white font-jakarta">{candidate.fullName}</h2>
-                <span className="bg-brand-primary text-white text-xs font-extrabold px-2.5 py-0.5 rounded-full">
-                  {candidate.matchScore}% {t('matchScore')}
-                </span>
+            <div style={{ minWidth: 0 }}>
+              <div className="dgm-name-row">
+                <h2 className="dgm-name dg-display">{candidate.fullName}</h2>
+                <span className={`dgm-match-pill dgm-match-${tone}`}>{candidate.matchScore}% {T.matchScore}</span>
               </div>
-              <p className="text-xs text-slate-300 font-medium">{candidate.headline}</p>
-              <div className="flex items-center space-x-4 text-xs text-slate-400 mt-2">
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-brand-soft-blue" />
-                  {candidate.location}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Briefcase className="w-3.5 h-3.5 text-brand-soft-blue" />
-                  {candidate.experienceYears} {t('yearsExp')}
-                </span>
+              <div className="dgm-headline">{candidate.headline}</div>
+              <div className="dgm-meta">
+                <span className="dgm-meta-item"><MapPin size={13} />{candidate.location}</span>
+                <span className="dgm-meta-item"><Briefcase size={13} />{candidate.experienceYears} {T.yearsExp}</span>
               </div>
             </div>
           </div>
-
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
+          <button className="dgm-close" onClick={onClose} aria-label="Close">
+            <X size={18} />
           </button>
         </div>
 
-        {/* Modal Content Scrollable Area */}
-        <div className="p-6 overflow-y-auto space-y-6 text-slate-800">
-          
-          {/* Action Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200/80">
-            <div className="flex items-center space-x-4 text-xs text-slate-600 font-medium">
-              <span className="flex items-center gap-1">
-                <DollarSign className="w-4 h-4 text-emerald-600" />
-                <strong>{t('expectation')}</strong> {candidate.salaryExpectation || 'Negotiable'}
-              </span>
-              <span className="flex items-center gap-1">
-                <Calendar className="w-4 h-4 text-brand-primary" />
-                <strong>{t('availability')}</strong> {candidate.availability || 'Immediate'}
-              </span>
+        <div className="dgm-body">
+          <div className="dgm-toolbar">
+            <div className="dgm-toolbar-facts">
+              <span className="dgm-toolbar-fact"><DollarSign size={14} color="var(--dg-green-600)" /><strong>{T.expectation}</strong> {candidate.salaryExpectation || 'Negotiable'}</span>
+              <span className="dgm-toolbar-fact"><Calendar size={14} color="var(--dg-teal-600)" /><strong>{T.availability}</strong> {candidate.availability || 'Immediate'}</span>
             </div>
-
-            <div className="flex items-center space-x-2">
-              {/* HR Edit Button */}
-              <button
-                onClick={handleEditClick}
-                className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-250 bg-white hover:bg-slate-100 text-slate-700 cursor-pointer"
-                title={t('editCandidate')}
-              >
-                <Edit className="w-4 h-4 text-brand-primary" />
-                <span className="hidden sm:inline">{t('editCandidate')}</span>
+            <div className="dgm-toolbar-actions">
+              <button className="dgm-btn" onClick={handleEditClick} title={T.editCandidate}>
+                <Edit size={13} color="var(--dg-teal-600)" /><span>{T.editCandidate}</span>
               </button>
-
-              {/* HR Delete Button */}
-              <button
-                onClick={handleDeleteClick}
-                className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-250 bg-white hover:bg-rose-50 text-rose-600 cursor-pointer"
-                title={t('deleteCandidate')}
-              >
-                <Trash2 className="w-4 h-4 text-rose-500" />
-                <span className="hidden sm:inline">{t('deleteCandidate')}</span>
+              <button className="dgm-btn dgm-btn-danger" onClick={handleDeleteClick} title={T.deleteCandidate}>
+                <Trash2 size={13} /><span>{T.deleteCandidate}</span>
               </button>
-
-              {/* Shortlist Toggle */}
               <button
+                className={'dgm-btn ' + (isShortlisted ? 'dgm-btn-shortlisted' : 'dgm-btn-shortlist')}
                 onClick={() => onToggleShortlist(candidate)}
-                className={`flex items-center space-x-1.5 text-xs font-semibold px-4 py-2 rounded-lg border transition-all cursor-pointer ${
-                  isShortlisted
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-brand-primary text-white hover:bg-brand-deep-blue border-transparent shadow-xs'
-                }`}
               >
-                {isShortlisted ? (
-                  <>
-                    <BookmarkCheck className="w-4 h-4 text-emerald-600" />
-                    <span>{t('inShortlist')}</span>
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="w-4 h-4" />
-                    <span>{t('addToShortlist')}</span>
-                  </>
-                )}
+                {isShortlisted ? (<><BookmarkCheck size={14} /><span>{T.inShortlist}</span></>) : (<><Bookmark size={14} /><span>{T.addToShortlist}</span></>)}
               </button>
             </div>
           </div>
 
-          {/* Candidate Summary */}
           <div>
-            <h3 className="text-sm font-bold text-slate-900 mb-2 font-jakarta uppercase tracking-wider text-[11px] text-slate-500">
-              {t('professionalOverview')}
-            </h3>
-            <p className="text-sm text-slate-700 leading-relaxed bg-white p-4 rounded-xl border border-slate-200">
-              {candidate.summary}
-            </p>
+            <div className="dgm-section-label">{T.professionalOverview}</div>
+            <div className="dgm-box">{candidate.summary}</div>
           </div>
 
-          {/* AI Match Rationale Report */}
-          <div className="bg-brand-light-blue/20 p-4 rounded-xl border border-brand-mid-blue/10">
-            <h3 className="text-sm font-bold text-slate-950 mb-3 font-jakarta flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-brand-primary" />
-              {t('aiEvaluation')}
-            </h3>
-            <ul className="space-y-2">
+          <div className="dgm-ai-box">
+            <div className="dgm-ai-title"><Sparkles size={15} />{T.aiEvaluation}</div>
+            <ul className="dgm-ai-list">
               {candidate.verifiedMatchReasons?.map((reason, idx) => (
-                <li key={idx} className="flex items-start space-x-2 text-xs text-slate-900">
-                  <CheckCircle2 className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
+                <li className="dgm-ai-item" key={idx}>
+                  <CheckCircle2 size={15} color="var(--dg-teal-600)" style={{ flexShrink: 0, marginTop: 1 }} />
                   <span>{reason}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Technical Skills Breakdown */}
           <div>
-            <h3 className="text-sm font-bold text-slate-900 mb-3 font-jakarta uppercase tracking-wider text-[11px] text-slate-500">
-              {t('verifiedSkills')}
-            </h3>
-            <div className="flex flex-wrap gap-2">
+            <div className="dgm-section-label">{T.verifiedSkills}</div>
+            <div className="dgm-skills">
               {candidate.skills.map((skill, idx) => (
-                <span
-                  key={idx}
-                  className="bg-slate-100 text-slate-800 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200"
-                >
-                  {skill}
-                </span>
+                <span className="dgm-skill" key={idx}>{skill}</span>
               ))}
             </div>
           </div>
 
-          {/* Education & Contacts Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <div className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1.5">
-                <GraduationCap className="w-4 h-4 text-slate-655" />
-                {t('education')}
-              </div>
-              <div className="text-sm font-semibold text-slate-900">{candidate.education}</div>
+          <div className="dgm-grid2">
+            <div className="dgm-info-card">
+              <div className="dgm-info-label"><GraduationCap size={13} />{T.education}</div>
+              <div className="dgm-info-value">{candidate.education}</div>
             </div>
-
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <div className="text-xs font-bold text-slate-500 uppercase mb-2">{t('contacts')}</div>
-              <div className="flex flex-col space-y-1.5 text-xs">
-                <a href={`mailto:${candidate.email}`} className="text-brand-primary hover:underline flex items-center gap-1.5 font-medium">
-                  <Mail className="w-3.5 h-3.5" />
-                  {candidate.email}
-                </a>
-                {candidate.linkedin && (
-                  <span className="text-slate-700 flex items-center gap-1.5 font-medium">
-                    <Globe className="w-3.5 h-3.5 text-brand-primary" />
-                    {candidate.linkedin}
-                  </span>
-                )}
-                {candidate.github && (
-                  <span className="text-slate-700 flex items-center gap-1.5 font-medium">
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-800" />
-                    {candidate.github}
-                  </span>
-                )}
+            <div className="dgm-info-card">
+              <div className="dgm-info-label">{T.contacts}</div>
+              <div className="dgm-contact-row">
+                <Mail size={13} color="var(--dg-teal-600)" />
+                <a className="dgm-contact-link" href={`mailto:${candidate.email}`}>{candidate.email}</a>
               </div>
+              {candidate.linkedin && (
+                <div className="dgm-contact-row"><Globe size={13} color="var(--dg-teal-600)" />{candidate.linkedin}</div>
+              )}
+              {candidate.github && (
+                <div className="dgm-contact-row"><ExternalLink size={13} color="var(--dg-ink-500)" />{candidate.github}</div>
+              )}
             </div>
           </div>
 
-          {/* Recruiter Internal Notes */}
-          <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-sm font-bold text-slate-900 mb-3 font-jakarta">{t('recruiterNotes')}</h3>
-            
+          <div>
+            <div className="dgm-notes-title dg-display">{T.recruiterNotes}</div>
             {candidate.notes && candidate.notes.length > 0 && (
-              <div className="space-y-2 mb-3">
-                {candidate.notes.map((note) => (
-                  <div key={note.id} className="bg-amber-50/70 p-3 rounded-lg border border-amber-200 text-xs text-slate-800">
-                    <div className="font-medium">{note.text}</div>
-                    <div className="text-[10px] text-slate-400 mt-1">{note.time}</div>
+              <div>
+                {candidate.notes.map((n) => (
+                  <div className="dgm-note" key={n.id}>
+                    <div>{n.text}</div>
+                    <div className="dgm-note-time">{n.time}</div>
                   </div>
                 ))}
               </div>
             )}
-
-            <form onSubmit={handleAddNote} className="flex gap-2">
+            <form className="dgm-note-form" onSubmit={handleAddNote}>
               <input
+                className="dgm-note-input"
                 type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={t('addNotePlaceholder')}
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg text-xs p-2.5 text-slate-900 outline-none focus:border-brand-primary"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={T.addNotePlaceholder}
               />
-              <button
-                type="submit"
-                className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>{t('saveNote')}</span>
+              <button className="dgm-note-submit" type="submit">
+                <Send size={13} /><span>{T.saveNote}</span>
               </button>
             </form>
           </div>
-
         </div>
 
-        {/* Modal Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-sm font-semibold transition-colors cursor-pointer"
-          >
-            {t('closeProfile')}
-          </button>
+        <div className="dgm-footer">
+          <button className="dgm-footer-btn" onClick={onClose}>{T.closeProfile}</button>
         </div>
-
       </div>
     </div>
   );
-};
+}
+
+export default CandidateDetailModal;
