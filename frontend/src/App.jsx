@@ -29,49 +29,118 @@ if (typeof window !== 'undefined' && !localStorage.getItem('digitalia_tables_cle
   localStorage.setItem('digitalia_tables_cleared_v4', 'true');
 }
 
+function getEmptyUserState() {
+  return {
+    jobDescriptions: [],
+    savedRoleCandidates: {},
+    candidatePipelineStage: {},
+    searchHistory: [],
+    jobResultsCache: {}
+  };
+}
+
 function DashboardContent() {
   const { t, lang } = useLanguage();
+  const { user } = useAuth();
+  const userKey = user?.email ? user.email.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'guest';
+
   const [activeTab, setActiveTab] = useState(() => {
-    const saved = localStorage.getItem('digitalia_active_tab');
+    const saved = localStorage.getItem(`digitalia_user_${userKey}_active_tab`);
     return saved || 'sourcing';
   });
 
   useEffect(() => {
-    localStorage.setItem('digitalia_active_tab', activeTab);
-  }, [activeTab]);
-  // Per-job result cache: { [jobId]: [candidate, ...] }
+    localStorage.setItem(`digitalia_user_${userKey}_active_tab`, activeTab);
+  }, [activeTab, userKey]);
+
+  // Per-user job result cache: { [jobId]: [candidate, ...] }
   const [jobResultsCache, setJobResultsCache] = useState(() => {
-    const saved = localStorage.getItem('digitalia_job_results');
+    const saved = localStorage.getItem(`digitalia_user_${userKey}_job_results`);
     if (saved) { try { return JSON.parse(saved); } catch(e) {} }
-    return {};
+    return getEmptyUserState().jobResultsCache;
   });
 
-  const [candidates, setCandidates] = useState(() => {
-    const cache = (() => {
-      const saved = localStorage.getItem('digitalia_job_results');
-      if (saved) { try { return JSON.parse(saved); } catch(e) {} }
-      return {};
-    })();
-    return cache['job-1'] || [];
+  const [jobDescriptions, setJobDescriptions] = useState(() => {
+    const saved = localStorage.getItem(`digitalia_user_${userKey}_job_descriptions`);
+    if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+    return getEmptyUserState().jobDescriptions;
   });
-  const [isSearching, setIsSearching] = useState(false);
-  const [agentStep, setAgentStep] = useState(1);
+
+  const [savedRoleCandidates, setSavedRoleCandidates] = useState(() => {
+    const saved = localStorage.getItem(`digitalia_user_${userKey}_saved_role_candidates`);
+    if (saved) { try { return JSON.parse(saved); } catch(e) {} }
+    return getEmptyUserState().savedRoleCandidates;
+  });
+
   const [shortlist, setShortlist] = useState(() => {
-    const saved = localStorage.getItem('digitalia_shortlist');
+    const saved = localStorage.getItem(`digitalia_user_${userKey}_shortlist`);
     if (saved) { try { return JSON.parse(saved); } catch(e) {} }
     return [];
   });
 
-  // Pipeline Kanban stage per candidate: { [candId]: 'new' | 'contacted' | 'interview' | 'offer' | 'hired' | 'rejected' }
   const [candidatePipelineStage, setCandidatePipelineStage] = useState(() => {
-    const saved = localStorage.getItem('digitalia_pipeline_stages');
+    const saved = localStorage.getItem(`digitalia_user_${userKey}_pipeline_stages`);
     if (saved) { try { return JSON.parse(saved); } catch(e) {} }
-    return {};
+    return getEmptyUserState().candidatePipelineStage;
   });
 
+  const [searchHistory, setSearchHistory] = useState(() => {
+    const saved = localStorage.getItem(`digitalia_user_${userKey}_search_history`);
+    if (saved) { try { return JSON.parse(saved); } catch(e) {} }
+    return getEmptyUserState().searchHistory;
+  });
+
+  const [candidates, setCandidates] = useState(() => {
+    const defaultJobId = jobDescriptions[0]?.id;
+    return (defaultJobId && jobResultsCache[defaultJobId]) || [];
+  });
+
+  // Re-sync states whenever user switches accounts
   useEffect(() => {
-    localStorage.setItem('digitalia_pipeline_stages', JSON.stringify(candidatePipelineStage));
-  }, [candidatePipelineStage]);
+    const seed = getEmptyUserState();
+    
+    const savedJds = localStorage.getItem(`digitalia_user_${userKey}_job_descriptions`);
+    const jds = savedJds ? JSON.parse(savedJds) : seed.jobDescriptions;
+    setJobDescriptions(jds);
+
+    const savedSavedRole = localStorage.getItem(`digitalia_user_${userKey}_saved_role_candidates`);
+    setSavedRoleCandidates(savedSavedRole ? JSON.parse(savedSavedRole) : seed.savedRoleCandidates);
+
+    const savedCache = localStorage.getItem(`digitalia_user_${userKey}_job_results`);
+    const cache = savedCache ? JSON.parse(savedCache) : seed.jobResultsCache;
+    setJobResultsCache(cache);
+
+    const savedStages = localStorage.getItem(`digitalia_user_${userKey}_pipeline_stages`);
+    setCandidatePipelineStage(savedStages ? JSON.parse(savedStages) : seed.candidatePipelineStage);
+
+    const savedHistory = localStorage.getItem(`digitalia_user_${userKey}_search_history`);
+    setSearchHistory(savedHistory ? JSON.parse(savedHistory) : seed.searchHistory);
+
+    const defaultJobId = jds[0]?.id;
+    setCandidates((defaultJobId && cache[defaultJobId]) || []);
+    setSelectedJobId(defaultJobId || null);
+  }, [userKey]);
+
+  // Persist user-specific datasets to localStorage on change
+  useEffect(() => {
+    localStorage.setItem(`digitalia_user_${userKey}_job_descriptions`, JSON.stringify(jobDescriptions));
+  }, [jobDescriptions, userKey]);
+
+  useEffect(() => {
+    localStorage.setItem(`digitalia_user_${userKey}_saved_role_candidates`, JSON.stringify(savedRoleCandidates));
+  }, [savedRoleCandidates, userKey]);
+
+  useEffect(() => {
+    localStorage.setItem(`digitalia_user_${userKey}_job_results`, JSON.stringify(jobResultsCache));
+  }, [jobResultsCache, userKey]);
+
+  useEffect(() => {
+    localStorage.setItem(`digitalia_user_${userKey}_pipeline_stages`, JSON.stringify(candidatePipelineStage));
+  }, [candidatePipelineStage, userKey]);
+
+  useEffect(() => {
+    localStorage.setItem(`digitalia_user_${userKey}_search_history`, JSON.stringify(searchHistory));
+  }, [searchHistory, userKey]);
 
   const handleUpdateCandidateStage = (candidateId, newStage) => {
     setCandidatePipelineStage(prev => ({
@@ -95,34 +164,16 @@ function DashboardContent() {
   // Comparator state
   const [isComparatorOpen, setIsComparatorOpen] = useState(false);
 
-  // Search History tracking
-  const [searchHistory, setSearchHistory] = useState(() => {
-    const saved = localStorage.getItem('digitalia_search_history');
-    if (saved) { try { return JSON.parse(saved); } catch(e) {} }
-    return [];
-  });
-
   // Track last search so the refresh button can re-run it
   const [lastSearch, setLastSearch] = useState(null);
 
-  useEffect(() => {
-    localStorage.setItem('digitalia_search_history', JSON.stringify(searchHistory));
-  }, [searchHistory]);
-
-  // Persist per-job cache to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('digitalia_job_results', JSON.stringify(jobResultsCache));
-  }, [jobResultsCache]);
-  // savedRoleCandidates: { [jobId]: [candidateId, ...] }
-  const [savedRoleCandidates, setSavedRoleCandidates] = useState(() => {
-    const saved = localStorage.getItem('digitalia_saved_role_candidates');
-    if (saved) { try { return JSON.parse(saved); } catch(e) {} }
-    return {};
-  });
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   const [isBackendOnline, setIsBackendOnline] = useState(true);
+
+  const [isSearching, setIsSearching] = useState(false);
+  const [agentStep, setAgentStep] = useState(1);
 
   // View state: 'grid' vs 'carousel'
   const [viewMode, setViewMode] = useState('carousel');
@@ -136,38 +187,6 @@ function DashboardContent() {
   const [isJobModalOpen, setIsJobModalOpen] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
   const [selectedJobId, setSelectedJobId] = useState(null);
-  const [jobDescriptions, setJobDescriptions] = useState(() => {
-    const saved = localStorage.getItem('digitalia_job_descriptions');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse saved jobs:', e);
-      }
-    }
-    return [];
-  });
-
-  // Ensure legacy mock data in localStorage is cleared once
-  useEffect(() => {
-    if (!localStorage.getItem('digitalia_mock_cleared_v2')) {
-      localStorage.removeItem('digitalia_job_descriptions');
-      localStorage.removeItem('digitalia_saved_role_candidates');
-      localStorage.removeItem('digitalia_job_results');
-      localStorage.removeItem('digitalia_shortlist');
-      localStorage.removeItem('digitalia_pipeline_stages');
-      localStorage.removeItem('digitalia_search_history');
-      localStorage.setItem('digitalia_mock_cleared_v2', 'true');
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('digitalia_job_descriptions', JSON.stringify(jobDescriptions));
-  }, [jobDescriptions]);
-
-  useEffect(() => {
-    localStorage.setItem('digitalia_saved_role_candidates', JSON.stringify(savedRoleCandidates));
-  }, [savedRoleCandidates]);
 
   // Gather ALL known candidate objects across current search state, shortlist, and per-job caches
   const allKnownCandidates = useMemo(() => {
@@ -973,6 +992,7 @@ function DashboardContent() {
         {/* Tab 4: Dashboard Analytics View */}
         {activeTab === 'dashboard' && (
           <DashboardView
+            user={user}
             jobDescriptions={jobDescriptions}
             candidates={allKnownCandidates}
             savedRoleCandidates={savedRoleCandidates}
