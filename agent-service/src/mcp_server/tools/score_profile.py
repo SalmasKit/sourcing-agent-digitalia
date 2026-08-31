@@ -20,9 +20,10 @@ settings = get_settings()
 def _get_llm() -> ChatGroq | None:
     if not settings.groq_api_key:
         return None
+    model_name = settings.groq_model or "qwen/qwen3.6-27b"
     return ChatGroq(
         api_key=settings.groq_api_key,
-        model=settings.groq_model,
+        model=model_name,
         temperature=settings.groq_temperature,
         max_tokens=1024,
     )
@@ -56,7 +57,7 @@ def _build_profile_context(profile: dict) -> str:
     if skills := profile.get("skills"):
         parts.append(f"Skills: {', '.join(skills)}")
     if summary := profile.get("summary"):
-        parts.append(f"Summary: {summary[:300]}")
+        parts.append(f"Summary: {summary}")
     return "\n".join(parts)
 
 
@@ -69,9 +70,24 @@ async def score_profile(
     job_text = _build_job_context(criteria)
     profile_text = _build_profile_context(profile)
 
-    # 1. Embedding similarity
-    embedding_similarity = await compute_similarity(job_text, profile_text)
-    embedding_score = round(embedding_similarity * 100)
+    # 1. Role / Title Match Score (Crucial for exact career domain alignment)
+    req_title = (criteria.get("job_title") or "").strip().lower()
+    cand_title = f"{profile.get('headline', '')} {profile.get('current_role', '')}".lower()
+
+    if not req_title:
+        title_score = 90
+    else:
+        stop_words = {"lead", "senior", "junior", "manager", "head", "specialist", "in", "and", "of", "the", "de", "du", "des", "le", "la", "pour", "chef", "responsable", "directeur", "consultant"}
+        req_words = [w for w in re.findall(r'\w+', req_title) if w not in stop_words]
+        if req_title in cand_title:
+            title_score = 100
+        elif req_words and all(w in cand_title for w in req_words):
+            title_score = 95
+        elif req_words and any(w in cand_title for w in req_words):
+            matched_count = sum(1 for w in req_words if w in cand_title)
+            title_score = 60 + int((matched_count / len(req_words)) * 30)
+        else:
+            title_score = 30  # Heavily penalize unrelated domains
 
     # 2. Rule-based skill score
     required_skills = [s.lower() for s in criteria.get("required_skills", [])]
@@ -83,6 +99,17 @@ async def score_profile(
 
     # 3. Experience score
     min_exp = criteria.get("min_experience_years") or 0
+    if min_exp == 0:
+        seniority_str = f"{criteria.get('seniority', '')} {criteria.get('job_title', '')}".lower()
+        if "senior" in seniority_str:
+            min_exp = 5
+        elif any(k in seniority_str for k in ["lead", "principal", "architect", "manager", "director"]):
+            min_exp = 8
+        elif any(k in seniority_str for k in ["mid", "medior"]):
+            min_exp = 3
+        elif any(k in seniority_str for k in ["junior", "entry"]):
+            min_exp = 1
+
     candidate_exp = profile.get("experience_years") or 0
     if min_exp == 0:
         exp_score = 80
@@ -102,17 +129,25 @@ async def score_profile(
     elif "remote" in cand_loc or "remote" in req_loc:
         location_score = 90
     else:
-        location_score = 75
+        location_score = 70
 
-    # Base weighted score
+    # Base weighted score prioritizing exact title & skills
     base_score = int(
-        skill_score * 0.40
-        + exp_score * 0.25
-        + location_score * 0.20
-        + embedding_score * 0.15
+        title_score * 0.35
+        + skill_score * 0.30
+        + exp_score * 0.20
+        + location_score * 0.15
     )
 
-    # 5. LLM rationale generation
+    # 5. Semantic embedding score
+    try:
+        raw_sim = await compute_similarity(job_text, profile_text)
+        embedding_score = round(max(0.0, min(1.0, float(raw_sim))) * 100)
+    except Exception as exc:
+        logger.warning(f"Embedding similarity computation failed: {exc}")
+        embedding_score = 70
+
+    # 6. LLM rationale generation
     llm_data = {}
     llm = _get_llm() if use_llm_rationale else None
     if llm:
@@ -127,7 +162,7 @@ async def score_profile(
                         "skills": profile.get("skills"),
                         "experience_years": profile.get("experience_years"),
                         "location": profile.get("location"),
-                        "summary": profile.get("summary", "")[:300],
+                        "summary": profile.get("summary", ""),
                     }, ensure_ascii=False, indent=2),
                 )),
             ]
@@ -140,6 +175,8 @@ async def score_profile(
                 ).strip()
             else:
                 raw = content.strip()
+            # Strip <think>...</think> tags from qwen reasoning models
+            raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
             json_match = re.search(r"\{.*\}", raw, re.DOTALL)
             if json_match:
                 llm_data = json.loads(json_match.group())

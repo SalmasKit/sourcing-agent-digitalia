@@ -20,7 +20,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=3, description="Natural language sourcing query")
     job_id: str | None = Field(default=None, description="Optional Job Description ID")
     search_request_id: str | None = Field(default=None, description="Optional Search Request ID from Spring Boot")
-    max_results: int = Field(default=20, ge=1, le=50)
+    max_results: int = Field(default=10, ge=1, le=50)
 
 
 class ScoreRequest(BaseModel):
@@ -42,7 +42,7 @@ async def health_check() -> HealthResponse:
         status="ok",
         agent="Digitalia Sourcing Agent v1.0",
         model=settings.groq_model,
-        data_source="mock" if settings.effective_use_mock else "serpapi",
+        data_source="serpapi",
         groq_configured=bool(settings.groq_api_key),
     )
 
@@ -81,5 +81,5 @@ async def list_models() -> dict:
             {"id": "llama-3.1-8b-instant", "name": "Llama 3.1 8B", "recommended": False},
             {"id": "mixtral-8x7b-32768", "name": "Mixtral 8x7B", "recommended": False},
         ],
-        "data_source": "mock" if settings.effective_use_mock else "serpapi",
+        "data_source": "serpapi",
     }

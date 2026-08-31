@@ -21,7 +21,7 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
     document.head.appendChild(link);
   }, []);
 
-  // Sync default location and tech from selectedJob when it changes
+  // Sync default location, tech, and prompt from selectedJob when it changes
   useEffect(() => {
     if (selectedJob) {
       if (selectedJob.location && selectedJob.location !== 'All Locations') {
@@ -30,20 +30,27 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
       if (selectedJob.skills && selectedJob.skills.length > 0) {
         setSelectedTech(selectedJob.skills);
       }
+      // Pre-fill the search query with the job's sourcing prompt/description
+      const jobPrompt = selectedJob.description || selectedJob.prompt || '';
+      if (jobPrompt.trim()) {
+        setQuery(jobPrompt.trim());
+      }
+    } else {
+      setQuery('');
     }
   }, [selectedJob?.id]);
 
   const QUICK_PROMPTS = lang === 'FR' ? [
-    selectedJob ? `Expert ${selectedJob.title} avec 5+ ans d'expérience` : "Ingénieurs Java & Spring Boot Senior à Casablanca",
-    selectedJob ? `Candidat disponible immédiatement pour ${selectedJob.title}` : "Développeurs Full-Stack React & TypeScript",
-    selectedJob ? `Expertise ${selectedJob.skills?.join(', ') || 'technique'} éprouvée` : "DevOps / SRE avec Docker & Kubernetes"
+    selectedJob ? `Expert ${selectedJob.title} avec 5+ ans d'expérience` : "Chef de Projet Marketing Digital & Strategy",
+    selectedJob ? `Candidat disponible immédiatement pour ${selectedJob.title}` : "Ingénieur Full-Stack React & Spring Boot",
+    selectedJob ? `Expertise ${selectedJob.skills?.join(', ') || 'professionnelle'} éprouvée` : "Responsable RH & Talent Acquisition Specialist"
   ] : [
-    selectedJob ? `Senior ${selectedJob.title} with 5+ years experience` : "Senior Java & Spring Boot Engineers in Casablanca",
-    selectedJob ? `Immediately available candidate for ${selectedJob.title}` : "Full-Stack React & TypeScript Developers",
-    selectedJob ? `Proven ${selectedJob.skills?.join(', ') || 'technical'} expertise` : "DevOps / SRE with Docker & Kubernetes"
+    selectedJob ? `Senior ${selectedJob.title} with 5+ years experience` : "Senior Digital Marketing & Strategy Lead",
+    selectedJob ? `Immediately available candidate for ${selectedJob.title}` : "Full-Stack Engineer (React & Spring Boot)",
+    selectedJob ? `Proven ${selectedJob.skills?.join(', ') || 'professional'} expertise` : "HR Manager & Talent Acquisition Lead"
   ];
 
-  const TECH_TAGS = ['Java', 'Spring Boot', 'React', 'Docker', 'Python', 'AWS', 'TypeScript', 'PostgreSQL'];
+  const TECH_TAGS = ['Java & Spring', 'React', 'Digital Marketing', 'Financial Analysis', 'HR & Recruiting', 'Sales & BD', 'Python', 'Project Management'];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -64,7 +71,8 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
   };
 
   const handleReset = () => {
-    setQuery('');
+    const jobPrompt = selectedJob?.description || selectedJob?.prompt || '';
+    setQuery(jobPrompt.trim());
     setLocation(selectedJob?.location || 'All Locations');
     setMinExp(3);
     setSelectedTech(selectedJob?.skills || []);

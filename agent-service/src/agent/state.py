@@ -10,9 +10,12 @@ class SourcingState(TypedDict):
     Shared state flowing through all LangGraph nodes.
 
     Flow:
-        raw_query → [interpret] → criteria
-        criteria  → [search]    → raw_profiles
-        raw_profiles → [score]  → scored_profiles
+        raw_query    → [interpret]  → criteria
+        criteria     → [search]     → raw_profiles       (SerpAPI or mock)
+        raw_profiles → [enrich]     → raw_profiles       (RapidAPI data merged in;
+                                                          each profile gains enrichment_source:
+                                                          "enriched" | "snippet_fallback")
+        raw_profiles → [score]      → scored_profiles
         scored_profiles → [format] → final_output
     """
 

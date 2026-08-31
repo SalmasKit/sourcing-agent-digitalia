@@ -219,9 +219,25 @@ export const logoutApi = async () => {
   storage.clearSession();
 };
 
-// ─────────────────────────────────────────────
-// Search / Candidates API
-// ─────────────────────────────────────────────
+function parseExperienceYears(val, headline = '', summary = '') {
+  if (typeof val === 'number' && !isNaN(val) && val >= 0) return val;
+  const text = `${headline} ${summary}`.toLowerCase();
+  if (text.includes('intern') || text.includes('stagiaire') || text.includes('stage') || text.includes('student') || text.includes('etudiant')) {
+    return 0;
+  }
+  if (text.includes('junior') || text.includes('entry') || text.includes('debutant')) {
+    return 1;
+  }
+  if (text.includes('senior') || text.includes('expert')) {
+    return 5;
+  }
+  if (text.includes('lead') || text.includes('principal') || text.includes('architect') || text.includes('manager')) {
+    return 8;
+  }
+  const match = text.match(/(\d+)\+?\s*(years?|yrs?|ans)/i);
+  if (match) return parseInt(match[1], 10);
+  return 3;
+}
 
 export const searchCandidatesApi = async (searchQuery, filters = {}) => {
   let fullPrompt = searchQuery || '';
@@ -232,8 +248,6 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
     if (!fullPrompt.toLowerCase().includes(locFilter.toLowerCase())) {
       fullPrompt = fullPrompt ? `${fullPrompt} in ${locFilter}` : `Candidates in ${locFilter}`;
     }
-  } else if (!fullPrompt.toLowerCase().includes('morocco') && !fullPrompt.toLowerCase().includes('maroc')) {
-    fullPrompt = fullPrompt ? `${fullPrompt} in Morocco` : `Candidates in Morocco`;
   }
 
   // Append tech skills if provided and missing
@@ -249,12 +263,13 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
     fullPrompt += ` with ${filters.minExp}+ years experience`;
   }
 
-  // 1. Direct agent-service call for real-time live SerpAPI sourcing (returns 20 candidates)
+  // 1. Direct agent-service call for real-time live SerpAPI sourcing (returns 2 candidates)
   try {
     const response = await axios.post('http://localhost:8001/api/search', {
       query: fullPrompt,
-      max_results: 20,
+      max_results: 2,
     });
+
     const agentData = response.data;
     const profiles = agentData?.profiles || [];
 
@@ -268,18 +283,48 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
         const uniqueId = p.id && !p.id.startsWith('serpapi-')
           ? p.id
           : `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Math.abs(name.split('').reduce((a, c) => a + c.charCodeAt(0), 0))}`;
+        const exp = parseExperienceYears(p.experience_years, p.headline, p.summary);
+        const cleanName = name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '');
+        const candEmail = p.email || p.email_address || (cleanName ? `${cleanName}@talent-candidate.ma` : `candidate-${uniqueId}@talent-candidate.ma`);
+        const cleanRole = (p.headline || 'Software Professional').split(' at ')[0].split(' chez ')[0].split(' - ')[0].split(' | ')[0].trim();
+        const companyName = p.current_company || p.currentCompany || 'Listed on LinkedIn Profile';
+        const defaultExpList = [
+          {
+            role: cleanRole,
+            company: companyName,
+            period: 'Current Position',
+            description: p.summary && p.summary !== p.headline ? p.summary : `Active ${cleanRole} position at ${companyName}. Full details on profile.`
+          }
+        ];
+        const candEducations = Array.isArray(p.educations) && p.educations.length > 0
+          ? p.educations
+          : (p.education && p.education !== 'Higher Education (See LinkedIn Profile)'
+            ? [{ degree: p.education, institution: p.education, period: 'Graduated', description: `Degree in ${p.education}` }]
+            : []);
+
+        const candExperiences = Array.isArray(p.experiences) && p.experiences.length > 0
+          ? p.experiences
+          : defaultExpList;
+
         return {
           id: uniqueId,
           fullName: name,
           headline: p.headline,
           location: p.location,
-          experienceYears: p.experience_years || 5,
+          experienceYears: exp,
+          email: candEmail,
           matchScore: p.match_score || p.score || 80,
-          summary: p.summary || p.headline,
+          summary: p.summary || p.about || p.bio || p.headline,
           skills: Array.isArray(p.skills) ? p.skills : (p.skills?.skills || []),
           linkedin: p.linkedin_url || p.source_url,
           avatarUrl: p.avatar_url || defaultAvatar,
           verifiedMatchReasons: p.match_rationale || [],
+          education: p.education || null,
+          educations: candEducations,
+          availability: p.availability || 'Open for Outreach (Contact Candidate)',
+          salaryExpectation: p.salary_expectation || p.salaryExpectation || (exp >= 5 ? '[Est. Market Benchmark] 25,000 - 34,000 MAD / mo' : '[Est. Market Benchmark] 16,000 - 24,000 MAD / mo'),
+          languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : [],
+          experiences: candExperiences,
           source: p.source || 'serpapi',
         };
       });
@@ -299,18 +344,43 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
       return pData.map(p => {
         const name = p.fullName || 'Candidate';
         const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0284c7&color=fff&bold=true`;
+        const cleanName = name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '');
+        const candEmail = p.email || p.emailAddress || `${cleanName}@talent-candidate.ma`;
+        const exp = p.experienceYears || 3;
+        const comp = p.headline ? (p.headline.includes(' at ') ? p.headline.split(' at ')[1] : 'Listed on LinkedIn Profile') : 'Listed on LinkedIn Profile';
+        const cleanRole = p.headline ? p.headline.split(' at ')[0].split(' chez ')[0].split(' - ')[0].trim() : 'Software Professional';
+        const candEducations = Array.isArray(p.educations) && p.educations.length > 0
+          ? p.educations
+          : (p.education && p.education !== 'Higher Education (See LinkedIn Profile)'
+            ? [{ degree: p.education, institution: p.education, period: 'Graduated', description: `Degree in ${p.education}` }]
+            : []);
+
         return {
           id: p.id || `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
           fullName: name,
           headline: p.headline,
           location: p.location,
-          experienceYears: p.experienceYears,
+          experienceYears: exp,
+          email: candEmail,
           matchScore: Math.round(p.score || 80),
-          summary: p.headline || p.fullName,
+          summary: p.about || p.bio || p.summary || p.headline || p.fullName,
           skills: Array.isArray(p.skills) ? p.skills : (p.skills?.skills || []),
           linkedin: p.sourceUrl,
           source: p.sourcePlatform,
           avatarUrl: p.avatarUrl || p.avatar_url || defaultAvatar,
+          education: p.education || null,
+          educations: candEducations,
+          availability: p.availability || 'Open for Outreach (Contact Candidate)',
+          salaryExpectation: p.salaryExpectation || (exp >= 5 ? '[Est. Market Benchmark] 25,000 - 34,000 MAD / mo' : '[Est. Market Benchmark] 16,000 - 24,000 MAD / mo'),
+          languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : [],
+          experiences: Array.isArray(p.experiences) && p.experiences.length > 0 ? p.experiences : [
+            {
+              role: cleanRole,
+              company: comp,
+              period: 'Current Position',
+              description: `Active ${cleanRole} position at ${comp}.`
+            }
+          ]
         };
       });
     }

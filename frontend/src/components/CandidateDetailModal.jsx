@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  X, MapPin, Briefcase, Mail, Globe, ExternalLink, GraduationCap,
-  CheckCircle2, Bookmark, BookmarkCheck, Sparkles, Send, DollarSign, Calendar, Edit, Trash2
+  X, MapPin, Briefcase, Mail, Globe, ExternalLink,
+  CheckCircle2, Bookmark, BookmarkCheck, Sparkles, Send, DollarSign, Calendar, Edit, Trash2, Languages
 } from 'lucide-react';
+
 
 import { useLanguage } from '../context/LanguageContext';
 import { getAvatarUrl as getAvatarUrlUtil } from '../utils/avatar';
@@ -16,6 +17,69 @@ function scoreTone(score) {
   if (score >= 80) return 'teal';
   return 'bronze';
 }
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatExperiencePeriod(expItem) {
+  if (!expItem) return 'Present';
+
+  let period = expItem.period || expItem.duration || '';
+
+  // Clean python dict artifact if any e.g. "{'year': 2021..."
+  if (typeof period === 'string' && period.includes("{'year'")) {
+    const years = period.match(/\b(19\d\d|20\d\d)\b/g);
+    if (years && years.length >= 2) return `${years[0]} - ${years[1]}`;
+    if (years && years.length === 1) return `${years[0]} - Present`;
+  }
+
+  // Format ISO range e.g. "2021-03 - 2023-08" -> "Mar 2021 - Aug 2023"
+  if (typeof period === 'string' && period.trim()) {
+    let p = period.trim();
+    p = p.replace(/^(\d{4})-(\d{1,2})\s*[-–—]\s*(\d{4})-(\d{1,2})$/, (_, y1, m1, y2, m2) => {
+      const sm = MONTH_NAMES[parseInt(m1, 10) - 1] || m1;
+      const em = MONTH_NAMES[parseInt(m2, 10) - 1] || m2;
+      return `${sm} ${y1} - ${em} ${y2}`;
+    });
+    p = p.replace(/^(\d{4})-(\d{1,2})\s*[-–—]\s*(Present|Current|Actuel|Aujourd'hui)$/i, (_, y1, m1) => {
+      const sm = MONTH_NAMES[parseInt(m1, 10) - 1] || m1;
+      return `${sm} ${y1} - Present`;
+    });
+    if (!p.toLowerCase().includes('null') && !p.toLowerCase().includes('none')) {
+      return p;
+    }
+  }
+
+  const formatSingleDate = (raw) => {
+    if (!raw) return '';
+    if (typeof raw === 'object') {
+      const y = raw.year || raw.start_year || raw.end_year;
+      const m = raw.month || raw.start_month || raw.end_month;
+      if (y && m) {
+        const mIdx = typeof m === 'number' ? m - 1 : parseInt(m, 10) - 1;
+        return `${MONTH_NAMES[mIdx] || m} ${y}`;
+      }
+      return y ? String(y) : '';
+    }
+    const s = String(raw).trim();
+    const isoMatch = s.match(/^(\d{4})-(\d{1,2})/);
+    if (isoMatch) {
+      const mIdx = parseInt(isoMatch[2], 10) - 1;
+      return `${MONTH_NAMES[mIdx] || isoMatch[2]} ${isoMatch[1]}`;
+    }
+    return s.length >= 4 ? s : '';
+  };
+
+  const startStr = formatSingleDate(expItem.start || expItem.startDate || expItem.starts_at || expItem.start_date);
+  const endStr = formatSingleDate(expItem.end || expItem.endDate || expItem.ends_at || expItem.end_date);
+
+  if (startStr && endStr) return `${startStr} - ${endStr}`;
+  if (startStr) return `${startStr} - Present`;
+  if (endStr) return `Until ${endStr}`;
+
+  return period || 'Present';
+}
+
+
 
 const T = {
   matchScore: 'match',
@@ -115,7 +179,7 @@ export function CandidateDetailModal({
         .dgm-match-green { color: #B7EBD0; background: rgba(39,143,94,0.25); border-color: rgba(39,143,94,0.5); }
         .dgm-match-teal { color: #9FE0E8; background: rgba(14,124,140,0.28); border-color: rgba(14,124,140,0.5); }
         .dgm-match-bronze { color: #F0C88A; background: rgba(180,101,15,0.25); border-color: rgba(180,101,15,0.5); }
-        .dgm-headline { font-size: 12px; color: rgba(255,255,255,0.6); font-weight: 500; margin-top: 3px; }
+        .dgm-headline { font-size: 12.5px; color: rgba(255,255,255,0.75); font-weight: 500; margin-top: 4px; line-height: 1.45; word-break: break-word; }
         .dgm-meta { display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: rgba(255,255,255,0.55); margin-top: 8px; }
         .dgm-meta-item { display: flex; align-items: center; gap: 5px; }
         .dgm-close { background: none; border: none; color: rgba(255,255,255,0.55); cursor: pointer; padding: 6px; border-radius: 8px; flex-shrink: 0; }
@@ -220,6 +284,18 @@ export function CandidateDetailModal({
               <span className="dgm-toolbar-fact"><Calendar size={14} color="var(--dg-teal-600)" /><strong>{T.availability}</strong> {candidate.availability || 'Immediate'}</span>
             </div>
             <div className="dgm-toolbar-actions">
+              {candidate.linkedin && (
+                <a
+                  className="dgm-btn dgm-btn-linkedin"
+                  href={candidate.linkedin.startsWith('http') ? candidate.linkedin : `https://${candidate.linkedin}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <ExternalLink size={13} color="var(--dg-teal-700)" />
+                  <span style={{ color: 'var(--dg-teal-700)', fontWeight: 700 }}>LinkedIn</span>
+                </a>
+              )}
               <button className="dgm-btn" onClick={handleEditClick} title={T.editCandidate}>
                 <Edit size={13} color="var(--dg-teal-600)" /><span>{T.editCandidate}</span>
               </button>
@@ -261,24 +337,97 @@ export function CandidateDetailModal({
             </div>
           </div>
 
-          <div className="dgm-grid2">
-            <div className="dgm-info-card">
-              <div className="dgm-info-label"><GraduationCap size={13} />{T.education}</div>
-              <div className="dgm-info-value">{candidate.education}</div>
+          {/* Professional Experience List */}
+          <div>
+            <div className="dgm-section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Briefcase size={13} color="var(--dg-teal-600)" />
+              <span>Professional Experience {candidate.experiences?.length ? `(${candidate.experiences.length})` : ''}</span>
             </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {candidate.experiences && candidate.experiences.length > 0 ? (
+                candidate.experiences.map((expItem, idx) => {
+                  const roleName = expItem.role || expItem.title || expItem.position || 'Professional';
+                  const companyName = expItem.company || expItem.company_name || expItem.organization || 'Organization';
+                  const periodText = formatExperiencePeriod(expItem);
+                  const descText = expItem.description || expItem.summary || '';
+                  return (
+                    <div className="dgm-info-card" key={idx}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--dg-ink-900)' }}>{roleName}</div>
+                          <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--dg-teal-700)' }}>{companyName}</div>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--dg-ink-600)', background: 'var(--dg-sunken)', padding: '3px 8px', borderRadius: 6 }}>
+                          {periodText}
+                        </span>
+                      </div>
+                      {descText && (
+                        <div style={{ fontSize: 11.5, color: 'var(--dg-ink-700)', lineHeight: 1.55 }}>{descText}</div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="dgm-box" style={{ color: 'var(--dg-ink-400)', fontStyle: 'italic', fontSize: 12 }}>
+                  Experience details available on LinkedIn profile.
+                  {candidate.linkedin && (
+                    <a
+                      href={candidate.linkedin.startsWith('http') ? candidate.linkedin : `https://${candidate.linkedin}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{ color: 'var(--dg-teal-700)', marginLeft: 6, textDecoration: 'underline' }}
+                    >View Profile</a>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+
+
+          {/* Languages & Skills metadata */}
+          {candidate.languages && candidate.languages.length > 0 && (
             <div className="dgm-info-card">
-              <div className="dgm-info-label">{T.contacts}</div>
-              <div className="dgm-contact-row">
-                <Mail size={13} color="var(--dg-teal-600)" />
-                <a className="dgm-contact-link" href={`mailto:${candidate.email}`}>{candidate.email}</a>
+              <div className="dgm-info-label"><Languages size={13} />Languages</div>
+              <div className="dgm-skills" style={{ marginTop: 4 }}>
+                {candidate.languages.map((lang, idx) => (
+                  <span className="dgm-skill" key={idx}>{lang}</span>
+                ))}
               </div>
-              {candidate.linkedin && (
-                <div className="dgm-contact-row"><Globe size={13} color="var(--dg-teal-600)" />{candidate.linkedin}</div>
-              )}
-              {candidate.github && (
-                <div className="dgm-contact-row"><ExternalLink size={13} color="var(--dg-ink-500)" />{candidate.github}</div>
-              )}
             </div>
+          )}
+
+          <div className="dgm-info-card">
+            <div className="dgm-info-label">{T.contacts}</div>
+            <div className="dgm-contact-row">
+              <Mail size={13} color="var(--dg-teal-600)" />
+              <a className="dgm-contact-link" href={`mailto:${candidate.email}`}>{candidate.email}</a>
+            </div>
+            {candidate.linkedin && (
+              <div className="dgm-contact-row">
+                <Globe size={13} color="var(--dg-teal-600)" />
+                <a
+                  className="dgm-contact-link"
+                  href={candidate.linkedin.startsWith('http') ? candidate.linkedin : `https://${candidate.linkedin}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {candidate.linkedin}
+                </a>
+              </div>
+            )}
+            {candidate.github && (
+              <div className="dgm-contact-row">
+                <ExternalLink size={13} color="var(--dg-ink-500)" />
+                <a
+                  className="dgm-contact-link"
+                  href={candidate.github.startsWith('http') ? candidate.github : `https://${candidate.github}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {candidate.github}
+                </a>
+              </div>
+            )}
           </div>
 
           <div>

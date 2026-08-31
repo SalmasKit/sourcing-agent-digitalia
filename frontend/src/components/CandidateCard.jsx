@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { MapPin, Briefcase, BookmarkCheck, ChevronRight, Edit2, Trash2, Bookmark } from 'lucide-react';
+import { MapPin, Briefcase, BookmarkCheck, ChevronRight, Edit2, Trash2, Bookmark, ExternalLink } from 'lucide-react';
 
 import { useLanguage } from '../context/LanguageContext';
 import { getAvatarUrl as getAvatarUrlUtil } from '../utils/avatar';
@@ -16,6 +16,7 @@ const T = {
   shortlist: 'Shortlist',
   viewProfile: 'View profile',
   selectRole: 'Select a role to save',
+  openLinkedin: 'Open LinkedIn profile',
 };
 
 function scoreTone(score) {
@@ -85,7 +86,7 @@ export function CandidateCard({
         .dgc-icon-btn {
           width: 30px; height: 30px; border-radius: 8px; background: var(--dg-surface);
           border: 1px solid var(--dg-border); color: var(--dg-ink-500);
-          display: flex; align-items: center; justify-content: center; cursor: pointer;
+          display: flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none;
           transition: background .15s ease, color .15s ease, border-color .15s ease;
         }
         .dgc-icon-btn:hover { background: var(--dg-sunken); color: var(--dg-teal-700); border-color: var(--dg-border-strong); }
@@ -95,7 +96,7 @@ export function CandidateCard({
         .dgc-person { display: flex; align-items: center; gap: 14px; min-width: 0; }
         .dgc-avatar { width: 50px; height: 50px; border-radius: 13px; object-fit: cover; border: 1px solid var(--dg-border); flex-shrink: 0; }
         .dgc-name { font-size: 15px; font-weight: 700; color: var(--dg-ink-900); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .dgc-headline { font-size: 12px; color: var(--dg-ink-500); font-weight: 500; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dgc-headline { font-size: 12px; color: var(--dg-ink-500); font-weight: 500; margin-top: 3px; line-height: 1.45; word-break: break-word; }
 
         .dgc-score { font-family: var(--font-mono); font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 9px; border: 1px solid; flex-shrink: 0; }
         .dgc-score-green { color: var(--dg-green-700); background: var(--dg-green-100); border-color: rgba(31,110,74,0.25); }
@@ -137,6 +138,18 @@ export function CandidateCard({
 
       <div className="dgc-card">
         <div className="dgc-hover-actions">
+          {candidate.linkedin && (
+            <a
+              className="dgc-icon-btn"
+              href={candidate.linkedin.startsWith('http') ? candidate.linkedin : `https://${candidate.linkedin}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={T.openLinkedin}
+              aria-label={T.openLinkedin}
+            >
+              <ExternalLink size={13} />
+            </a>
+          )}
           <button className="dgc-icon-btn" onClick={() => onEdit(candidate)} title={T.editCandidate} aria-label={T.editCandidate}>
             <Edit2 size={13} />
           </button>
@@ -171,11 +184,11 @@ export function CandidateCard({
           <p className="dgc-summary">{candidate.summary}</p>
 
           <div className="dgc-skills">
-            {candidate.skills.slice(0, 4).map((skill, idx) => (
+            {candidate.skills.slice(0, 6).map((skill, idx) => (
               <span className="dgc-skill" key={idx}>{skill}</span>
             ))}
-            {candidate.skills.length > 4 && (
-              <span className="dgc-skill dgc-skill-more">+{candidate.skills.length - 4}</span>
+            {candidate.skills.length > 6 && (
+              <span className="dgc-skill dgc-skill-more">+{candidate.skills.length - 6} more</span>
             )}
           </div>
         </div>

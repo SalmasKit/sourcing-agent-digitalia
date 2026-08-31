@@ -9,7 +9,6 @@ const T = {
   jobHeadline: 'Job headline',
   jobHeadlinePh: 'e.g. Senior software architect',
   location: 'Location',
-  education: 'Education',
   expYears: 'Exp. years',
   matchScorePct: 'Match score %',
   salaryExpectation: 'Salary expectation',
@@ -39,7 +38,6 @@ export function EditCandidateModal({
   const [salaryExpectation, setSalaryExpectation] = useState('');
   const [availability, setAvailability] = useState('');
   const [verifiedMatchReasons, setVerifiedMatchReasons] = useState('');
-  const [education, setEducation] = useState('');
   const [email, setEmail] = useState('');
   const fontsLoaded = useRef(false);
 
@@ -65,7 +63,6 @@ export function EditCandidateModal({
       setSalaryExpectation(candidate.salaryExpectation || '');
       setAvailability(candidate.availability || '');
       setVerifiedMatchReasons(candidate.verifiedMatchReasons ? candidate.verifiedMatchReasons.join('\n') : '');
-      setEducation(candidate.education || '');
       setEmail(candidate.email || '');
     } else {
       setFullName('');
@@ -78,7 +75,6 @@ export function EditCandidateModal({
       setSalaryExpectation('');
       setAvailability('');
       setVerifiedMatchReasons('');
-      setEducation('');
       setEmail('');
     }
   }, [candidate, isOpen]);
@@ -99,7 +95,6 @@ export function EditCandidateModal({
       salaryExpectation,
       availability,
       verifiedMatchReasons: verifiedMatchReasons.split('\n').map((r) => r.trim()).filter(Boolean),
-      education,
       email,
       avatarUrl: candidate?.avatarUrl || null,
       shortlisted: candidate?.shortlisted || false,
@@ -193,15 +188,9 @@ export function EditCandidateModal({
             <input className="dge-input" type="text" required value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder={T.jobHeadlinePh} />
           </div>
 
-          <div className="dge-row2">
-            <div>
-              <label className="dge-label">{T.location}</label>
-              <input className="dge-input" type="text" value={location} onChange={(e) => setLocation(e.target.value)} />
-            </div>
-            <div>
-              <label className="dge-label">{T.education}</label>
-              <input className="dge-input" type="text" value={education} onChange={(e) => setEducation(e.target.value)} />
-            </div>
+          <div>
+            <label className="dge-label">{T.location}</label>
+            <input className="dge-input" type="text" value={location} onChange={(e) => setLocation(e.target.value)} />
           </div>
 
           <div className="dge-row3">

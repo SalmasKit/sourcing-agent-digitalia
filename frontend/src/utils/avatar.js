@@ -25,23 +25,24 @@ export const getAvatarUrl = (fullName, avatarUrl) => {
     initials = parts[0].slice(0, 2).toUpperCase();
   }
 
-  // Curated modern color pairs (background & text)
+  // Digitalia brand palette — muted corporate tones that match the app's design tokens
   const colors = [
-    { bg: '#0284c7', text: '#ffffff' }, // Sky Blue
-    { bg: '#4f46e5', text: '#ffffff' }, // Indigo
-    { bg: '#0d9488', text: '#ffffff' }, // Teal
-    { bg: '#2563eb', text: '#ffffff' }, // Royal Blue
-    { bg: '#7c3aed', text: '#ffffff' }, // Violet
-    { bg: '#0891b2', text: '#ffffff' }, // Cyan
+    { bg: '#0E7C8C', text: '#ffffff' }, // Teal 600  (--dg-teal-600)
+    { bg: '#0A5C68', text: '#ffffff' }, // Teal 700  (--dg-teal-700)
+    { bg: '#278F5E', text: '#ffffff' }, // Green 600 (--dg-green-600)
+    { bg: '#1F6E4A', text: '#ffffff' }, // Green 700 (--dg-green-700)
+    { bg: '#B4650F', text: '#ffffff' }, // Bronze 600 (--dg-bronze-600)
+    { bg: '#38414F', text: '#ffffff' }, // Ink 700   (--dg-ink-700)
   ];
 
   // Pick color deterministically based on candidate name
   const charSum = Math.abs(nameStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
   const { bg, text } = colors[charSum % colors.length];
 
+  // rx="0" — the <img> element's CSS border-radius controls the shape in each component
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
-    <rect width="120" height="120" rx="28" fill="${bg}"/>
-    <text x="60" y="65" font-family="-apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="800" fill="${text}" text-anchor="middle" dominant-baseline="middle">${initials}</text>
+    <rect width="120" height="120" rx="0" fill="${bg}"/>
+    <text x="60" y="60" font-family="'Space Grotesk', 'Inter', system-ui, sans-serif" font-size="46" font-weight="800" fill="${text}" text-anchor="middle" dominant-baseline="middle">${initials}</text>
   </svg>`;
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;

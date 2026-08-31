@@ -29,15 +29,59 @@ logging.basicConfig(
 logger = logging.getLogger("agent-service")
 
 
+async def _check_and_log_api_keys():
+    """Probe all configured API services and print a live quota status banner in the terminal."""
+    import httpx
+    settings = get_settings()
+
+    logger.info("=" * 65)
+    logger.info("       DIGITALIA SOURCING AGENT — API KEYS & QUOTA MONITOR       ")
+    logger.info("=" * 65)
+
+    # 1. SerpAPI Status & Quota Check
+    if settings.serpapi_api_key:
+        try:
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                r = await client.get(
+                    "https://serpapi.com/account",
+                    params={"api_key": settings.serpapi_api_key}
+                )
+            if r.status_code == 200:
+                data = r.json()
+                left = data.get("total_searches_left") or (data.get("searches_per_month", 250) - data.get("this_month_usage", 0))
+                email = data.get("account_email", "N/A")
+                plan = data.get("plan_name", "Free")
+                logger.info(f" 🔑 [SerpAPI]   : 🟢 ACTIVE — {left} searches left (Plan: {plan} | {email})")
+            elif r.status_code in (401, 403):
+                logger.warning(f" 🔑 [SerpAPI]   : 🔴 QUOTA EXHAUSTED / INVALID KEY (HTTP {r.status_code})")
+            else:
+                logger.info(f" 🔑 [SerpAPI]   : 🟡 Configured (Key: {settings.serpapi_api_key[:8]}...)")
+        except Exception as e:
+            logger.info(f" 🔑 [SerpAPI]   : 🟡 Configured (Key: {settings.serpapi_api_key[:8]}...)")
+    else:
+        logger.warning(" 🔑 [SerpAPI]   : ⚪ NOT CONFIGURED")
+
+    # 2. Apollo.io Status
+    if settings.apollo_api_key:
+        key_preview = f"{settings.apollo_api_key[:6]}...{settings.apollo_api_key[-4:]}"
+        logger.info(f" 🔑 [Apollo.io] : 🟢 ACTIVE (Primary Enrichment Key: {key_preview})")
+    else:
+        logger.warning(" 🔑 [Apollo.io] : ⚪ NOT CONFIGURED")
+
+    # 3. Groq LLM Status
+    if settings.groq_api_key:
+        logger.info(f" 🔑 [Groq LLM]  : 🟢 ACTIVE (Model: {settings.groq_model})")
+    else:
+        logger.warning(" 🔑 [Groq LLM]  : ⚪ NOT CONFIGURED")
+
+    logger.info("=" * 65)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    settings = get_settings()
-    logger.info("=" * 50)
-    logger.info(" Digitalia Sourcing Agent Service — Active")
-    logger.info(f" Model       : {settings.groq_model}")
-    logger.info(f" Data Source : {'MOCK' if settings.effective_use_mock else 'SerpAPI'}")
-    logger.info("=" * 50)
+    await _check_and_log_api_keys()
 
+    settings = get_settings()
     try:
         from src.embeddings.client import _get_model
         _get_model(settings.embedding_model)

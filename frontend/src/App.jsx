@@ -17,7 +17,7 @@ import { AuthModal } from './components/AuthModal';
 import AuthPage from './components/AuthPage';
 import { searchCandidatesApi, getInitialCandidates } from './services/api';
 import { getAvatarUrl } from './utils/avatar';
-import { Sparkles, Users, Filter, RefreshCw, LayoutGrid, Sliders, ChevronLeft, ChevronRight, BookmarkCheck, MapPin, Briefcase, Plus, Edit, Trash2, FileText, X, ArrowRightLeft } from 'lucide-react';
+import { Sparkles, Users, Filter, RefreshCw, LayoutGrid, Sliders, ChevronLeft, ChevronRight, BookmarkCheck, MapPin, Briefcase, Plus, Edit, Trash2, FileText, X, ArrowRightLeft, ExternalLink } from 'lucide-react';
 
 // Synchronously clear old localStorage mock keys before any state initialization
 if (typeof window !== 'undefined' && !localStorage.getItem('digitalia_tables_cleared_v4')) {
@@ -838,6 +838,18 @@ function DashboardContent() {
 
                           {/* HR Controls */}
                           <div className="flex items-center space-x-2">
+                            {currentCandidate.linkedin && (
+                              <a
+                                href={currentCandidate.linkedin.startsWith('http') ? currentCandidate.linkedin : `https://${currentCandidate.linkedin}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 bg-teal-50 hover:bg-teal-100 rounded-xl text-teal-700 font-bold text-xs flex items-center gap-1.5 border border-teal-200"
+                                title="Open LinkedIn Profile"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>LinkedIn</span>
+                              </a>
+                            )}
                             <button
                               onClick={() => handleOpenEditCandidate(currentCandidate)}
                               className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-teal-700 cursor-pointer border border-slate-200"
