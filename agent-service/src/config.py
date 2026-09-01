@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://sourcing_user:sourcing_password@localhost:5433/sourcing_db"
 
     # Data source
-    serpapi_api_key: str = "REDACTED_SERPAPI_KEY"
+    serpapi_api_key: str = Field(default="", description="SerpAPI key — required for LinkedIn profile search")
 
 
     # Embeddings
@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     spring_boot_url: str = "http://localhost:8080"
 
     # Profile Enrichment (Apollo.io)
-    apollo_api_key: str = Field(default="REDACTED_APOLLO_KEY", description="Apollo.io API key for candidate enrichment")
+    apollo_api_key: str = Field(default="", description="Apollo.io API key for candidate enrichment")
     enrichment_enabled: bool = True
     enrichment_monthly_quota: int = 1000
 
