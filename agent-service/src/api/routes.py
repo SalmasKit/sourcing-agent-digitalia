@@ -76,10 +76,6 @@ async def score_single_profile(request: ScoreRequest) -> dict:
 async def list_models() -> dict:
     return {
         "current_model": settings.groq_model,
-        "available_models": [
-            {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B", "recommended": True},
-            {"id": "llama-3.1-8b-instant", "name": "Llama 3.1 8B", "recommended": False},
-            {"id": "mixtral-8x7b-32768", "name": "Mixtral 8x7B", "recommended": False},
-        ],
+        "embedding_model": settings.embedding_model,
         "data_source": "serpapi",
     }

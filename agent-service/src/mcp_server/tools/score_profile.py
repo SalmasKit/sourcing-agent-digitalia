@@ -18,12 +18,11 @@ settings = get_settings()
 
 
 def _get_llm() -> ChatGroq | None:
-    if not settings.groq_api_key:
+    if not settings.groq_api_key or not settings.groq_model:
         return None
-    model_name = settings.groq_model or "qwen/qwen3.6-27b"
     return ChatGroq(
         api_key=settings.groq_api_key,
-        model=model_name,
+        model=settings.groq_model,
         temperature=settings.groq_temperature,
         max_tokens=1024,
     )
@@ -61,16 +60,75 @@ def _build_profile_context(profile: dict) -> str:
     return "\n".join(parts)
 
 
+def _build_candidate_corpus(profile: dict[str, Any]) -> tuple[str, list[str]]:
+    """Build searchable lowercase text corpus and clean skills list from candidate."""
+    corpus_parts: list[str] = []
+    clean_skills: list[str] = []
+
+    for s in profile.get("skills", []) or []:
+        if isinstance(s, str) and s.strip():
+            clean_skills.append(s.strip().lower())
+            corpus_parts.append(s.strip().lower())
+
+    if h := profile.get("headline"):
+        corpus_parts.append(str(h).lower())
+    if s := profile.get("summary"):
+        corpus_parts.append(str(s).lower())
+    if r := profile.get("current_role"):
+        corpus_parts.append(str(r).lower())
+
+    for exp in profile.get("experiences", []) or []:
+        if isinstance(exp, dict):
+            if t := exp.get("title") or exp.get("role"):
+                corpus_parts.append(str(t).lower())
+            if d := exp.get("description"):
+                corpus_parts.append(str(d).lower())
+
+    for ext in profile.get("extensions", []) or []:
+        if isinstance(ext, str):
+            corpus_parts.append(ext.lower())
+
+    return " ".join(corpus_parts), clean_skills
+
+
+def _baseline_skill_check(required_skill: str, full_corpus: str, profile_skills: list[str]) -> bool:
+    """Fast baseline string & token containment check for offline fallback."""
+    req_clean = required_skill.strip().lower()
+    if not req_clean:
+        return False
+
+    if any(req_clean in ps or ps in req_clean for ps in profile_skills):
+        return True
+
+    # Check for sub-terms in parentheses (e.g. 'Pay-Per-Click (PPC)' -> 'ppc', 'pay-per-click')
+    terms = [req_clean]
+    if "(" in req_clean and ")" in req_clean:
+        if m := re.search(r"\((.*?)\)", req_clean):
+            terms.append(m.group(1).strip())
+        terms.append(re.sub(r"\(.*?\)", "", req_clean).strip())
+
+    for t in terms:
+        if not t:
+            continue
+        if len(t) <= 3:
+            if re.search(r"\b" + re.escape(t) + r"\b", full_corpus):
+                return True
+        elif t in full_corpus:
+            return True
+
+    return False
+
+
 async def score_profile(
     profile: dict[str, Any],
     criteria: dict[str, Any],
     use_llm_rationale: bool = True,
 ) -> dict[str, Any]:
-    """Score a single profile against criteria."""
+    """Score a single profile against criteria using LLM semantic reasoning and embeddings."""
     job_text = _build_job_context(criteria)
     profile_text = _build_profile_context(profile)
 
-    # 1. Role / Title Match Score (Crucial for exact career domain alignment)
+    # 1. Role / Title Match Score
     req_title = (criteria.get("job_title") or "").strip().lower()
     cand_title = f"{profile.get('headline', '')} {profile.get('current_role', '')}".lower()
 
@@ -87,13 +145,18 @@ async def score_profile(
             matched_count = sum(1 for w in req_words if w in cand_title)
             title_score = 60 + int((matched_count / len(req_words)) * 30)
         else:
-            title_score = 30  # Heavily penalize unrelated domains
+            title_score = 30
 
-    # 2. Rule-based skill score
-    required_skills = [s.lower() for s in criteria.get("required_skills", [])]
-    profile_skills = [s.lower() for s in profile.get("skills", [])]
+    # 2. Baseline skill check across profile corpus
+    required_skills = criteria.get("required_skills", []) or []
+    full_corpus, profile_skills = _build_candidate_corpus(profile)
 
-    matched_skills = [s for s in required_skills if any(s in ps for ps in profile_skills)]
+    matched_skills = [
+        s for s in required_skills
+        if _baseline_skill_check(s, full_corpus, profile_skills)
+    ]
+    missing_skills = [s for s in required_skills if s not in matched_skills]
+
     skill_match_ratio = len(matched_skills) / len(required_skills) if required_skills else 0.5
     skill_score = round(skill_match_ratio * 100)
 
@@ -101,10 +164,10 @@ async def score_profile(
     min_exp = criteria.get("min_experience_years") or 0
     if min_exp == 0:
         seniority_str = f"{criteria.get('seniority', '')} {criteria.get('job_title', '')}".lower()
-        if "senior" in seniority_str:
-            min_exp = 5
-        elif any(k in seniority_str for k in ["lead", "principal", "architect", "manager", "director"]):
+        if any(k in seniority_str for k in ["manager", "director", "head", "lead", "principal", "architect"]):
             min_exp = 8
+        elif "senior" in seniority_str:
+            min_exp = 5
         elif any(k in seniority_str for k in ["mid", "medior"]):
             min_exp = 3
         elif any(k in seniority_str for k in ["junior", "entry"]):
@@ -131,7 +194,7 @@ async def score_profile(
     else:
         location_score = 70
 
-    # Base weighted score prioritizing exact title & skills
+    # Base weighted score
     base_score = int(
         title_score * 0.35
         + skill_score * 0.30
@@ -147,23 +210,36 @@ async def score_profile(
         logger.warning(f"Embedding similarity computation failed: {exc}")
         embedding_score = 70
 
-    # 6. LLM rationale generation
+    # 6. LLM intelligent semantic evaluation
     llm_data = {}
     llm = _get_llm() if use_llm_rationale else None
     if llm:
         try:
+            # Package full candidate context (including experiences list) for the LLM
+            profile_eval_payload = {
+                "full_name": profile.get("full_name"),
+                "headline": profile.get("headline"),
+                "skills": profile.get("skills", []),
+                "experience_years": profile.get("experience_years"),
+                "location": profile.get("location"),
+                "summary": profile.get("summary", ""),
+                "experiences": [
+                    {
+                        "role": e.get("title") or e.get("role"),
+                        "company": e.get("company"),
+                        "period": e.get("period"),
+                        "description": e.get("description")
+                    }
+                    for e in (profile.get("experiences") or [])[:4]
+                    if isinstance(e, dict)
+                ],
+            }
+
             messages = [
                 SystemMessage(content=SCORING_SYSTEM),
                 HumanMessage(content=SCORING_USER.format(
                     criteria_json=json.dumps(criteria, ensure_ascii=False, indent=2),
-                    profile_json=json.dumps({
-                        "full_name": profile.get("full_name"),
-                        "headline": profile.get("headline"),
-                        "skills": profile.get("skills"),
-                        "experience_years": profile.get("experience_years"),
-                        "location": profile.get("location"),
-                        "summary": profile.get("summary", ""),
-                    }, ensure_ascii=False, indent=2),
+                    profile_json=json.dumps(profile_eval_payload, ensure_ascii=False, indent=2),
                 )),
             ]
             response = await llm.ainvoke(messages)
@@ -175,13 +251,22 @@ async def score_profile(
                 ).strip()
             else:
                 raw = content.strip()
-            # Strip <think>...</think> tags from qwen reasoning models
+            # Strip think tags if reasoning model is used
             raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
             json_match = re.search(r"\{.*\}", raw, re.DOTALL)
             if json_match:
                 llm_data = json.loads(json_match.group())
+                
+                # Adopt LLM's dynamic semantic skill verification
+                if isinstance(llm_data.get("matched_skills"), list) and llm_data["matched_skills"]:
+                    matched_skills = llm_data["matched_skills"]
+                if isinstance(llm_data.get("missing_skills"), list):
+                    missing_skills = llm_data["missing_skills"]
+                if isinstance(llm_data.get("skill_match_score"), int):
+                    skill_score = llm_data["skill_match_score"]
+
                 llm_score = llm_data.get("match_score", base_score)
-                base_score = int((base_score * 0.5) + (llm_score * 0.5))
+                base_score = int((base_score * 0.4) + (llm_score * 0.6))
         except Exception as exc:
             logger.warning(f"LLM rationale failed for {profile.get('full_name')}: {exc}")
 
@@ -203,14 +288,14 @@ async def score_profile(
         "location_score": location_score,
         "embedding_score": embedding_score,
         "matched_skills": matched_skills,
-        "missing_skills": [s for s in required_skills if s not in matched_skills],
+        "missing_skills": missing_skills,
         "match_rationale": llm_data.get("match_rationale", [
             f"Skills: {len(matched_skills)}/{len(required_skills)} required skills matched",
             f"Experience: {candidate_exp} years ({'+' if candidate_exp >= min_exp else '-'} vs required {min_exp})",
             f"Location fit: {'High' if location_score >= 80 else 'Moderate'}",
         ]),
         "key_strengths": llm_data.get("key_strengths", [s for s in matched_skills[:3]]),
-        "gaps": llm_data.get("gaps", []),
+        "gaps": llm_data.get("gaps", [s for s in missing_skills[:3]]),
         "recommendation": llm_data.get("recommendation", recommendation),
     }
 
@@ -219,3 +304,4 @@ async def score_profiles_batch(profiles: list[dict], criteria: dict) -> list[dic
     import asyncio
     scored = await asyncio.gather(*[score_profile(p, criteria, use_llm_rationale=False) for p in profiles])
     return sorted(scored, key=lambda p: p.get("match_score", 0), reverse=True)
+

@@ -53,7 +53,6 @@ export const fr = {
   professionalOverview: 'Aperçu Professionnel',
   aiEvaluation: 'Évaluation d\'Adéquation de l\'Agent IA',
   verifiedSkills: 'Compétences Techniques Vérifiées',
-  education: 'Diplômes & Formation',
   contacts: 'Coordonnées & Réseaux',
   recruiterNotes: 'Notes Internes Recruteur',
   saveNote: 'Enregistrer Note',

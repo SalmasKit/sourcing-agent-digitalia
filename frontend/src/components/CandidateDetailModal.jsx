@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X, MapPin, Briefcase, Mail, Globe, ExternalLink,
-  CheckCircle2, Bookmark, BookmarkCheck, Sparkles, Send, DollarSign, Calendar, Edit, Trash2, Languages
+  CheckCircle2, Bookmark, BookmarkCheck, Sparkles, Send, DollarSign, Calendar, Edit, Trash2
 } from 'lucide-react';
 
 
@@ -93,7 +93,6 @@ const T = {
   professionalOverview: 'Professional overview',
   aiEvaluation: 'AI match evaluation',
   verifiedSkills: 'Verified skills',
-  education: 'Education',
   contacts: 'Contacts',
   recruiterNotes: 'Recruiter notes',
   addNotePlaceholder: 'Add a note about this candidate',
@@ -383,18 +382,6 @@ export function CandidateDetailModal({
           </div>
 
 
-
-          {/* Languages & Skills metadata */}
-          {candidate.languages && candidate.languages.length > 0 && (
-            <div className="dgm-info-card">
-              <div className="dgm-info-label"><Languages size={13} />Languages</div>
-              <div className="dgm-skills" style={{ marginTop: 4 }}>
-                {candidate.languages.map((lang, idx) => (
-                  <span className="dgm-skill" key={idx}>{lang}</span>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="dgm-info-card">
             <div className="dgm-info-label">{T.contacts}</div>

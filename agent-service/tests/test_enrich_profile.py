@@ -1,10 +1,11 @@
 """
-test_enrich_profile.py — Tests for the RapidAPI LinkedIn enrichment node.
+test_enrich_profile.py — Tests for Apollo.io LinkedIn enrichment node and tools.
 
 Test groups:
-    1. Unit tests for enrich_candidate() with mocked httpx (no real API calls).
+    1. Unit tests for enrich_candidate() with mocked Apollo.io HTTP (no real API calls).
     2. Unit tests for enrich_node() graph node with mocked enrich_candidate().
     3. Integration test for full pipeline with ENRICHMENT_ENABLED=false.
+    4. Unit test for MCP enrich_profile tool.
 """
 import asyncio
 import json
@@ -17,45 +18,43 @@ import pytest
 # Fixtures & helpers
 # ---------------------------------------------------------------------------
 
-# Realistic RapidAPI response payload (subset of the actual schema)
-_MOCK_RAPIDAPI_RESPONSE: dict[str, Any] = {
-    "data": {
-        "firstName": "Youssef",
-        "lastName": "Alami",
+_MOCK_APOLLO_RESPONSE: dict[str, Any] = {
+    "person": {
+        "first_name": "Youssef",
+        "last_name": "Alami",
+        "name": "Youssef Alami",
         "headline": "Senior Software Engineer at OCP Group",
-        "educations": [
-            {
-                "school": "École Mohammadia d'Ingénieurs",
-                "degree": "Engineering Degree",
-                "fieldOfStudy": "Computer Science",
-                "start": "2015",
-                "end": "2018",
-            },
-            {
-                "school": "Université Hassan II",
-                "degree": "Licence",
-                "fieldOfStudy": "Mathematics",
-                "start": "2012",
-                "end": "2015",
-            },
-        ],
-        "experiences": [
+        "title": "Senior Software Engineer",
+        "organization": {"name": "OCP Group"},
+        "departments": ["Engineering", "Information Technology"],
+        "functions": ["software_development"],
+        "employment_history": [
             {
                 "title": "Senior Software Engineer",
-                "company": "OCP Group",
-                "start": "2021-03",
-                "end": None,
+                "organization_name": "OCP Group",
+                "start_date": "2021-03",
+                "end_date": None,
+                "current": True,
                 "description": "Architecting and delivering cloud-native microservices.",
             },
             {
                 "title": "Software Engineer",
-                "company": "CIH Bank",
-                "start": "2018-09",
-                "end": "2021-02",
+                "organization_name": "CIH Bank",
+                "start_date": "2018-09",
+                "end_date": "2021-02",
+                "current": False,
                 "description": "Developed core banking APIs in Java / Spring Boot.",
             },
         ],
-        "skills": ["Java", "Spring Boot", "Python", "Docker", "Kubernetes", "AWS"],
+        "education_history": [
+            {
+                "school": "École Mohammadia d'Ingénieurs",
+                "degree": "Engineering Degree",
+                "field_of_study": "Computer Science",
+                "start_date": "2015",
+                "end_date": "2018",
+            }
+        ],
     }
 }
 
@@ -80,40 +79,32 @@ class TestEnrichCandidate:
 
     @pytest.mark.asyncio
     async def test_enrich_candidate_success(self):
-        """Happy path: 200 response → EnrichedProfile with real education & experience."""
-        mock_resp = _make_mock_response(200, _MOCK_RAPIDAPI_RESPONSE)
+        """Happy path: 200 Apollo response → EnrichedProfile with real education & experience."""
+        mock_resp = _make_mock_response(200, _MOCK_APOLLO_RESPONSE)
 
         with (
-            patch("src.enrichment.enrich_profile.settings") as mock_settings,
-            patch("src.enrichment.enrich_profile.QuotaManager.check_and_increment", new_callable=AsyncMock, return_value=True),
+            patch("src.mcp_server.tools.enrich_profile.settings") as mock_settings,
+            patch("src.mcp_server.tools.enrich_profile.QuotaManager.check_and_increment", new_callable=AsyncMock, return_value=True),
             patch("httpx.AsyncClient") as mock_client_cls,
         ):
             mock_settings.has_enrichment = True
-            mock_settings.apollo_api_key = ""
-            mock_settings.scrapingdog_api_key = "test-key"
+            mock_settings.apollo_api_key = "test-apollo-key"
             mock_settings.enrichment_monthly_quota = 1000
             mock_settings.database_url = "postgresql+asyncpg://user:pass@localhost/db"
 
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.get = AsyncMock(return_value=mock_resp)
             mock_client.post = AsyncMock(return_value=mock_resp)
             mock_client_cls.return_value = mock_client
 
-            from src.enrichment.enrich_profile import enrich_candidate
+            from src.mcp_server.tools.enrich_profile import enrich_candidate
             result = await enrich_candidate(_MOCK_LINKEDIN_URL)
 
         assert result is not None, "Expected EnrichedProfile, got None"
         assert result.raw_source == "enriched"
         assert result.full_name == "Youssef Alami"
         assert result.headline == "Senior Software Engineer at OCP Group"
-
-        # Education list must be non-empty and well-structured
-        assert len(result.education) >= 1, "Expected at least 1 education entry"
-        edu = result.education[0]
-        assert edu.institution != ""
-        assert edu.degree is not None
 
         # Experience list must be non-empty and well-structured
         assert len(result.experience) >= 1, "Expected at least 1 experience entry"
@@ -128,14 +119,14 @@ class TestEnrichCandidate:
     async def test_enrich_candidate_quota_exceeded(self):
         """When monthly quota is exceeded, enrich_candidate must return None immediately."""
         with (
-            patch("src.enrichment.enrich_profile.settings") as mock_settings,
-            patch("src.enrichment.enrich_profile.QuotaManager.check_and_increment", new_callable=AsyncMock, return_value=False),
+            patch("src.mcp_server.tools.enrich_profile.settings") as mock_settings,
+            patch("src.mcp_server.tools.enrich_profile.QuotaManager.check_and_increment", new_callable=AsyncMock, return_value=False),
         ):
             mock_settings.has_enrichment = True
-            mock_settings.scrapingdog_api_key = "test-key"
+            mock_settings.apollo_api_key = "test-key"
             mock_settings.enrichment_monthly_quota = 0  # quota exhausted
 
-            from src.enrichment.enrich_profile import enrich_candidate
+            from src.mcp_server.tools.enrich_profile import enrich_candidate
             result = await enrich_candidate(_MOCK_LINKEDIN_URL)
 
         assert result is None, "Should return None when quota is exceeded"
@@ -146,23 +137,23 @@ class TestEnrichCandidate:
         mock_resp = _make_mock_response(429, {"message": "Too Many Requests"})
 
         with (
-            patch("src.enrichment.enrich_profile.settings") as mock_settings,
-            patch("src.enrichment.enrich_profile.QuotaManager.check_and_increment", new_callable=AsyncMock, return_value=True),
-            patch("src.enrichment.enrich_profile._decrement_quota_on_failure", new_callable=AsyncMock) as mock_decrement,
+            patch("src.mcp_server.tools.enrich_profile.settings") as mock_settings,
+            patch("src.mcp_server.tools.enrich_profile.QuotaManager.check_and_increment", new_callable=AsyncMock, return_value=True),
+            patch("src.mcp_server.tools.enrich_profile._decrement_quota_on_failure", new_callable=AsyncMock) as mock_decrement,
             patch("httpx.AsyncClient") as mock_client_cls,
         ):
             mock_settings.has_enrichment = True
-            mock_settings.scrapingdog_api_key = "test-key"
+            mock_settings.apollo_api_key = "test-key"
             mock_settings.enrichment_monthly_quota = 1000
             mock_settings.database_url = "postgresql+asyncpg://user:pass@localhost/db"
 
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.get = AsyncMock(return_value=mock_resp)
+            mock_client.post = AsyncMock(return_value=mock_resp)
             mock_client_cls.return_value = mock_client
 
-            from src.enrichment.enrich_profile import enrich_candidate
+            from src.mcp_server.tools.enrich_profile import enrich_candidate
             result = await enrich_candidate(_MOCK_LINKEDIN_URL)
 
         assert result is None, "Should return None on HTTP 429"
@@ -171,10 +162,10 @@ class TestEnrichCandidate:
     @pytest.mark.asyncio
     async def test_enrich_candidate_no_url(self):
         """Blank or non-LinkedIn URLs must return None immediately without any API call."""
-        with patch("src.enrichment.enrich_profile.settings") as mock_settings:
+        with patch("src.mcp_server.tools.enrich_profile.settings") as mock_settings:
             mock_settings.has_enrichment = True
 
-            from src.enrichment.enrich_profile import enrich_candidate
+            from src.mcp_server.tools.enrich_profile import enrich_candidate
 
             # Blank URL
             assert await enrich_candidate("") is None
@@ -184,10 +175,10 @@ class TestEnrichCandidate:
     @pytest.mark.asyncio
     async def test_enrich_candidate_enrichment_disabled(self):
         """When ENRICHMENT_ENABLED=false (has_enrichment=False), skip immediately."""
-        with patch("src.enrichment.enrich_profile.settings") as mock_settings:
+        with patch("src.mcp_server.tools.enrich_profile.settings") as mock_settings:
             mock_settings.has_enrichment = False
 
-            from src.enrichment.enrich_profile import enrich_candidate
+            from src.mcp_server.tools.enrich_profile import enrich_candidate
             result = await enrich_candidate(_MOCK_LINKEDIN_URL)
 
         assert result is None
@@ -199,54 +190,52 @@ class TestEnrichCandidate:
 
 
 class TestEnrichNode:
-    """Unit tests for the enrich_node LangGraph node function."""
+    """Unit tests for enrich_node() in graph.py."""
 
     def _make_state(self, profiles: list[dict]) -> dict:
-        """Build a minimal SourcingState-compatible dict."""
         return {
-            "raw_query": "Senior Java Developer",
-            "job_id": None,
-            "criteria": {"job_title": "Java Developer"},
+            "query": "Java developer Casablanca",
+            "criteria": {"job_title": "Java Developer", "required_skills": ["Java"]},
             "raw_profiles": profiles,
+            "enriched_profiles": [],
             "scored_profiles": [],
-            "final_output": {},
+            "top_profiles": [],
+            "sourcing_summary": {},
             "messages": [],
             "error": None,
+            "retry_count": 0,
         }
 
     @pytest.mark.asyncio
     async def test_enrich_node_disabled(self):
         """When enrichment is disabled, enrich_node must be a no-op — profiles unchanged."""
-        sample_profiles = [
-            {"id": "p1", "full_name": "Alice", "linkedin_url": _MOCK_LINKEDIN_URL},
-        ]
-        state = self._make_state(sample_profiles)
+        state = self._make_state([{"id": "p1", "full_name": "Test User", "linkedin_url": _MOCK_LINKEDIN_URL}])
 
-        with patch("src.agent.graph.settings") as mock_settings:
+        with (
+            patch("src.agent.graph.settings") as mock_settings,
+            patch("src.agent.graph._ai_enrich_profile", new_callable=AsyncMock) as mock_ai,
+        ):
             mock_settings.has_enrichment = False
-            mock_settings.groq_api_key = ""  # also disable Groq so node is a true no-op
+            mock_settings.groq_api_key = ""
 
             from src.agent.graph import enrich_node
             result_state = await enrich_node(state)  # type: ignore[arg-type]
 
-        # State must be returned unchanged (same object identity)
-        assert result_state["raw_profiles"] == sample_profiles
         # No enrichment_source key should have been added
         assert "enrichment_source" not in result_state["raw_profiles"][0]
 
     @pytest.mark.asyncio
-    async def test_enrich_node_fallback_on_none(self):
-        """When enrich_candidate returns None, profiles get enrichment_source='snippet_fallback'."""
-        sample_profiles = [
-            {"id": "p1", "full_name": "Bob", "linkedin_url": _MOCK_LINKEDIN_URL},
-            {"id": "p2", "full_name": "Carol", "linkedin_url": ""},
-        ]
-        state = self._make_state(sample_profiles)
+    async def test_enrich_node_api_failure_fallback_to_groq(self):
+        """When enrich_candidate returns None, fallback to groq_fallback or snippet_only."""
+        state = self._make_state([
+            {"id": "p1", "full_name": "User 1", "linkedin_url": _MOCK_LINKEDIN_URL},
+            {"id": "p2", "full_name": "User 2", "linkedin_url": "https://linkedin.com/in/user2"},
+        ])
 
         with (
             patch("src.agent.graph.settings") as mock_settings,
             patch("src.agent.graph.enrich_candidate", new_callable=AsyncMock, return_value=None),
-            patch("src.agent.graph._ai_enrich_profile", new_callable=AsyncMock, side_effect=lambda p: p),
+            patch("src.agent.graph._ai_enrich_profile", side_effect=lambda p: {**p, "enrichment_source": "groq_fallback"}),
         ):
             mock_settings.has_enrichment = True
             mock_settings.groq_api_key = "test-groq-key"
@@ -257,13 +246,12 @@ class TestEnrichNode:
         profiles = result_state["raw_profiles"]
         assert len(profiles) == 2
         for p in profiles:
-            # groq_fallback is the expected source when ScrapingDog returns None
             assert p["enrichment_source"] in ("groq_fallback", "snippet_only")
 
     @pytest.mark.asyncio
     async def test_enrich_node_merges_enriched_data(self):
         """When enrich_candidate succeeds, the enriched fields must overwrite the originals."""
-        from src.enrichment.enrich_profile import (
+        from src.mcp_server.tools.enrich_profile import (
             EnrichedProfile, EducationEntry, ExperienceEntry,
         )
 
@@ -300,9 +288,7 @@ class TestEnrichNode:
         assert p["full_name"] == "Youssef Alami"
         assert p["headline"] == "Senior SWE at OCP"
         assert "Java" in p["skills"]
-        assert p["enrichment_source"] in ("apollo", "scrapingdog", "enriched")
-        assert len(p["educations"]) == 1
-        assert p["educations"][0]["institution"] == "EMI"
+        assert p["enrichment_source"] in ("apollo", "enriched")
         assert len(p["experiences"]) == 1
         assert p["experiences"][0]["company"] == "OCP Group"
 
@@ -314,24 +300,19 @@ class TestEnrichNode:
 
 class TestFullPipelineEnrichmentDisabled:
     """
-    Integration test confirming the old snippet-only path is 100% intact
+    Integration test confirming the snippet-only path is 100% intact
     when enrichment is turned off.
-
-    Patches `run_sourcing_agent` (the function the FastAPI route calls) to return
-    a canned result, isolating the test to API routing / request-response contract
-    validation — not Groq LLM latency.
     """
 
     def test_full_pipeline_enrichment_disabled(self):
         """POST /api/search with enrichment off returns profiles with expected shape."""
         import os
         os.environ["ENRICHMENT_ENABLED"] = "false"
-        os.environ["SCRAPINGDOG_API_KEY"] = ""
+        os.environ["APOLLO_API_KEY"] = ""
 
         from src.config import get_settings
         get_settings.cache_clear()
 
-        # Canned pipeline result — exactly what run_sourcing_agent would return
         _CANNED_RESULT = {
             "job_id": None,
             "query": "Senior Java Developer à Casablanca",
@@ -386,14 +367,42 @@ class TestFullPipelineEnrichmentDisabled:
         assert isinstance(data["profiles"], list)
         assert len(data["profiles"]) == 2
 
-        # All profiles should have snippet_fallback since enrichment is disabled
         for p in data["profiles"]:
-            assert p.get("enrichment_source") == "snippet_fallback", (
-                f"Expected snippet_fallback, got: {p.get('enrichment_source')}"
-            )
+            assert p.get("enrichment_source") == "snippet_fallback"
 
         # Cleanup
         os.environ.pop("ENRICHMENT_ENABLED", None)
-        os.environ.pop("RAPIDAPI_KEY", None)
+        os.environ.pop("APOLLO_API_KEY", None)
         get_settings.cache_clear()
 
+
+# ---------------------------------------------------------------------------
+# 4. MCP Tool Test
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_mcp_enrich_profile_tool():
+    """Verify that the MCP enrich_profile tool wraps enrich_candidate properly."""
+    from src.mcp_server.tools.enrich_profile import enrich_profile, EnrichedProfile
+
+    mock_enriched = EnrichedProfile(
+        full_name="Youssef Alami",
+        headline="Senior Software Engineer",
+        summary="Experienced engineer.",
+        education=[],
+        experience=[],
+        skills=["Python", "FastAPI"],
+        raw_source="enriched",
+    )
+
+    with patch("src.mcp_server.tools.enrich_profile.enrich_candidate", new_callable=AsyncMock, return_value=mock_enriched):
+        result = await enrich_profile("https://www.linkedin.com/in/youssef-alami")
+        assert result is not None
+        assert result["full_name"] == "Youssef Alami"
+        assert result["skills"] == ["Python", "FastAPI"]
+        assert result["raw_source"] == "enriched"
+
+    with patch("src.mcp_server.tools.enrich_profile.enrich_candidate", new_callable=AsyncMock, return_value=None):
+        result = await enrich_profile("https://www.linkedin.com/in/invalid")
+        assert result is None

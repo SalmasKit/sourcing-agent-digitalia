@@ -7,15 +7,19 @@ from functools import lru_cache
 
 import numpy as np
 
+from src.config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 @lru_cache(maxsize=1)
-def _get_model(model_name: str = "all-MiniLM-L6-v2"):
+def _get_model(model_name: str | None = None):
+    name = model_name or settings.embedding_model
     try:
         from sentence_transformers import SentenceTransformer
-        logger.info(f"Loading embedding model: {model_name}")
-        model = SentenceTransformer(model_name)
+        logger.info(f"Loading embedding model: {name}")
+        model = SentenceTransformer(name)
         logger.info("Embedding model loaded successfully ✓")
         return model
     except Exception as exc:
@@ -32,7 +36,7 @@ def _cosine_similarity(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
 
 
 async def compute_similarity(text_a: str, text_b: str) -> float:
-    model = _get_model()
+    model = _get_model(settings.embedding_model)
     if model is None:
         return _keyword_overlap_similarity(text_a, text_b)
 

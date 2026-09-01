@@ -14,6 +14,7 @@ from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from src.config import get_settings
+from src.mcp_server.tools.enrich_profile import clean_4_line_summary, ExperienceEntry
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -51,16 +52,15 @@ def _parse_json_from_llm(raw: str) -> Any:
 _groq_rate_limited: bool = False  # circuit breaker — set True on 429
 
 
-def _get_llm(model_name: str | None = None):
-    if not settings.groq_api_key:
+def _get_llm():
+    if not settings.groq_api_key or not settings.groq_model:
         return None
-    selected_model = model_name or settings.groq_model or "openai/gpt-oss-120b"
     return ChatGroq(
         api_key=settings.groq_api_key,
-        model=selected_model,
-        temperature=0.1,
+        model=settings.groq_model,
+        temperature=settings.groq_temperature,
         max_tokens=800,
-        max_retries=0,  # never auto-retry — we handle fallbacks ourselves
+        max_retries=0,  # we handle error catching directly
     )
 
 
@@ -107,29 +107,16 @@ CRITICAL REQUIREMENTS:
      * Do NOT invent start or end years that are not explicitly stated in the candidate data.
 
 
-3. educations: Extract any university, business school, or degree mentioned ONLY IF the school/institution name is explicitly visible in the input data.
-   - If mentioned: return degree, institution, period (e.g. "2017 - 2020", "Graduated 2019", "2015 - 2018"), and an informative 1-2 sentence description.
-   - ANTI-HALLUCINATION RULE: If NO school, university, or degree name is explicitly stated in the candidate data, you MUST return an empty list []. Do NOT invent, guess, infer, or fabricate any education. Do NOT add generic entries like "Higher Education" or "University" unless the actual institution name is clearly visible in the data.
-
-4. current_company: Accurate primary employer name.
-5. location: Clean City, Country (e.g., "Casablanca, Morocco").
-6. skills: A curated list of 8 to 12 relevant domain skills.
-7. languages: Spoken languages with proficiency level (e.g., ["French (Fluent / Bilingual)", "English (Professional Working)", "Arabic (Native)"]).
+3. current_company: Accurate primary employer name.
+4. location: Clean City, Country (e.g., "Casablanca, Morocco").
+5. skills: A curated list of 8 to 12 relevant domain skills.
+6. languages: Spoken languages with proficiency level (e.g., ["French (Fluent / Bilingual)", "English (Professional Working)", "Arabic (Native)"]).
 
 Return ONLY a valid JSON object matching this schema:
 {
   "current_company": "string",
   "location": "string",
   "summary": "string (extensive 4-5 sentence executive bio)",
-  "education": "string",
-  "educations": [
-    {
-      "degree": "string",
-      "institution": "string",
-      "period": "string",
-      "description": "string"
-    }
-  ],
   "skills": ["string"],
   "languages": ["string"],
   "experiences": [
@@ -149,58 +136,24 @@ Company Hint: {current_company_hint}
 Bio Snippet: {snippet}
 LinkedIn Extensions: {extensions_text}"""
 
-    models_to_try = [
-        settings.groq_model or "openai/gpt-oss-20b",
-        "qwen/qwen3.6-27b",
-        "openai/gpt-oss-120b",
-    ]
-
     data = None
-
-    for model_name in models_to_try:
+    llm_inst = _get_llm()
+    if llm_inst:
         try:
-            llm_inst = _get_llm(model_name)
-            if not llm_inst:
-                break
             response = await llm_inst.ainvoke([
                 SystemMessage(content=prompt_system),
                 HumanMessage(content=prompt_user)
             ])
             raw_text = str(response.content)
             data = _parse_json_from_llm(raw_text)
-            if data and isinstance(data, dict):
-                break
         except Exception as exc:
-            err_str = str(exc)
-            logger.warning(f"Enrichment attempt with {model_name} failed for {full_name}: {exc}")
-            if "429" in err_str or "rate_limit" in err_str.lower() or "quota" in err_str.lower():
-                await asyncio.sleep(0.3)
-                continue
-            continue
+            logger.warning(f"AI enrichment failed for {full_name}: {exc}")
 
 
     if data and isinstance(data, dict):
         if comp := data.get("current_company"):
             if comp and "Listed on" not in comp and "See LinkedIn" not in comp and len(comp) < 80:
                 profile["current_company"] = comp
-        if edu := data.get("education"):
-            if edu and "Higher Education" not in edu:
-                profile["education"] = edu
-        if edus := data.get("educations"):
-            if isinstance(edus, list):
-                # Filter out fabricated generic education entries
-                GENERIC_INSTS = ("university", "higher education", "enseignement supérieur", "est apis", "unknown", "n/a", "none", "")
-                real_edus = [
-                    e for e in edus
-                    if isinstance(e, dict)
-                    and (e.get("institution") or e.get("school", "")).strip()
-                    and (e.get("institution") or e.get("school", "")).strip().lower() not in GENERIC_INSTS
-                ]
-                if real_edus:
-                    profile["educations"] = real_edus
-                    inst_0 = real_edus[0].get("institution") or real_edus[0].get("school")
-                    deg_0 = real_edus[0].get("degree") or ""
-                    profile["education"] = f"{deg_0} - {inst_0}".strip(" -") if deg_0 and deg_0 != inst_0 else inst_0
 
 
         if langs := data.get("languages"):
@@ -233,12 +186,34 @@ async def search_profiles(criteria: dict[str, Any], limit: int = 10) -> list[dic
 async def _serpapi_search(criteria: dict, limit: int = 10) -> list[dict]:
     raw_job_title = (criteria.get("job_title") or "Professional").strip()
     skills_list = criteria.get("required_skills", [])
-    
-    # Filter skills to only genuine concise tags (max 2 words, max 25 chars) to prevent query pollution
+
+    # Normalize skills for the query: prefer short abbreviations from parentheses
+    # (e.g. "Pay-Per-Click (PPC)" → "PPC", "Conversion Rate Optimization (CRO)" → "CRO")
+    # so we don't blow out the SerpAPI query length limit.
+    def _shorten_skill(s: str) -> str:
+        s = s.strip()
+        abbr_match = re.search(r"\(([A-Z][A-Z0-9\-]{0,9})\)", s)
+        if abbr_match:
+            return abbr_match.group(1)  # e.g. "PPC", "CRO", "ROAS"
+        # Already short enough
+        if len(s.split()) <= 3 and len(s) <= 30:
+            return s
+        # Use first 3 words for very long phrases
+        return " ".join(s.split()[:3])
+
     clean_skills = [
-        s for s in skills_list
-        if s.lower() not in raw_job_title.lower() and len(s.split()) <= 2 and len(s) <= 25
-    ][:3]
+        _shorten_skill(s) for s in skills_list
+        if s.lower() not in raw_job_title.lower()
+    ]
+    # Deduplicate and cap at 3 for a focused query
+    seen_sk: set[str] = set()
+    deduped_skills: list[str] = []
+    for sk in clean_skills:
+        sk_low = sk.lower()
+        if sk_low not in seen_sk:
+            seen_sk.add(sk_low)
+            deduped_skills.append(sk)
+    clean_skills = deduped_skills[:3]
     skills = " OR ".join(f'"{s}"' if " " in s else s for s in clean_skills) if clean_skills else ""
     location = (criteria.get("location") or "").strip()
     raw_seniority = criteria.get("seniority", "")
@@ -366,7 +341,7 @@ async def _serpapi_search(criteria: dict, limit: int = 10) -> list[dict]:
 
             start_offset += 20
 
-    # Only run LLM enrichment here if live ScrapingDog/RapidAPI enrichment is NOT enabled
+    # Only run LLM enrichment here if live Apollo enrichment is NOT enabled
     if not settings.has_enrichment and settings.groq_api_key and profiles:
         try:
             enrich_count = min(len(profiles), limit)
@@ -470,6 +445,17 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
 
     full_text = f"{title} {snippet} {' '.join(extensions)}"
 
+    # Strip Unicode bidirectional control characters (e.g. U+200F RTL mark) that
+    # appear in Moroccan/Arabic LinkedIn profile extension strings and cause
+    # charmap codec errors downstream.
+    _BDI_CTRL = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]")
+
+    def _sanitize(text: str) -> str:
+        return _BDI_CTRL.sub("", text).strip()
+
+    extensions = [_sanitize(e) for e in extensions]
+    full_text = _sanitize(full_text)
+
     # Location: LinkedIn always puts candidate location first in extensions
     cand_location = ""
     if extensions:
@@ -540,11 +526,26 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
         }
     ]
 
-    # Education is left empty unless provided by structured enrichment (Apollo/ScrapingDog)
-    educations = []
-    edu_str = None
-
     salary_exp = _estimate_salary(exp_years, criteria.get("seniority", ""))
+
+    # 2. Languages — empty unless explicitly provided
+    cand_languages = []
+
+    # 3. Generate structured executive overview
+    summary_overview = clean_4_line_summary(
+        full_name=name,
+        headline=clean_role,
+        experiences=[
+            ExperienceEntry(
+                company=company or "Organization",
+                title=clean_role,
+                role=clean_role,
+                period=exp_period,
+                description=snippet or f"Active position as {clean_role}."
+            )
+        ],
+        skills=candidate_skills,
+    )
 
     return {
         "id": unique_id,
@@ -559,13 +560,11 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
         "linkedin_url": url,
         "email": cand_email,
         "avatar_url": None,
-        "summary": snippet or f"Experienced {clean_role} with strong background in Moroccan and international markets.",
-        "education": None,
-        "educations": [],
+        "summary": summary_overview,
         "availability": "Open for Outreach",
         "salary_expectation": salary_exp,
         "contract_preference": criteria.get("contract_type", "Any"),
-        "languages": ["French (Fluent)", "English (Professional)", "Arabic (Native)"],
+        "languages": cand_languages,
         "experiences": experiences,
         "extensions": extensions,
         "source": "serpapi",
@@ -582,3 +581,5 @@ def _estimate_salary(exp_years: int, seniority: str) -> str:
     if exp_years >= 3 or "mid" in sen:
         return "[Est.] Mid Level"
     return "[Est.] Junior Level"
+
+

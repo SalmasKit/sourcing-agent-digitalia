@@ -296,12 +296,6 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
             description: p.summary && p.summary !== p.headline ? p.summary : `Active ${cleanRole} position at ${companyName}. Full details on profile.`
           }
         ];
-        const candEducations = Array.isArray(p.educations) && p.educations.length > 0
-          ? p.educations
-          : (p.education && p.education !== 'Higher Education (See LinkedIn Profile)'
-            ? [{ degree: p.education, institution: p.education, period: 'Graduated', description: `Degree in ${p.education}` }]
-            : []);
-
         const candExperiences = Array.isArray(p.experiences) && p.experiences.length > 0
           ? p.experiences
           : defaultExpList;
@@ -319,8 +313,6 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
           linkedin: p.linkedin_url || p.source_url,
           avatarUrl: p.avatar_url || defaultAvatar,
           verifiedMatchReasons: p.match_rationale || [],
-          education: p.education || null,
-          educations: candEducations,
           availability: p.availability || 'Open for Outreach (Contact Candidate)',
           salaryExpectation: p.salary_expectation || p.salaryExpectation || (exp >= 5 ? '[Est. Market Benchmark] 25,000 - 34,000 MAD / mo' : '[Est. Market Benchmark] 16,000 - 24,000 MAD / mo'),
           languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : [],
@@ -349,11 +341,6 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
         const exp = p.experienceYears || 3;
         const comp = p.headline ? (p.headline.includes(' at ') ? p.headline.split(' at ')[1] : 'Listed on LinkedIn Profile') : 'Listed on LinkedIn Profile';
         const cleanRole = p.headline ? p.headline.split(' at ')[0].split(' chez ')[0].split(' - ')[0].trim() : 'Software Professional';
-        const candEducations = Array.isArray(p.educations) && p.educations.length > 0
-          ? p.educations
-          : (p.education && p.education !== 'Higher Education (See LinkedIn Profile)'
-            ? [{ degree: p.education, institution: p.education, period: 'Graduated', description: `Degree in ${p.education}` }]
-            : []);
 
         return {
           id: p.id || `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
@@ -368,8 +355,6 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
           linkedin: p.sourceUrl,
           source: p.sourcePlatform,
           avatarUrl: p.avatarUrl || p.avatar_url || defaultAvatar,
-          education: p.education || null,
-          educations: candEducations,
           availability: p.availability || 'Open for Outreach (Contact Candidate)',
           salaryExpectation: p.salaryExpectation || (exp >= 5 ? '[Est. Market Benchmark] 25,000 - 34,000 MAD / mo' : '[Est. Market Benchmark] 16,000 - 24,000 MAD / mo'),
           languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : [],

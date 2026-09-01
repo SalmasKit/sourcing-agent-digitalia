@@ -17,7 +17,8 @@ def test_models_endpoint():
     response = client.get("/api/models")
     assert response.status_code == 200
     data = response.json()
-    assert "available_models" in data
+    assert "current_model" in data
+    assert "embedding_model" in data
     assert data["data_source"] == "serpapi"
 
 

@@ -12,9 +12,9 @@ class SourcingState(TypedDict):
     Flow:
         raw_query    → [interpret]  → criteria
         criteria     → [search]     → raw_profiles       (SerpAPI or mock)
-        raw_profiles → [enrich]     → raw_profiles       (RapidAPI data merged in;
+        raw_profiles → [enrich]     → raw_profiles       (Apollo.io data merged in;
                                                           each profile gains enrichment_source:
-                                                          "enriched" | "snippet_fallback")
+                                                          "apollo" | "groq_fallback" | "snippet_only")
         raw_profiles → [score]      → scored_profiles
         scored_profiles → [format] → final_output
     """

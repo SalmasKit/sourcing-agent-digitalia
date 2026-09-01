@@ -28,11 +28,9 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY:-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}
       - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-20b}
 
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
       - SERPAPI_API_KEY=${SERPAPI_API_KEY:-REDACTED_SERPAPI_KEY}
       - APOLLO_API_KEY=${APOLLO_API_KEY:-REDACTED_APOLLO_KEY}
-
-
-      - SCRAPINGDOG_API_KEY=${SCRAPINGDOG_API_KEY:-6a956e69ae7df899dcffd634}
       - ENRICHMENT_ENABLED=true
       - ENRICHMENT_MONTHLY_QUOTA=1000
       - DATABASE_URL=postgresql+asyncpg://sourcing_user:sourcing_password@postgres:5432/sourcing_db

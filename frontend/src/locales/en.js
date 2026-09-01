@@ -53,7 +53,6 @@ export const en = {
   professionalOverview: 'Professional Overview',
   aiEvaluation: 'AI Agent Suitability Evaluation',
   verifiedSkills: 'Verified Technical Competencies',
-  education: 'Education & Qualifications',
   contacts: 'Verified Contact Profiles',
   recruiterNotes: 'Internal Recruiter Notes',
   saveNote: 'Save Note',

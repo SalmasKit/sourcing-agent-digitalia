@@ -40,11 +40,8 @@ class Settings(BaseSettings):
     # Spring Boot callback
     spring_boot_url: str = "http://localhost:8080"
 
-    # Profile Enrichment (Apollo.io & ScrapingDog)
+    # Profile Enrichment (Apollo.io)
     apollo_api_key: str = Field(default="REDACTED_APOLLO_KEY", description="Apollo.io API key for candidate enrichment")
-
-
-    scrapingdog_api_key: str = Field(default="", description="ScrapingDog API key (legacy/fallback)")
     enrichment_enabled: bool = True
     enrichment_monthly_quota: int = 1000
 
@@ -54,11 +51,8 @@ class Settings(BaseSettings):
 
     @property
     def has_enrichment(self) -> bool:
-        """True when Apollo or ScrapingDog key is configured and enrichment is enabled."""
-        has_key = bool(
-            (self.apollo_api_key and self.apollo_api_key.strip())
-            or (self.scrapingdog_api_key and self.scrapingdog_api_key.strip())
-        )
+        """True when Apollo.io key is configured and enrichment is enabled."""
+        has_key = bool(self.apollo_api_key and self.apollo_api_key.strip())
         return bool(has_key and self.enrichment_enabled)
 
 

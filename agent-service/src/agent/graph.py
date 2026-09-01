@@ -12,7 +12,7 @@ from langgraph.graph.state import CompiledStateGraph
 from src.agent.state import SourcingState
 from src.agent.prompts import CRITERIA_EXTRACTION_SYSTEM, CRITERIA_EXTRACTION_USER
 from src.config import get_settings
-from src.enrichment.enrich_profile import enrich_candidate
+from src.mcp_server.tools.enrich_profile import enrich_candidate
 from src.mcp_server.tools.search_profiles import search_profiles, _ai_enrich_profile
 from src.mcp_server.tools.score_profile import score_profiles_batch
 
@@ -21,12 +21,11 @@ settings = get_settings()
 
 
 def _get_llm(max_tokens: int = 1024) -> ChatGroq | None:
-    if not settings.groq_api_key:
+    if not settings.groq_api_key or not settings.groq_model:
         return None
-    model_name = settings.groq_model or "openai/gpt-oss-20b"
     return ChatGroq(
         api_key=settings.groq_api_key,
-        model=model_name,
+        model=settings.groq_model,
         temperature=settings.groq_temperature,
         max_tokens=max_tokens,
     )
@@ -57,7 +56,7 @@ def _parse_json_from_llm(raw: str) -> Any:
 
 async def interpret_request(state: SourcingState) -> SourcingState:
     logger.info(f"[Node 1] Interpreting: {state['raw_query'][:80]}")
-    llm = _get_llm(max_tokens=1024)
+    llm = _get_llm(max_tokens=2048)
 
     if not llm:
         fallback = _build_fallback_criteria(state["raw_query"])
@@ -74,7 +73,18 @@ async def interpret_request(state: SourcingState) -> SourcingState:
             HumanMessage(content=CRITERIA_EXTRACTION_USER.format(query=state["raw_query"])),
         ]
         response = await llm.ainvoke(messages)
-        raw_content = re.sub(r'<think>.*?</think>', '', cast(str, response.content), flags=re.DOTALL).strip()
+
+        # Reasoning models (e.g. gpt-oss-20b) sometimes emit all output as internal
+        # thinking tokens and return an empty content string. Fall back to
+        # reasoning_content in additional_kwargs before giving up.
+        raw_content = cast(str, response.content or "")
+        if not raw_content.strip():
+            raw_content = (
+                response.additional_kwargs.get("reasoning_content")
+                or response.additional_kwargs.get("thinking")
+                or ""
+            )
+        raw_content = re.sub(r'<think>.*?</think>', '', raw_content, flags=re.DOTALL).strip()
         criteria = _parse_json_from_llm(raw_content)
 
         if not criteria or not isinstance(criteria, dict):
@@ -84,6 +94,21 @@ async def interpret_request(state: SourcingState) -> SourcingState:
         criteria.setdefault("required_skills", [])
         criteria.setdefault("seniority", "Any")
         criteria.setdefault("location", "Any")
+
+        # Explicit numeric experience takes precedence if mentioned in query (e.g. "+8 years", "8+ ans")
+        explicit_exp = _extract_min_experience_from_query(state["raw_query"])
+        if explicit_exp is not None:
+            criteria["min_experience_years"] = explicit_exp
+        elif not criteria.get("min_experience_years"):
+            sen_str = f"{criteria.get('seniority', '')} {criteria.get('job_title', '')}".lower()
+            if any(k in sen_str for k in ["manager", "director", "head", "lead", "principal", "architect"]):
+                criteria["min_experience_years"] = 8
+            elif "senior" in sen_str:
+                criteria["min_experience_years"] = 5
+            elif any(k in sen_str for k in ["mid", "medior"]):
+                criteria["min_experience_years"] = 3
+            elif any(k in sen_str for k in ["junior", "entry"]):
+                criteria["min_experience_years"] = 1
 
         return {
             **state,
@@ -122,8 +147,8 @@ async def search_node(state: SourcingState) -> SourcingState:
 
 async def enrich_node(state: SourcingState) -> SourcingState:
     """
-    Node 2.5 — Enrich profiles with real LinkedIn data from ScrapingDog.
-    When ScrapingDog is unavailable (quota exhausted / disabled), automatically
+    Node 2.5 — Enrich profiles with real LinkedIn data from Apollo.io.
+    When Apollo.io is unavailable (quota exhausted / disabled), automatically
     falls back to Groq LLM enrichment so experiences, educations, and summaries
     are always populated.
     """
@@ -144,26 +169,25 @@ async def enrich_node(state: SourcingState) -> SourcingState:
         async with sem:
             url = profile.get("linkedin_url", "")
 
-            # --- Try Apollo.io (primary) or ScrapingDog (fallback) ---
+            # --- Try Apollo.io enrichment ---
             enrich_result = None
             if settings.has_enrichment:
-                snip_hint = f"{profile.get('summary', '')} {profile.get('headline', '')} {profile.get('full_name', '')}"
+                snip_parts = [
+                    profile.get("summary", ""),
+                    profile.get("headline", ""),
+                    profile.get("full_name", ""),
+                    " ".join(str(e) for e in profile.get("extensions", [])),
+                ]
+                snip_hint = " ".join(p for p in snip_parts if p)
                 enrich_result = await enrich_candidate(url, snippet_hint=snip_hint)
 
             if enrich_result is not None:
-                if enrich_result.full_name and enrich_result.full_name not in ("Candidate", "None None", ""):
-                    profile["full_name"] = enrich_result.full_name
-                if enrich_result.headline and enrich_result.headline not in ("Software Engineering Professional", "None", ""):
-                    profile["headline"] = enrich_result.headline
+                if enrich_result.full_name and enrich_result.full_name.strip() not in ("None None", "None", "", "null", "null null"):
+                    profile["full_name"] = enrich_result.full_name.strip()
+                if enrich_result.headline and enrich_result.headline.strip() not in ("None", ""):
+                    profile["headline"] = enrich_result.headline.strip()
                 if enrich_result.skills:
                     profile["skills"] = list(dict.fromkeys(enrich_result.skills + profile.get("skills", [])))
-                if enrich_result.education:
-                    profile["educations"] = [e.model_dump() for e in enrich_result.education]
-                    profile["education"] = f"{enrich_result.education[0].degree or 'Degree'} - {enrich_result.education[0].institution}".strip(" -")
-                else:
-                    # If Apollo cannot extract education, keep it completely empty
-                    profile["educations"] = []
-                    profile["education"] = None
                 if enrich_result.experience:
                     valid_exps = [e.model_dump() for e in enrich_result.experience if "*" not in e.company and "*" not in e.title]
                     if valid_exps:
@@ -247,37 +271,47 @@ def _get_exp_field(exp: dict, *keys: str) -> str:
 
 
 def _format_clean_summary(p: dict) -> str:
-    """Format description/summary into maximum 4 complete, well-formed professional sentences."""
-    full_name = p.get("full_name") or "Candidate"
-    headline = p.get("headline") or "Software Engineering Professional"
-    comp = p.get("current_company") or ""
+    """Return the candidate's actual summary or a clean concise factual description from their real profile data."""
+    existing_summary = (p.get("summary") or "").strip()
+    if existing_summary and len(existing_summary) > 20:
+        return existing_summary
+
+    full_name = (p.get("full_name") or "").strip()
+    headline = (p.get("headline") or p.get("current_role") or "").strip()
+    comp = (p.get("current_company") or "").strip()
     skills = p.get("skills", [])
-    educations = p.get("educations", [])
     experiences = p.get("experiences", [])
 
     if not comp and experiences:
         comp = _get_exp_field(experiences[0], "company", "company_name", "organization")
+    if not headline and experiences:
+        headline = _get_exp_field(experiences[0], "role", "title", "position")
 
-    # Clean headline for summary text
     clean_role = re.sub(r"\s*[|•\-/].*$", "", headline).strip() or headline
 
     lines: list[str] = []
 
     # Line 1: Identity & Current Role
-    if comp and comp not in ("Unknown Company", "See LinkedIn Profile", "Company"):
-        lines.append(f"{full_name} is an experienced {clean_role} currently contributing at {comp}.")
-    else:
-        lines.append(f"{full_name} is an established {clean_role} with strong domain expertise.")
+    if full_name and clean_role and comp:
+        lines.append(f"{full_name} is working as {clean_role} at {comp}.")
+    elif full_name and clean_role:
+        lines.append(f"{full_name} is a {clean_role}.")
+    elif full_name and comp:
+        lines.append(f"{full_name} is currently at {comp}.")
+    elif clean_role and comp:
+        lines.append(f"Professional working as {clean_role} at {comp}.")
+    elif clean_role:
+        lines.append(f"Specialized as {clean_role}.")
+    elif existing_summary:
+        lines.append(existing_summary)
 
     # Line 2: Skills & Competencies
     s_list = skills if isinstance(skills, list) else (skills.get("skills", []) if isinstance(skills, dict) else [])
     if s_list:
         skills_str = ", ".join(str(s) for s in s_list[:5])
-        lines.append(f"Demonstrates core technical proficiencies in {skills_str}.")
-    else:
-        lines.append("Possesses advanced technical competencies across modern software architecture and development frameworks.")
+        lines.append(f"Key skills include {skills_str}.")
 
-    # Line 3: Proven Career Track Record
+    # Line 3: Past Experiences
     if experiences and len(experiences) > 1:
         past = []
         for e in experiences[1:3]:
@@ -286,26 +320,14 @@ def _format_clean_summary(p: dict) -> str:
             if role and c:
                 past.append(f"{role} at {c}")
         if past:
-            lines.append(f"Career history highlights demonstrated leadership as {', and '.join(past)}.")
-        else:
-            lines.append("Brings a proven track record of architecting and delivering scalable enterprise solutions.")
-    elif experiences:
-        first_role = _get_exp_field(experiences[0], "role", "title", "position") or clean_role
-        first_comp = _get_exp_field(experiences[0], "company", "company_name") or comp
-        lines.append(f"Delivers key operational milestones as {first_role} at {first_comp}.")
-    else:
-        lines.append("Brings a proven track record of architecting and delivering scalable enterprise solutions.")
+            lines.append(f"Career history includes {', and '.join(past)}.")
+    elif experiences and not comp:
+        first_role = _get_exp_field(experiences[0], "role", "title", "position")
+        first_comp = _get_exp_field(experiences[0], "company", "company_name")
+        if first_role and first_comp:
+            lines.append(f"Position held: {first_role} at {first_comp}.")
 
-    # Line 4: Educational Credentials / Business Impact
-    if educations and len(educations) > 0:
-        edu = educations[0]
-        deg = (edu.get("degree") or "Engineering / Higher Education").strip()
-        inst = (edu.get("institution") or "Higher Education Institution").strip()
-        lines.append(f"Academic qualifications include {deg} from {inst}.")
-    else:
-        lines.append("Demonstrates strong analytical problem-solving capabilities with a focus on driving measurable business impact.")
-
-    return " ".join(lines[:4])
+    return " ".join(lines) if lines else existing_summary
 
 
 async def format_output(state: SourcingState) -> SourcingState:
@@ -327,7 +349,6 @@ async def format_output(state: SourcingState) -> SourcingState:
             "location": p.get("location"),
             "current_company": p.get("current_company"),
             "current_role": p.get("current_role"),
-            "educations": p.get("educations", []),
             "experiences": p.get("experiences", []),
             "skills": p.get("skills", []) if isinstance(p.get("skills"), list) else (p.get("skills", {}).get("skills", []) if isinstance(p.get("skills"), dict) else []),
             "experience_years": p.get("experience_years"),
@@ -356,7 +377,9 @@ async def format_output(state: SourcingState) -> SourcingState:
             "top_candidate": scored[0].get("full_name") if scored else None,
             "top_score": scored[0].get("match_score") if scored else None,
         },
+        # Both keys exposed for backward compatibility with different callers
         "profiles": formatted_profiles,
+        "candidates": formatted_profiles,
     }
 
     return {
@@ -404,6 +427,27 @@ async def run_sourcing_agent(raw_query: str, job_id: str | None = None) -> dict:
     return result.get("final_output", {})
 
 
+def _extract_min_experience_from_query(query: str) -> int | None:
+    """Extract explicit numeric years of experience from query text (e.g. '+8 years', '8+ ans', 'min 5 years')."""
+    patterns = [
+        r"[+>≥]\s*(\d+)\s*(?:years?|ans?|yr|y\.?o\.?|d'expérience)",
+        r"(\d+)\s*\+\s*(?:years?|ans?|yr|y\.?o\.?)\b",
+        r"(\d+)\s*(?:years?|ans?|yr)\s*(?:of\s+experience|d'expérience)\b",
+        r"(?:min|minimum|au moins|plus de)\s*(\d+)\s*(?:years?|ans?|yr)",
+        r"\(\s*\+?\s*(\d+)\s*(?:years?|ans?|yr)\s*\)",
+    ]
+    for p in patterns:
+        m = re.search(p, query, re.IGNORECASE)
+        if m:
+            try:
+                val = int(m.group(1))
+                if 1 <= val <= 30:
+                    return val
+            except ValueError:
+                pass
+    return None
+
+
 def _build_fallback_criteria(query: str) -> dict:
     query_clean = query.strip()
     query_lower = query_clean.lower()
@@ -416,50 +460,46 @@ def _build_fallback_criteria(query: str) -> dict:
         if extracted_loc and len(extracted_loc) > 1:
             loc = extracted_loc
 
-    # Extract seniority
-    sen = "Senior" if "senior" in query_lower else "Lead" if "lead" in query_lower else "Junior" if "junior" in query_lower else "Any"
-    min_exp = 5 if sen == "Senior" else 8 if sen == "Lead" else 1 if sen == "Junior" else 0
+    # Extract seniority & min experience
+    explicit_exp = _extract_min_experience_from_query(query_clean)
+    if explicit_exp is not None:
+        min_exp = explicit_exp
+        sen = "Lead / Manager" if min_exp >= 8 else "Senior" if min_exp >= 5 else "Mid" if min_exp >= 3 else "Junior"
+    else:
+        if any(k in query_lower for k in ["manager", "director", "head", "lead", "principal", "architect"]):
+            sen = "Manager" if "manager" in query_lower else "Lead"
+            min_exp = 8
+        elif "senior" in query_lower:
+            sen = "Senior"
+            min_exp = 5
+        elif any(k in query_lower for k in ["mid", "medior"]):
+            sen = "Mid"
+            min_exp = 3
+        elif any(k in query_lower for k in ["junior", "entry"]):
+            sen = "Junior"
+            min_exp = 1
+        else:
+            sen = "Any"
+            min_exp = 0
 
     # Extract title dynamically from query
-    title = ""
-    # 1. Look for known role patterns in query
-    role_catalog = [
-        "Fullstack Developer", "Full Stack Developer", "Backend Developer", "Frontend Developer",
-        "Java Developer", "Python Developer", "React Developer", "Node Developer", "Angular Developer",
-        "DevOps Engineer", "Cloud Engineer", "Data Engineer", "Data Scientist", "Machine Learning Engineer",
-        "Software Engineer", "Solutions Architect", "Product Manager", "Project Manager", "Scrum Master",
-        "QA Engineer", "Test Automation Engineer", "Mobile Developer", "iOS Developer", "Android Developer",
-        "Digital Marketing Manager", "SEO Specialist", "Growth Marketer", "HR Manager", "Talent Acquisition",
-    ]
-    for r in role_catalog:
-        if re.search(r"\b" + re.escape(r) + r"\b", query_clean, re.IGNORECASE):
-            title = r
-            break
+    clean_chunk = re.sub(r"^(?:candidates?|profils?|recherche|seeking|looking for|hiring|we are looking for)\s+(?:for|de|d'|a|an)?\s*", "", query_clean, flags=re.IGNORECASE).strip()
+    clean_chunk = re.split(r"[\.\(\,\;]|\s+based\s+|\s+basé|\s+in\s+|\s+with\s+|\s+avec\s+", clean_chunk, flags=re.IGNORECASE)[0].strip()
+    words = [w for w in clean_chunk.split() if w.lower() not in ("a", "an", "the", "for", "in", "at", "to", "senior", "junior", "lead", "mid", "manager")]
+    title = " ".join(words[:3]) if words else "Professional"
+    if not title or len(title) > 50:
+        title = "Professional"
 
-    if not title:
-        # Fallback: extract concise title before punctuation, parenthesis, or 'based in'
-        clean_chunk = re.sub(r"^(?:candidates?|profils?|recherche|seeking|looking for|hiring|we are looking for)\s+(?:for|de|d'|a|an)?\s*", "", query_clean, flags=re.IGNORECASE).strip()
-        clean_chunk = re.split(r"[\.\(\,\;]|\s+based\s+|\s+basé|\s+in\s+|\s+with\s+|\s+avec\s+", clean_chunk, flags=re.IGNORECASE)[0].strip()
-        words = [w for w in clean_chunk.split() if w.lower() not in ("a", "an", "the", "for", "in", "at", "to", "senior", "junior", "lead", "mid")]
-        title = " ".join(words[:3]) if words else "Software Professional"
-
-    if not title or len(title) > 40:
-        title = "Software Engineer"
-
-
-    # Detect skills from catalog across domains (tech, marketing, management, etc.)
-    skills_catalog = [
-        "seo", "sem", "digital marketing", "growth marketing", "social media", "content strategy",
-        "google ads", "analytics", "crm", "campaign management", "copywriting", "brand management",
-        "java", "spring boot", "python", "react", "typescript", "docker", "kubernetes", "aws",
-        "node", "sql", "devops", "cloud", "c++", "c#", ".net", "product management", "ui/ux",
-        "recruiting", "talent acquisition", "hr", "sales", "business development"
-    ]
-    detected_skills = [s.title() for s in skills_catalog if re.search(r'\b' + re.escape(s) + r'\b', query_lower)]
+    # Extract skill tokens dynamically from "with / avec / skills:" clauses if present
+    skills: list[str] = []
+    if "with " in query_lower or "avec " in query_lower or "skills:" in query_lower:
+        skill_part = re.split(r"\b(?:with|avec|skills:)\b", query_clean, flags=re.IGNORECASE)[-1]
+        raw_tokens = [s.strip() for s in re.split(r"[,;/&|]|\band\b|\bet\b", skill_part) if len(s.strip()) > 1]
+        skills = [t for t in raw_tokens if not any(w in t.lower() for w in ["years", "ans", "experience", "remote", "hybrid", "cdi"])]
 
     return {
         "job_title": title,
-        "required_skills": detected_skills if detected_skills else [title],
+        "required_skills": skills if skills else [title],
         "seniority": sen,
         "min_experience_years": min_exp,
         "location": loc,
