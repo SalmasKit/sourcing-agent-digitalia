@@ -3,6 +3,7 @@ run.py — Convenience launcher.
 Run from agent-service/ root: python run.py
 """
 import uvicorn
+
 from src.config import get_settings
 
 if __name__ == "__main__":

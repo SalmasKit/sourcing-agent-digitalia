@@ -4,17 +4,17 @@ import logging
 import re
 from typing import Any, cast
 
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from langgraph.graph import StateGraph, END
+from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from src.agent.state import SourcingState
 from src.agent.prompts import CRITERIA_EXTRACTION_SYSTEM, CRITERIA_EXTRACTION_USER
+from src.agent.state import SourcingState
 from src.config import get_settings
 from src.mcp_server.tools.enrich_profile import enrich_candidate
-from src.mcp_server.tools.search_profiles import search_profiles, _ai_enrich_profile
 from src.mcp_server.tools.score_profile import score_profiles_batch
+from src.mcp_server.tools.search_profiles import _ai_enrich_profile, search_profiles
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

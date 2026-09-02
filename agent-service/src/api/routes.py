@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 
 from src.agent.graph import run_sourcing_agent
 from src.api.security import verify_jwt
-from src.mcp_server.tools.score_profile import score_profile
 from src.config import get_settings
+from src.mcp_server.tools.score_profile import score_profile
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -64,7 +64,7 @@ async def run_search(
         )
     except Exception as exc:
         logger.error(f"[API] Search error: {exc}")
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/api/score", tags=["Sourcing"])
@@ -77,7 +77,7 @@ async def score_single_profile(
         return {"profile": scored, "status": "scored"}
     except Exception as exc:
         logger.error(f"[API] Score error: {exc}")
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/api/models", tags=["System"])

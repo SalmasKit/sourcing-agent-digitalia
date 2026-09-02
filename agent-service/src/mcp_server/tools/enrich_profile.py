@@ -12,7 +12,7 @@ import asyncio
 import calendar
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 import asyncpg
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS enrichment_quotas (
 
 def _current_month_key() -> str:
     """Return the current UTC month as 'YYYY-MM'."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     return f"{now.year}-{now.month:02d}"
 
 

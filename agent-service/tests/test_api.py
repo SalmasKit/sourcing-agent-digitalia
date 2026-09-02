@@ -1,9 +1,11 @@
 import base64
-import jwt
 from unittest.mock import AsyncMock, patch
+
+import jwt
 from fastapi.testclient import TestClient
-from src.main import app
+
 from src.config import get_settings
+from src.main import app
 
 client = TestClient(app)
 

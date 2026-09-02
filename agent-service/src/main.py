@@ -2,8 +2,8 @@
 main.py — FastAPI entrypoint for Digitalia Sourcing Agent Service.
 """
 import logging
-import sys
 import os
+import sys
 from contextlib import asynccontextmanager
 
 # Allow running as `python main.py` from inside src/ OR
@@ -17,8 +17,8 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.config import get_settings
 from src.api.routes import router
+from src.config import get_settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -89,7 +89,7 @@ async def _check_and_log_api_keys():
                 logger.warning(f" 🔑 [SerpAPI]   : 🔴 QUOTA EXHAUSTED / INVALID KEY (HTTP {r.status_code})")
             else:
                 logger.info(f" 🔑 [SerpAPI]   : 🟡 Configured (Key: {settings.serpapi_api_key[:8]}...)")
-        except Exception as e:
+        except Exception:
             logger.info(f" 🔑 [SerpAPI]   : 🟡 Configured (Key: {settings.serpapi_api_key[:8]}...)")
     else:
         logger.warning(" 🔑 [SerpAPI]   : ⚪ NOT CONFIGURED")

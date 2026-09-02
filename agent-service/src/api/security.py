@@ -85,7 +85,7 @@ def verify_jwt(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication service misconfigured.",
-        )
+        ) from None
 
     try:
         payload = jwt.decode(
@@ -101,11 +101,11 @@ def verify_jwt(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired.",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from None
     except jwt.InvalidTokenError as exc:
         logger.warning(f"[SECURITY] Rejected invalid JWT: {exc}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or tampered token.",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from exc

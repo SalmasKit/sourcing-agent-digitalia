@@ -1,7 +1,8 @@
 """
 Agent state definition for the LangGraph sourcing pipeline.
 """
-from typing import TypedDict, Annotated
+from typing import Annotated, TypedDict
+
 from langgraph.graph.message import add_messages
 
 

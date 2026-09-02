@@ -7,8 +7,6 @@ Test groups:
     3. Integration test for full pipeline with ENRICHMENT_ENABLED=false.
     4. Unit test for MCP enrich_profile tool.
 """
-import asyncio
-import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -221,6 +219,7 @@ class TestEnrichNode:
             from src.agent.graph import enrich_node
             result_state = await enrich_node(state)  # type: ignore[arg-type]
 
+        mock_ai.assert_not_called()
         # No enrichment_source key should have been added
         assert "enrichment_source" not in result_state["raw_profiles"][0]
 
@@ -252,7 +251,9 @@ class TestEnrichNode:
     async def test_enrich_node_merges_enriched_data(self):
         """When enrich_candidate succeeds, the enriched fields must overwrite the originals."""
         from src.mcp_server.tools.enrich_profile import (
-            EnrichedProfile, EducationEntry, ExperienceEntry,
+            EducationEntry,
+            EnrichedProfile,
+            ExperienceEntry,
         )
 
         mock_result = EnrichedProfile(
@@ -348,8 +349,10 @@ class TestFullPipelineEnrichmentDisabled:
             return_value=_CANNED_RESULT,
         ):
             import base64
+
             import jwt
             from fastapi.testclient import TestClient
+
             from src.main import app
 
             secret = get_settings().jwt_secret or "9a4f2c5d6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c"
@@ -389,7 +392,7 @@ class TestFullPipelineEnrichmentDisabled:
 @pytest.mark.asyncio
 async def test_mcp_enrich_profile_tool():
     """Verify that the MCP enrich_profile tool wraps enrich_candidate properly."""
-    from src.mcp_server.tools.enrich_profile import enrich_profile, EnrichedProfile
+    from src.mcp_server.tools.enrich_profile import EnrichedProfile, enrich_profile
 
     mock_enriched = EnrichedProfile(
         full_name="Youssef Alami",

@@ -8,13 +8,13 @@ import json
 import logging
 import re
 from typing import Any
-import httpx
 
+import httpx
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
-from langchain_core.messages import SystemMessage, HumanMessage
 
 from src.config import get_settings
-from src.mcp_server.tools.enrich_profile import clean_4_line_summary, ExperienceEntry
+from src.mcp_server.tools.enrich_profile import ExperienceEntry, clean_4_line_summary
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
