@@ -40,6 +40,23 @@ class Settings(BaseSettings):
     # Spring Boot callback
     spring_boot_url: str = "http://localhost:8080"
 
+    # CORS — frontend origin allowed to make cross-origin requests.
+    # In production, set to the actual deployed frontend URL (no trailing slash).
+    # In dev, the Vite dev server origin is added automatically alongside this.
+    frontend_origin: str = Field(
+        default="http://localhost:5173",
+        description="Allowed frontend origin for CORS. Override in production.",
+    )
+
+    # JWT verification — must match the JWT_SECRET used by Spring Boot.
+    # When empty, the security dependency logs a warning and skips validation
+    # (useful for running the agent standalone without Spring Boot in dev).
+    jwt_secret: str = Field(
+        default="",
+        description="HS256 signing secret shared with Spring Boot (hex-encoded). "
+                    "Set to the same value as JWT_SECRET in the Spring Boot env.",
+    )
+
     # Profile Enrichment (Apollo.io)
     apollo_api_key: str = Field(default="", description="Apollo.io API key for candidate enrichment")
     enrichment_enabled: bool = True

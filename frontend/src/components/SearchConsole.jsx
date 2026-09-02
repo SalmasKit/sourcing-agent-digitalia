@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { Search, Sparkles, Filter, SlidersHorizontal, MapPin, Briefcase, RotateCcw } from 'lucide-react';
+import { Search, Sparkles, Filter, SlidersHorizontal, MapPin, Briefcase, RotateCcw, Users } from 'lucide-react';
 
 export function SearchConsole({ onSearch = () => {}, isSearching = false, selectedJob = null }) {
   const { lang, t } = useLanguage();
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('All Locations');
   const [minExp, setMinExp] = useState(3);
+  const [maxResults, setMaxResults] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedTech, setSelectedTech] = useState([]);
   const fontsLoaded = useRef(false);
@@ -54,12 +55,12 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSearch(query, { location, minExp, tech: selectedTech }, selectedJob?.id);
+    onSearch(query, { location, minExp, tech: selectedTech, maxResults }, selectedJob?.id);
   };
 
   const handleQuickPrompt = (promptText) => {
     setQuery(promptText);
-    onSearch(promptText, { location, minExp, tech: selectedTech }, selectedJob?.id);
+    onSearch(promptText, { location, minExp, tech: selectedTech, maxResults }, selectedJob?.id);
   };
 
   const toggleTech = (tag) => {
@@ -75,6 +76,7 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
     setQuery(jobPrompt.trim());
     setLocation(selectedJob?.location || 'All Locations');
     setMinExp(3);
+    setMaxResults(10);
     setSelectedTech(selectedJob?.skills || []);
   };
 
@@ -143,7 +145,7 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
 
         .dgsc-filters-panel {
           padding-top: 14px; border-top: 1px solid var(--dg-border); display: grid;
-          grid-template-columns: repeat(3, 1fr); gap: 18px;
+          grid-template-columns: repeat(4, 1fr); gap: 16px;
         }
         .dgsc-field-label { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: var(--dg-ink-500); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
         .dgsc-field-input {
@@ -157,7 +159,10 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
         }
         .dgsc-tech-chip-active { background: var(--dg-teal-100); color: var(--dg-teal-700); border-color: rgba(14,124,140,0.3); }
 
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
+          .dgsc-filters-panel { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
           .dgsc-filters-panel { grid-template-columns: 1fr; }
         }
       `}</style>
@@ -201,6 +206,17 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
             className="dgsc-input"
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {!selectedJob && (
+              <button
+                type="button"
+                onClick={() => setShowFilters(!showFilters)}
+                className={'dgsc-filter-toggle' + (showFilters || selectedTech.length > 0 || location !== 'All Locations' || maxResults !== 10 ? ' dgsc-filter-toggle-active' : '')}
+                style={{ padding: '6px 10px' }}
+              >
+                <SlidersHorizontal size={12} />
+                <span>{lang === 'FR' ? 'Filtres' : 'Filters'}</span>
+              </button>
+            )}
             {query && (
               <button
                 type="button"
@@ -276,6 +292,34 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
               onChange={(e) => setMinExp(Number(e.target.value))}
               style={{ width: '100%', accentColor: 'var(--dg-teal-600)', cursor: 'pointer' }}
             />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label className="dgsc-field-label" style={{ marginBottom: 0 }}>
+                <Users size={12} />
+                {lang === 'FR' ? 'Candidats ciblés' : 'Target Results'}
+              </label>
+              <span className="dg-mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--dg-teal-700)' }}>
+                {maxResults} {lang === 'FR' ? 'profils' : 'profiles'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 5, marginTop: 4 }}>
+              {[5, 10, 15, 20].map((count) => {
+                const isSelected = maxResults === count;
+                return (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => setMaxResults(count)}
+                    className={'dgsc-tech-chip' + (isSelected ? ' dgsc-tech-chip-active' : '')}
+                    style={{ flex: 1, textAlign: 'center', padding: '6px 0', fontSize: 11, fontWeight: isSelected ? 700 : 500 }}
+                  >
+                    {count}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div>

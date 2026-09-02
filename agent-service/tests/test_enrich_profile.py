@@ -347,15 +347,20 @@ class TestFullPipelineEnrichmentDisabled:
             new_callable=AsyncMock,
             return_value=_CANNED_RESULT,
         ):
+            import base64
+            import jwt
             from fastapi.testclient import TestClient
             from src.main import app
+
+            secret = get_settings().jwt_secret or "9a4f2c5d6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c"
+            token = jwt.encode({"sub": "test@digitalia.ma", "role": "RECRUITER"}, base64.b64decode(secret), algorithm="HS256")
 
             client = TestClient(app)
             payload = {
                 "query": "Senior Java Developer à Casablanca",
                 "max_results": 4,
             }
-            response = client.post("/api/search", json=payload)
+            response = client.post("/api/search", json=payload, headers={"Authorization": f"Bearer {token}"})
 
         assert response.status_code == 200, (
             f"Expected 200, got {response.status_code}: {response.text}"

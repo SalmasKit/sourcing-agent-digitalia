@@ -128,9 +128,10 @@ async def interpret_request(state: SourcingState) -> SourcingState:
 
 
 async def search_node(state: SourcingState) -> SourcingState:
-    logger.info("[Node 2] Searching profiles (limit: 2)...")
+    limit = state.get("max_results", 10)
+    logger.info(f"[Node 2] Searching profiles (limit: {limit})...")
     try:
-        profiles = await search_profiles(state["criteria"], limit=2)
+        profiles = await search_profiles(state["criteria"], limit=limit)
         return {
             **state,
             "raw_profiles": profiles,
@@ -160,7 +161,8 @@ async def enrich_node(state: SourcingState) -> SourcingState:
     if not profiles:
         return state
 
-    target_profiles = profiles[:2]
+    max_res = state.get("max_results", 10)
+    target_profiles = profiles[:max_res]
     logger.info(f"[Node 2.5] Enriching {len(target_profiles)} profiles...")
     sem = asyncio.Semaphore(2)
 
@@ -331,7 +333,8 @@ def _format_clean_summary(p: dict) -> str:
 
 
 async def format_output(state: SourcingState) -> SourcingState:
-    scored = state.get("scored_profiles", [])[:2]
+    max_res = state.get("max_results", 10)
+    scored = state.get("scored_profiles", [])[:max_res]
 
     strong_matches = [p for p in scored if p.get("match_score", 0) >= 80]
     avg_score = round(sum(p.get("match_score", 0) for p in scored) / len(scored)) if scored else 0
@@ -409,10 +412,15 @@ def build_sourcing_graph() -> CompiledStateGraph:  # type: ignore[type-arg]
 sourcing_graph = build_sourcing_graph()
 
 
-async def run_sourcing_agent(raw_query: str, job_id: str | None = None) -> dict:
+async def run_sourcing_agent(
+    raw_query: str,
+    job_id: str | None = None,
+    max_results: int = 10,
+) -> dict:
     initial_state: SourcingState = {
         "raw_query": raw_query,
         "job_id": job_id,
+        "max_results": max_results,
         "criteria": {},
         "raw_profiles": [],
         "scored_profiles": [],

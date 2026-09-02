@@ -2,12 +2,13 @@
 routes.py — FastAPI endpoints for agent-service.
 """
 import logging
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from src.agent.graph import run_sourcing_agent
+from src.api.security import verify_jwt
 from src.mcp_server.tools.score_profile import score_profile
 from src.config import get_settings
 
@@ -49,21 +50,28 @@ async def health_check() -> HealthResponse:
 
 @router.post("/api/search", tags=["Sourcing"])
 @router.post("/api/v1/agent/search", tags=["Sourcing"])
-async def run_search(request: SearchRequest) -> dict:
+async def run_search(
+    request: SearchRequest,
+    _token: Annotated[dict, Depends(verify_jwt)],
+) -> dict:
     job_identifier = request.search_request_id or request.job_id
     logger.info(f"[API] Search query: {request.query[:80]} (ID: {job_identifier})")
     try:
-        result = await run_sourcing_agent(raw_query=request.query, job_id=job_identifier)
-        if "profiles" in result:
-            result["profiles"] = result["profiles"][:request.max_results]
-        return result
+        return await run_sourcing_agent(
+            raw_query=request.query,
+            job_id=job_identifier,
+            max_results=request.max_results,
+        )
     except Exception as exc:
         logger.error(f"[API] Search error: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post("/api/score", tags=["Sourcing"])
-async def score_single_profile(request: ScoreRequest) -> dict:
+async def score_single_profile(
+    request: ScoreRequest,
+    _token: Annotated[dict, Depends(verify_jwt)],
+) -> dict:
     try:
         scored = await score_profile(request.profile, request.criteria)
         return {"profile": scored, "status": "scored"}

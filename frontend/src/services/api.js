@@ -3,6 +3,10 @@ import axios from 'axios';
 
 const API_BASE_URL = '/api/v1';
 
+// Read from environment — set VITE_DEMO_MODE=true only for offline demos.
+// NEVER enable in production; doing so allows auth bypass on backend failures.
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+
 // ─────────────────────────────────────────────
 // Storage helpers
 // ─────────────────────────────────────────────
@@ -27,24 +31,40 @@ export const storage = {
 };
 
 // ─────────────────────────────────────────────
-// Axios instance
+// Shared JWT request interceptor
+// Attaches the Bearer token to any axios instance.
+// ─────────────────────────────────────────────
+const jwtRequestInterceptor = (config) => {
+  const token = storage.getAccessToken();
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+};
+
+// ─────────────────────────────────────────────
+// Primary API client  →  /api/v1  (Spring Boot)
 // ─────────────────────────────────────────────
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor — attach Bearer token
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = storage.getAccessToken();
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+apiClient.interceptors.request.use(jwtRequestInterceptor, (e) => Promise.reject(e));
+
+// ─────────────────────────────────────────────
+// Agent-service client  →  /agent-api  (Vite proxy → Python agent)
+// The URL never appears in the browser bundle; the Vite dev proxy
+// (and the Spring Boot reverse-proxy in production) re-route
+// /agent-api/* to the agent-service internally.
+// Every request carries the same JWT Bearer token as apiClient.
+// ─────────────────────────────────────────────
+export const agentClient = axios.create({
+  baseURL: '/agent-api',
+  headers: { 'Content-Type': 'application/json' },
+});
+
+agentClient.interceptors.request.use(jwtRequestInterceptor, (e) => Promise.reject(e));
 
 // ─────────────────────────────────────────────
 // Token refresh logic (single-flight)
@@ -153,8 +173,10 @@ export const loginApi = async (email, password) => {
       user: normalizedUser,
     };
   } catch (error) {
-    console.warn('Backend login unavailable/failed, using local mode:', error.message);
-    if (email && password) {
+    if (DEMO_MODE && email && password) {
+      // Demo-mode only: create a local session when the backend is unreachable.
+      // This code path is disabled in production (VITE_DEMO_MODE != 'true').
+      console.warn('[DEMO_MODE] Backend login unavailable, falling back to local session:', error.message);
       const mockToken = 'mock_token_' + Date.now();
       const detectedRole = email.toLowerCase().includes('admin') ? 'HR_ADMIN' : 'RECRUITER';
       const mockUser = {
@@ -188,17 +210,21 @@ export const registerApi = async (name, email, password, role = 'RECRUITER') => 
     };
     return { user: normalizedUser };
   } catch (error) {
-    console.warn('Backend register unavailable/failed, using local mode:', error.message);
-    const mockToken = 'mock_token_' + Date.now();
-    const mockUser = {
-      id: 'usr-' + Date.now(),
-      email: email,
-      name: name,
-      fullName: name,
-      role: role || 'RECRUITER',
-    };
-    storage.setSession(mockToken, 'mock_refresh', mockUser);
-    return { token: mockToken, refreshToken: 'mock_refresh', user: mockUser };
+    if (DEMO_MODE) {
+      // Demo-mode only: create a local session when the backend is unreachable.
+      console.warn('[DEMO_MODE] Backend register unavailable, falling back to local session:', error.message);
+      const mockToken = 'mock_token_' + Date.now();
+      const mockUser = {
+        id: 'usr-' + Date.now(),
+        email: email,
+        name: name,
+        fullName: name,
+        role: role || 'RECRUITER',
+      };
+      storage.setSession(mockToken, 'mock_refresh', mockUser);
+      return { token: mockToken, refreshToken: 'mock_refresh', user: mockUser };
+    }
+    throw error;
   }
 };
 
@@ -263,11 +289,15 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
     fullPrompt += ` with ${filters.minExp}+ years experience`;
   }
 
-  // 1. Direct agent-service call for real-time live SerpAPI sourcing (returns 2 candidates)
+  // 1. Agent-service call for real-time SerpAPI sourcing.
+  //    Routed through the /agent-api Vite proxy (dev) / Spring Boot reverse-proxy
+  //    (prod) so the agent-service URL is never exposed to the browser and every
+  //    request carries a valid JWT Bearer token via agentClient's interceptor.
   try {
-    const response = await axios.post('http://localhost:8001/api/search', {
+    const limit = Number(filters.maxResults || filters.limit) || 10;
+    const response = await agentClient.post('/api/search', {
       query: fullPrompt,
-      max_results: 2,
+      max_results: limit,
     });
 
     const agentData = response.data;

@@ -29,6 +29,39 @@ logging.basicConfig(
 logger = logging.getLogger("agent-service")
 
 
+def _assert_jwt_secret_configured() -> None:
+    """
+    Startup invariant: JWT_SECRET must be set in production.
+
+    Checked once during lifespan startup so the service refuses to run in
+    a misconfigured state rather than silently granting access to every request.
+    In non-production environments the service starts with a loud warning so
+    developers can still run the agent standalone without Spring Boot.
+    """
+    settings = get_settings()
+    if settings.jwt_secret:
+        return  # all good
+
+    if settings.app_env == "production":
+        logger.critical(
+            "[SECURITY] FATAL: JWT_SECRET is not configured. "
+            "Refusing to start in production — set JWT_SECRET in the environment."
+        )
+        raise RuntimeError(
+            "JWT_SECRET must be set in production. "
+            "The agent-service cannot start without it."
+        )
+
+    # Non-production: warn visibly but allow boot so the agent can be run
+    # standalone during development without a full Spring Boot stack.
+    logger.warning("=" * 65)
+    logger.warning("  ⚠️  [SECURITY] JWT_SECRET is NOT configured.")
+    logger.warning("  All requests to /api/search and /api/score will be")
+    logger.warning("  accepted WITHOUT token validation.")
+    logger.warning("  Set JWT_SECRET in .env to enforce authentication.")
+    logger.warning("=" * 65)
+
+
 async def _check_and_log_api_keys():
     """Probe all configured API services and print a live quota status banner in the terminal."""
     import httpx
@@ -79,6 +112,9 @@ async def _check_and_log_api_keys():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fail closed on missing JWT secret before accepting any traffic.
+    _assert_jwt_secret_configured()
+
     await _check_and_log_api_keys()
 
     settings = get_settings()
@@ -99,12 +135,33 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_settings = get_settings()
+
+# CORS — never combine "*" with allow_credentials=True.
+# Per the CORS spec, browsers refuse to honor a wildcard origin on credentialed
+# requests (those carrying Authorization headers), and Starlette's behaviour in
+# that state is to reflect back the requesting origin — effectively allowing any
+# site to make authenticated calls. We list explicit origins only.
+_DEV_ORIGINS = [
+    "http://localhost:3000",   # Vite dev server (frontend)
+    "http://localhost:5173",   # Vite alt port
+    "http://localhost:8080",   # Spring Boot (service-to-service)
+]
+_PROD_ORIGINS = [
+    _settings.frontend_origin,   # e.g. https://digitalia.example.com
+    # Note: spring_boot_url is intentionally omitted. CORS is a browser-enforced
+    # restriction and only applies to requests originating from a browser page.
+    # Spring Boot → agent-service calls are server-to-server and bypass CORS
+    # entirely, so listing the backend URL here has no effect.
+]
+_ALLOWED_ORIGINS = _DEV_ORIGINS if _settings.app_env != "production" else _PROD_ORIGINS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://localhost:5173", "*"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(router)
