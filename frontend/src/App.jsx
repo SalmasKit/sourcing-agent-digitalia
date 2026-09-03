@@ -473,14 +473,23 @@ function DashboardContent() {
   };
 
   const handleAddNote = (candidateId, noteText) => {
-    const timestamp = new Date().toLocaleTimeString(lang === 'FR' ? 'fr-FR' : 'en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
+    const isFR = lang === 'FR';
+    const now = new Date();
+    const datePart = now.toLocaleDateString(isFR ? 'fr-FR' : 'en-US', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
     });
+    const timePart = now.toLocaleTimeString(isFR ? 'fr-FR' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const timestamp = isFR ? `${datePart} à ${timePart}` : `${datePart} at ${timePart}`;
     const newNote = {
       id: Date.now(),
       text: noteText,
-      time: timestamp
+      time: timestamp,
+      createdAt: now.toISOString(),
     };
     
     setCandidates(prev => prev.map(c => {

@@ -9,6 +9,7 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import { draftOutreachApi } from '../services/api';
 import { getAvatarUrl as getAvatarUrlUtil } from '../utils/avatar';
+import { formatNoteTimestamp } from './RecruiterNotesView';
 
 function getAvatarUrl(name, avatarUrl) {
   return getAvatarUrlUtil(name, avatarUrl);
@@ -598,7 +599,7 @@ export function CandidateDetailModal({
                 {candidate.notes.map((n) => (
                   <div className="dgm-note" key={n.id}>
                     <div>{n.text}</div>
-                    <div className="dgm-note-time">{n.time}</div>
+                    <div className="dgm-note-time">{formatNoteTimestamp(n, lang === 'FR')}</div>
                   </div>
                 ))}
               </div>

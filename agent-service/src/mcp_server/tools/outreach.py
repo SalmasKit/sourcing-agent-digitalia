@@ -8,6 +8,7 @@ behalf without a Talent Solutions partnership, so the deliverable here is
 a draft the recruiter copies into LinkedIn or their email client.
 """
 import logging
+import re
 from typing import Any, Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -43,8 +44,6 @@ Current role: {candidate.get('headline', 'N/A')}
 Key skills: {', '.join(candidate.get('skills', [])[:6])}
 Most recent role detail: {top_exp.get('description', 'N/A')}"""
 
-
-import re
 
 def _clean_llm_text(response: Any) -> str:
     raw = str(getattr(response, "content", "") or "")
