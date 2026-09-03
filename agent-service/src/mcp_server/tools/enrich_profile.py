@@ -69,6 +69,8 @@ class EnrichedProfile(BaseModel):
     full_name: str
     headline: str | None = None
     summary: str | None = None
+    email: str | None = None
+    email_is_verified: bool = False
     education: list[EducationEntry] = []
     experience: list[ExperienceEntry] = []
     skills: list[str] = []
@@ -509,7 +511,15 @@ def _parse_apollo_person(person: dict, snippet_hint: str = "") -> EnrichedProfil
         if isinstance(dept, str) and dept.strip() and dept.strip() not in skills_set:
             skills_set.append(dept.strip().title())
 
-    # 4. Clean executive summary
+    # 4. Extract verified email if present
+    raw_email = (person.get("email") or person.get("corporate_email") or "").strip()
+    personal_emails = person.get("personal_emails") or []
+    if (not raw_email or "@" not in raw_email) and isinstance(personal_emails, list) and personal_emails:
+        raw_email = str(personal_emails[0]).strip()
+
+    valid_email = raw_email if (raw_email and "@" in raw_email and not raw_email.endswith("@talent-candidate.ma")) else None
+
+    # 5. Clean executive summary
     raw_summary = (person.get("headline") or person.get("title") or "").strip()
     summary = clean_4_line_summary(
         raw_summary=raw_summary,
@@ -523,6 +533,8 @@ def _parse_apollo_person(person: dict, snippet_hint: str = "") -> EnrichedProfil
         full_name=full_name,
         headline=headline,
         summary=summary,
+        email=valid_email,
+        email_is_verified=bool(valid_email),
         education=[],
         experience=experiences,
         skills=skills_set,
@@ -572,7 +584,7 @@ async def enrich_candidate(linkedin_url: str, snippet_hint: str = "") -> Enriche
                 "Cache-Control": "no-cache",
                 "X-Api-Key": apollo_key,
             }
-            payload_data = {"api_key": apollo_key, "linkedin_url": url}
+            payload_data = {"linkedin_url": url}
             apollo_resp = await client.post(
                 "https://api.apollo.io/v1/people/match",
                 headers=headers,

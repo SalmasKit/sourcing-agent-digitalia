@@ -14,10 +14,32 @@ const TOKEN_KEY   = 'digitalia_auth_token';
 const REFRESH_KEY = 'digitalia_refresh_token';
 const USER_KEY    = 'digitalia_auth_user';
 
+export const isValidJwt = (token) => typeof token === 'string' && token.split('.').length === 3;
+
 export const storage = {
-  getAccessToken:  () => localStorage.getItem(TOKEN_KEY),
+  getAccessToken:  () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return null;
+    if (!DEMO_MODE && !isValidJwt(token)) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_KEY);
+      localStorage.removeItem(USER_KEY);
+      return null;
+    }
+    return token;
+  },
   getRefreshToken: () => localStorage.getItem(REFRESH_KEY),
-  getUser:         () => { try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; } },
+  getUser:         () => {
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!DEMO_MODE && (!token || !isValidJwt(token))) {
+        return null;
+      }
+      return JSON.parse(localStorage.getItem(USER_KEY));
+    } catch {
+      return null;
+    }
+  },
   setSession: (accessToken, refreshToken, user) => {
     localStorage.setItem(TOKEN_KEY,   accessToken);
     localStorage.setItem(REFRESH_KEY, refreshToken);
@@ -65,6 +87,16 @@ export const agentClient = axios.create({
 });
 
 agentClient.interceptors.request.use(jwtRequestInterceptor, (e) => Promise.reject(e));
+agentClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      storage.clearSession();
+      window.dispatchEvent(new CustomEvent('auth:session-expired'));
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ─────────────────────────────────────────────
 // Token refresh logic (single-flight)
@@ -80,17 +112,19 @@ const processPendingQueue = (error, token = null) => {
   pendingQueue = [];
 };
 
-// Response interceptor — auto-refresh on 401
+// Response interceptor — auto-refresh on 401 / 403
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const status = error.response?.status;
 
-    // Only attempt refresh once per request; skip auth endpoints
+    // Attempt refresh or session expiry on 401 / 403 for non-auth endpoints
     if (
-      error.response?.status === 401 &&
+      (status === 401 || status === 403) &&
+      originalRequest &&
       !originalRequest._retry &&
-      !originalRequest.url.includes('/auth/')
+      !originalRequest.url?.includes('/auth/')
     ) {
       if (isRefreshing) {
         // Queue this request until refresh completes
@@ -282,8 +316,9 @@ async function searchTalentPoolApi(searchQuery, filters = {}) {
       const exp = typeof p.experience_years === 'number' && !isNaN(p.experience_years)
         ? p.experience_years
         : parseExperienceYears(p.experience_years, p.headline, p.summary);
-      const cleanName = name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '');
-      const candEmail = p.email || p.email_address || (cleanName ? `${cleanName}@talent-candidate.ma` : `candidate-${uniqueId}@talent-candidate.ma`);
+      const candEmail = (p.email && !p.email.endsWith('@talent-candidate.ma'))
+        ? p.email
+        : (p.email_address && !p.email_address.endsWith('@talent-candidate.ma') ? p.email_address : null);
       const cleanRole = (p.headline || 'Software Professional').split(' at ')[0].split(' chez ')[0].split(' - ')[0].split(' | ')[0].trim();
       const companyName = p.current_company || p.currentCompany || 'Listed on LinkedIn Profile';
       const defaultExpList = [
@@ -359,14 +394,26 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
   //    (prod) so the agent-service URL is never exposed to the browser and every
   //    request carries a valid JWT Bearer token via agentClient's interceptor.
   try {
-    const limit = Number(filters.maxResults || filters.limit) || 10;
+    let limit = Number(filters.maxResults || filters.limit);
+    const countMatch = fullPrompt.match(/\b(?:top|find|source|get|first)?\s*(\d{1,2})\s*(?:candidates?|profils?|profiles?|développeurs?|developpeurs?|engineers?|candidats?)\b/i);
+    if (countMatch) {
+      const extracted = parseInt(countMatch[1], 10);
+      if (extracted >= 1 && extracted <= 50) {
+        limit = extracted;
+      }
+    }
+    if (!limit || isNaN(limit)) {
+      limit = 10;
+    }
+
     const response = await agentClient.post('/api/search', {
       query: fullPrompt,
       max_results: limit,
     });
 
     const agentData = response.data;
-    const profiles = agentData?.profiles || [];
+    const rawProfiles = agentData?.profiles || [];
+    const profiles = rawProfiles.slice(0, limit);
 
     // Notify Spring Boot backend in background to record search request
     apiClient.post('/searches', { rawDescription: fullPrompt }).catch(() => {});
@@ -379,8 +426,9 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
           ? p.id
           : `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Math.abs(name.split('').reduce((a, c) => a + c.charCodeAt(0), 0))}`;
         const exp = parseExperienceYears(p.experience_years, p.headline, p.summary);
-        const cleanName = name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '');
-        const candEmail = p.email || p.email_address || (cleanName ? `${cleanName}@talent-candidate.ma` : `candidate-${uniqueId}@talent-candidate.ma`);
+        const candEmail = (p.email && !p.email.endsWith('@talent-candidate.ma'))
+          ? p.email
+          : (p.email_address && !p.email_address.endsWith('@talent-candidate.ma') ? p.email_address : null);
         const cleanRole = (p.headline || 'Software Professional').split(' at ')[0].split(' chez ')[0].split(' - ')[0].split(' | ')[0].trim();
         const companyName = p.current_company || p.currentCompany || 'Listed on LinkedIn Profile';
         const defaultExpList = [
@@ -433,8 +481,9 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
       return pData.map(p => {
         const name = p.fullName || 'Candidate';
         const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0284c7&color=fff&bold=true`;
-        const cleanName = name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '');
-        const candEmail = p.email || p.emailAddress || `${cleanName}@talent-candidate.ma`;
+        const candEmail = (p.email && !p.email.endsWith('@talent-candidate.ma'))
+          ? p.email
+          : (p.emailAddress && !p.emailAddress.endsWith('@talent-candidate.ma') ? p.emailAddress : null);
         const exp = p.experienceYears || 3;
         const comp = p.headline ? (p.headline.includes(' at ') ? p.headline.split(' at ')[1] : 'Listed on LinkedIn Profile') : 'Listed on LinkedIn Profile';
         const cleanRole = p.headline ? p.headline.split(' at ')[0].split(' chez ')[0].split(' - ')[0].trim() : 'Software Professional';
@@ -471,6 +520,20 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
   }
 
   return [];
+};
+
+export const draftOutreachApi = async (candidate, jobContext = {}, channel = 'linkedin') => {
+  const response = await agentClient.post('/api/outreach', {
+    candidate: {
+      full_name: candidate.fullName || candidate.full_name,
+      headline: candidate.headline,
+      skills: candidate.skills,
+      experiences: candidate.experiences,
+    },
+    job_context: jobContext,
+    channel,
+  });
+  return response.data;
 };
 
 export default apiClient;

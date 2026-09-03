@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X, MapPin, Briefcase, Mail, Globe, ExternalLink,
-  CheckCircle2, Bookmark, BookmarkCheck, Sparkles, Send, DollarSign, Calendar, Edit, Trash2
+  CheckCircle2, Bookmark, BookmarkCheck, Sparkles, Send, DollarSign, Calendar, Edit, Trash2,
+  AlertCircle
 } from 'lucide-react';
 
 
 import { useLanguage } from '../context/LanguageContext';
+import { draftOutreachApi } from '../services/api';
 import { getAvatarUrl as getAvatarUrlUtil } from '../utils/avatar';
 
 function getAvatarUrl(name, avatarUrl) {
@@ -110,6 +112,12 @@ export function CandidateDetailModal({
   onAddNote = () => { },
 }) {
   const [note, setNote] = useState('');
+  const [outreachOpen, setOutreachOpen] = useState(false);
+  const [outreachChannel, setOutreachChannel] = useState('linkedin');
+  const [outreachDraft, setOutreachDraft] = useState('');
+  const [outreachSubject, setOutreachSubject] = useState('');
+  const [isDrafting, setIsDrafting] = useState(false);
+  const [copied, setCopied] = useState(false);
   const fontsLoaded = useRef(false);
 
   useEffect(() => {
@@ -123,6 +131,25 @@ export function CandidateDetailModal({
   }, []);
 
   if (!candidate) return null;
+
+  const hasEmail = Boolean(candidate.email && candidate.email.trim() && !candidate.email.toLowerCase().endsWith('@talent-candidate.ma'));
+  const isEmailVerified = Boolean(candidate.email_is_verified || (hasEmail && !candidate.email.toLowerCase().endsWith('@talent-candidate.ma')));
+
+  const handleDraftOutreach = async (channel) => {
+    setOutreachChannel(channel);
+    setIsDrafting(true);
+    setOutreachOpen(true);
+    setCopied(false);
+    try {
+      const result = await draftOutreachApi(candidate, { job_title: candidate.headline }, channel);
+      setOutreachDraft(result.draft || '');
+      setOutreachSubject(result.subject || '');
+    } catch (err) {
+      setOutreachDraft('Could not generate a draft right now. Please try again.');
+    } finally {
+      setIsDrafting(false);
+    }
+  };
 
   const handleAddNote = (e) => {
     e.preventDefault();
@@ -295,6 +322,24 @@ export function CandidateDetailModal({
                   <span style={{ color: 'var(--dg-teal-700)', fontWeight: 700 }}>LinkedIn</span>
                 </a>
               )}
+              <button
+                type="button"
+                className="dgm-btn"
+                onClick={() => handleDraftOutreach('linkedin')}
+                title="Draft LinkedIn message"
+              >
+                <Send size={13} color="var(--dg-teal-600)" />
+                <span>Draft LinkedIn</span>
+              </button>
+              <button
+                type="button"
+                className="dgm-btn"
+                onClick={() => handleDraftOutreach('email')}
+                title="Draft email"
+              >
+                <Mail size={13} color="var(--dg-teal-600)" />
+                <span>Draft Email</span>
+              </button>
               <button className="dgm-btn" onClick={handleEditClick} title={T.editCandidate}>
                 <Edit size={13} color="var(--dg-teal-600)" /><span>{T.editCandidate}</span>
               </button>
@@ -309,6 +354,118 @@ export function CandidateDetailModal({
               </button>
             </div>
           </div>
+
+          {/* Outreach Message Drafting Panel */}
+          {outreachOpen && (
+            <div style={{ background: 'var(--dg-paper)', border: '1px solid var(--dg-border)', borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="dgm-section-label" style={{ margin: 0 }}>
+                  {outreachChannel === 'email' ? 'Email draft' : 'LinkedIn message draft'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOutreachOpen(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dg-ink-400)', padding: 2 }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {isDrafting ? (
+                <div className="dgm-box" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--dg-ink-500)', fontSize: 12.5 }}>
+                  <div style={{ width: 14, height: 14, border: '2px solid var(--dg-teal-600)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  <span>Drafting candidate outreach message with Groq AI...</span>
+                </div>
+              ) : (
+                <>
+                  {outreachChannel === 'email' && !hasEmail && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#b91c1c', fontSize: '12px' }}>
+                      <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                      <span>No email address on file for this candidate. You can copy the generated draft or reach out on LinkedIn.</span>
+                    </div>
+                  )}
+                  {outreachChannel === 'email' && hasEmail && !isEmailVerified && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#b45309', fontSize: '12px' }}>
+                      <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                      <span>
+                        <strong>Notice:</strong> <code>{candidate.email}</code> is an unverified placeholder email. Please confirm their direct address before sending.
+                      </span>
+                    </div>
+                  )}
+                  {outreachChannel === 'email' && (
+                    <input
+                      className="dgm-note-input"
+                      style={{ width: '100%', boxSizing: 'border-box', marginBottom: 2, fontWeight: 600 }}
+                      value={outreachSubject}
+                      onChange={(e) => setOutreachSubject(e.target.value)}
+                      placeholder="Subject"
+                    />
+                  )}
+                  <textarea
+                    className="dgm-note-input"
+                    style={{ width: '100%', boxSizing: 'border-box', minHeight: 120, resize: 'vertical', fontFamily: 'inherit' }}
+                    value={outreachDraft}
+                    onChange={(e) => setOutreachDraft(e.target.value)}
+                  />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="dgm-btn"
+                      onClick={() => {
+                        navigator.clipboard.writeText(outreachDraft);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                    >
+                      <CheckCircle2 size={13} color="var(--dg-teal-600)" />
+                      <span>{copied ? 'Copied!' : 'Copy to clipboard'}</span>
+                    </button>
+                    {outreachChannel === 'email' && (
+                      hasEmail ? (
+                        <a
+                          className="dgm-btn"
+                          href={`mailto:${candidate.email}?subject=${encodeURIComponent(outreachSubject)}&body=${encodeURIComponent(outreachDraft)}`}
+                          style={{ textDecoration: 'none' }}
+                          title={isEmailVerified ? 'Open default email client' : 'Open email client (Warning: recipient address is an unverified placeholder)'}
+                        >
+                          <Mail size={13} color="var(--dg-teal-600)" />
+                          <span>Open in email client</span>
+                          {!isEmailVerified && (
+                            <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.15)', color: '#b45309', marginLeft: 4, fontWeight: 500 }}>
+                              Placeholder
+                            </span>
+                          )}
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          className="dgm-btn"
+                          disabled
+                          style={{ opacity: 0.55, cursor: 'not-allowed' }}
+                          title="No recipient email address available"
+                        >
+                          <Mail size={13} color="var(--dg-ink-400)" />
+                          <span>No email client target</span>
+                        </button>
+                      )
+                    )}
+                    {outreachChannel === 'linkedin' && candidate.linkedin && (
+                      <a
+                        className="dgm-btn"
+                        href={candidate.linkedin.startsWith('http') ? candidate.linkedin : `https://${candidate.linkedin}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        <ExternalLink size={13} color="var(--dg-teal-600)" />
+                        <span>Open LinkedIn profile to send</span>
+                      </a>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           <div>
             <div className="dgm-section-label">{T.professionalOverview}</div>
@@ -387,7 +544,24 @@ export function CandidateDetailModal({
             <div className="dgm-info-label">{T.contacts}</div>
             <div className="dgm-contact-row">
               <Mail size={13} color="var(--dg-teal-600)" />
-              <a className="dgm-contact-link" href={`mailto:${candidate.email}`}>{candidate.email}</a>
+              {hasEmail ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <a className="dgm-contact-link" href={`mailto:${candidate.email}`}>{candidate.email}</a>
+                  {isEmailVerified ? (
+                    <span style={{ fontSize: '10.5px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.1)', color: '#059669', fontWeight: 500 }}>
+                      Verified
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '10.5px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.12)', color: '#b45309', fontWeight: 500 }} title="Synthetic placeholder email generated from candidate name">
+                      Placeholder
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span style={{ color: 'var(--dg-ink-400)', fontSize: 12.5, fontStyle: 'italic' }}>
+                  No email available
+                </span>
+              )}
             </div>
             {candidate.linkedin && (
               <div className="dgm-contact-row">

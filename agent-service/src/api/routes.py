@@ -2,7 +2,7 @@
 routes.py — FastAPI endpoints for agent-service.
 """
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -101,6 +101,26 @@ async def score_single_profile(
         return {"profile": scored, "status": "scored"}
     except Exception as exc:
         logger.error(f"[API] Score error: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class OutreachRequest(BaseModel):
+    candidate: dict[str, Any]
+    job_context: dict[str, Any] = Field(default_factory=dict)
+    channel: Literal["linkedin", "email"] = "linkedin"
+
+
+@router.post("/api/outreach", tags=["Sourcing"])
+async def draft_outreach(
+    request: OutreachRequest,
+    _token: Annotated[dict, Depends(verify_jwt)],
+) -> dict:
+    from src.mcp_server.tools.outreach import generate_outreach
+    try:
+        result = await generate_outreach(request.candidate, request.job_context, request.channel)
+        return result
+    except Exception as exc:
+        logger.error(f"[API] Outreach draft error: {exc}")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

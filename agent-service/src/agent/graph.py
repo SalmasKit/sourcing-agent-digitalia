@@ -200,6 +200,9 @@ async def enrich_node(state: SourcingState) -> SourcingState:
                         profile["current_company"] = valid_exps[0].get("company") or profile.get("current_company")
                 if enrich_result.summary:
                     profile["summary"] = enrich_result.summary
+                if enrich_result.email:
+                    profile["email"] = enrich_result.email
+                    profile["email_is_verified"] = enrich_result.email_is_verified
 
                 profile["enrichment_source"] = "apollo"
                 return profile

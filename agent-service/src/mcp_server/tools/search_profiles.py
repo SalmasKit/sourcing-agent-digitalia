@@ -478,9 +478,10 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
     email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", full_text)
     if email_match:
         cand_email = email_match.group(0)
+        email_is_verified = True
     else:
-        clean_name = re.sub(r"[^a-z0-9]+", ".", name.lower()).strip(".")
-        cand_email = f"{clean_name}@talent-candidate.ma" if clean_name else f"candidate.{profile_hash}@talent-candidate.ma"
+        cand_email = None
+        email_is_verified = False
 
     # Parse current company and clean role from title
     company = ""
@@ -559,6 +560,7 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
         "seniority": criteria.get("seniority", "N/A"),
         "linkedin_url": url,
         "email": cand_email,
+        "email_is_verified": email_is_verified,
         "avatar_url": None,
         "summary": summary_overview,
         "availability": "Open for Outreach",

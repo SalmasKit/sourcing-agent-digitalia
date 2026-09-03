@@ -366,14 +366,22 @@ export function SearchConsole({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <label className="dgsc-field-label" style={{ marginBottom: 0 }}>
                 <Users size={12} />
-                {lang === 'FR' ? 'Candidats ciblés' : 'Target Results'}
+                {lang === 'FR' ? 'Nombre de profils ciblés' : 'Target Results (Profiles)'}
               </label>
               <span className="dg-mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--dg-teal-700)' }}>
                 {maxResults} {lang === 'FR' ? 'profils' : 'profiles'}
               </span>
             </div>
-            <div style={{ display: 'flex', gap: 5, marginTop: 4 }}>
-              {[5, 10, 15, 20].map((count) => {
+            <input
+              type="range"
+              min="1"
+              max="25"
+              value={maxResults}
+              onChange={(e) => setMaxResults(Number(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--dg-teal-600)', cursor: 'pointer', marginBottom: 6 }}
+            />
+            <div style={{ display: 'flex', gap: 5, marginTop: 2 }}>
+              {[2, 5, 10, 15, 20].map((count) => {
                 const isSelected = maxResults === count;
                 return (
                   <button
@@ -381,7 +389,7 @@ export function SearchConsole({
                     type="button"
                     onClick={() => setMaxResults(count)}
                     className={'dgsc-tech-chip' + (isSelected ? ' dgsc-tech-chip-active' : '')}
-                    style={{ flex: 1, textAlign: 'center', padding: '6px 0', fontSize: 11, fontWeight: isSelected ? 700 : 500 }}
+                    style={{ flex: 1, textAlign: 'center', padding: '5px 0', fontSize: 11, fontWeight: isSelected ? 700 : 500 }}
                   >
                     {count}
                   </button>

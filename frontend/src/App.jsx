@@ -267,9 +267,13 @@ function DashboardContent() {
       setCandidates(results);
       setCarouselIndex(0);
 
-      // Save results under this job's cache entry
+      // Save results under this job's cache entry — keep pool results separate from sourced results
       if (activeJobId) {
-        setJobResultsCache(prev => ({ ...prev, [activeJobId]: results }));
+        if (filters?.searchMode === 'pool') {
+          setJobResultsCache(prev => ({ ...prev, [`${activeJobId}:pool`]: results }));
+        } else {
+          setJobResultsCache(prev => ({ ...prev, [activeJobId]: results }));
+        }
       }
 
       const activeJob = jobDescriptions.find(j => j.id === activeJobId);
@@ -286,8 +290,12 @@ function DashboardContent() {
 
       const successMsg = filters?.searchMode === 'pool'
         ? (lang === 'FR'
-            ? `${results.length} profil(s) trouvés dans votre vivier pour "${jobLabel}".`
-            : `Found ${results.length} profile(s) from your talent pool for "${jobLabel}".`)
+            ? (results.length > 0 
+                ? `${results.length} profil(s) trouvés dans votre vivier pour "${jobLabel}".`
+                : `Aucun candidat trouvé dans votre vivier. Revenez à "Sourcer" pour trouver de nouveaux profils.`)
+            : (results.length > 0
+                ? `Found ${results.length} profile(s) from your talent pool for "${jobLabel}".`
+                : `No candidates found in your talent pool. Switch back to "Source" to find new profiles.`))
         : (lang === 'FR'
             ? `L'agent IA a sourcé ${results.length} candidats pour "${jobLabel}".`
             : `AI Agent sourced ${results.length} candidate profiles for "${jobLabel}".`);
@@ -299,6 +307,26 @@ function DashboardContent() {
       clearTimeout(t2);
       clearTimeout(t3);
       setIsSearching(false);
+    }
+  };
+
+  const handleSearchModeChange = (newMode) => {
+    setSearchMode(newMode);
+    const activeJobId = selectedJobId || (jobDescriptions[0] ? jobDescriptions[0].id : null);
+    if (!activeJobId) return;
+
+    if (newMode === 'source') {
+      const cachedSource = jobResultsCache[activeJobId];
+      if (cachedSource && cachedSource.length > 0) {
+        setCandidates(cachedSource);
+        setCarouselIndex(0);
+      }
+    } else if (newMode === 'pool') {
+      const cachedPool = jobResultsCache[`${activeJobId}:pool`];
+      if (cachedPool && cachedPool.length > 0) {
+        setCandidates(cachedPool);
+        setCarouselIndex(0);
+      }
     }
   };
 
@@ -314,7 +342,7 @@ function DashboardContent() {
     } else {
       // First time sourcing this job — call the API
       const queryStr = job.description || `${job.title} ${(job.skills || []).join(' ')} ${job.location || ''}`.trim();
-      handleSearch(queryStr, { location: job.location, tech: job.skills }, job.id);
+      handleSearch(queryStr, { location: job.location, tech: job.skills, maxResults: lastSearch?.filters?.maxResults || 10 }, job.id);
     }
   };
 
@@ -686,7 +714,7 @@ function DashboardContent() {
               isSearching={isSearching} 
               selectedJob={jobDescriptions.find(j => j.id === selectedJobId) || jobDescriptions[0]}
               searchMode={searchMode}
-              onSearchModeChange={setSearchMode}
+              onSearchModeChange={handleSearchModeChange}
             />
 
             {/* AI Agent Execution Pipeline Status Widget */}

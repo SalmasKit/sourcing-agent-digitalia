@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
       setToken(savedToken);
       setUser(savedUser);
     } else {
+      storage.clearSession();
       setToken(null);
       setUser(null);
     }
