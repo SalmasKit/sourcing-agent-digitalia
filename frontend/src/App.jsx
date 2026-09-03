@@ -1145,6 +1145,9 @@ function DashboardContent() {
         {activeTab === 'notes' && (
           <RecruiterNotesView
             candidates={allKnownCandidates}
+            jobDescriptions={jobDescriptions}
+            savedRoleCandidates={savedRoleCandidates}
+            jobResultsCache={jobResultsCache}
             onViewCandidate={(candidate) => {
               setSelectedCandidate(candidate);
             }}
