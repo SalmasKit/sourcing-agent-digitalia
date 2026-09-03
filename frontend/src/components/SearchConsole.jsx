@@ -2,8 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Search, Sparkles, Filter, SlidersHorizontal, MapPin, Briefcase, RotateCcw, Users } from 'lucide-react';
 
-export function SearchConsole({ onSearch = () => {}, isSearching = false, selectedJob = null }) {
+export function SearchConsole({
+  onSearch = () => {},
+  isSearching = false,
+  selectedJob = null,
+  searchMode: externalMode,
+  onSearchModeChange,
+}) {
   const { lang, t } = useLanguage();
+  const [internalMode, setInternalMode] = useState('source');
+  const searchMode = externalMode !== undefined ? externalMode : internalMode;
+  const setSearchMode = (mode) => {
+    if (onSearchModeChange) onSearchModeChange(mode);
+    setInternalMode(mode);
+  };
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('All Locations');
   const [minExp, setMinExp] = useState(3);
@@ -55,12 +67,12 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSearch(query, { location, minExp, tech: selectedTech, maxResults }, selectedJob?.id);
+    onSearch(query, { location, minExp, tech: selectedTech, maxResults, searchMode }, selectedJob?.id);
   };
 
   const handleQuickPrompt = (promptText) => {
     setQuery(promptText);
-    onSearch(promptText, { location, minExp, tech: selectedTech, maxResults }, selectedJob?.id);
+    onSearch(promptText, { location, minExp, tech: selectedTech, maxResults, searchMode }, selectedJob?.id);
   };
 
   const toggleTech = (tag) => {
@@ -115,6 +127,21 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
         }
         .dgsc-filter-toggle:hover { background: var(--dg-sunken); }
         .dgsc-filter-toggle-active { background: var(--dg-teal-100); color: var(--dg-teal-700); border-color: rgba(14,124,140,0.3); }
+
+        .dgsc-mode-toggle {
+          display: inline-flex; align-items: center; gap: 4px; background: var(--dg-paper);
+          border: 1px solid var(--dg-border); border-radius: 10px; padding: 3px; align-self: flex-start;
+        }
+        .dgsc-mode-btn {
+          display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600;
+          background: transparent; border: 1px solid transparent; border-radius: 8px;
+          padding: 5px 12px; color: var(--dg-ink-700); cursor: pointer; transition: all .15s ease;
+        }
+        .dgsc-mode-btn:hover { background: var(--dg-sunken); color: var(--dg-ink-900); }
+        .dgsc-mode-btn-active {
+          background: var(--dg-teal-100); color: var(--dg-teal-700);
+          border-color: rgba(14,124,140,0.3); font-weight: 700;
+        }
 
         .dgsc-bar {
           display: flex; align-items: center; background: var(--dg-paper); border: 1px solid var(--dg-border);
@@ -194,6 +221,39 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
         </div>
       )}
 
+      {/* Sourcing Mode Segmented Control */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div className="dgsc-mode-toggle" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={searchMode === 'source'}
+            className={'dgsc-mode-btn' + (searchMode === 'source' ? ' dgsc-mode-btn-active' : '')}
+            onClick={() => setSearchMode('source')}
+          >
+            <Sparkles size={12} />
+            <span>{lang === 'FR' ? 'Sourcer de nouveaux profils' : 'Source new candidates'}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={searchMode === 'pool'}
+            className={'dgsc-mode-btn' + (searchMode === 'pool' ? ' dgsc-mode-btn-active' : '')}
+            onClick={() => setSearchMode('pool')}
+          >
+            <Users size={12} />
+            <span>{lang === 'FR' ? 'Chercher dans mon vivier' : 'Search my talent pool'}</span>
+          </button>
+        </div>
+
+        {searchMode === 'pool' && (
+          <span style={{ fontSize: 11, color: 'var(--dg-teal-700)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dg-teal-600)' }} />
+            {lang === 'FR' ? 'Re-ranking sémantique direct • 0 coût SerpAPI/Groq' : 'Instant semantic re-rank • Zero API cost'}
+          </span>
+        )}
+      </div>
+
       {/* Main Search Bar */}
       <form onSubmit={handleSubmit}>
         <div className="dgsc-bar">
@@ -202,7 +262,11 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={selectedJob ? (lang === 'FR' ? `Rédigez ou ajustez le prompt pour "${selectedJob.title}"...` : `Type or adjust sourcing prompt for "${selectedJob.title}"...`) : t('searchPlaceholder')}
+            placeholder={
+              searchMode === 'pool'
+                ? (lang === 'FR' ? 'Décrivez le poste pour chercher dans votre vivier...' : 'Describe the role to search your talent pool...')
+                : (selectedJob ? (lang === 'FR' ? `Rédigez ou ajustez le prompt pour "${selectedJob.title}"...` : `Type or adjust sourcing prompt for "${selectedJob.title}"...`) : t('searchPlaceholder'))
+            }
             className="dgsc-input"
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -235,12 +299,12 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
               {isSearching ? (
                 <>
                   <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                  <span>{t('sourcingProgress')}</span>
+                  <span>{searchMode === 'pool' ? (lang === 'FR' ? 'Recherche vivier...' : 'Searching pool...') : t('sourcingProgress')}</span>
                 </>
               ) : (
                 <>
-                  <Sparkles size={13} />
-                  <span>{t('sourcingBtn')}</span>
+                  {searchMode === 'pool' ? <Users size={13} /> : <Sparkles size={13} />}
+                  <span>{searchMode === 'pool' ? (lang === 'FR' ? 'Chercher dans le vivier' : 'Search Talent Pool') : t('sourcingBtn')}</span>
                 </>
               )}
             </button>
@@ -265,34 +329,38 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
 
       {/* Expandable Advanced Filters Panel */}
       {showFilters && (
-        <div className="dgsc-filters-panel">
-          <div>
-            <label className="dgsc-field-label"><MapPin size={12} />{t('targetLocation')}</label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. Casablanca, Rabat, Paris, Remote..."
-              className="dgsc-field-input"
-            />
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <label className="dgsc-field-label" style={{ marginBottom: 0 }}><Briefcase size={12} />{t('minExperience')}</label>
-              <span className="dg-mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--dg-teal-700)' }}>
-                {minExp}+ {t('years')}
-              </span>
+        <div className="dgsc-filters-panel" style={searchMode === 'pool' ? { gridTemplateColumns: 'minmax(260px, 340px)' } : {}}>
+          {searchMode !== 'pool' && (
+            <div>
+              <label className="dgsc-field-label"><MapPin size={12} />{t('targetLocation')}</label>
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="e.g. Casablanca, Rabat, Paris, Remote..."
+                className="dgsc-field-input"
+              />
             </div>
-            <input
-              type="range"
-              min="0"
-              max="12"
-              value={minExp}
-              onChange={(e) => setMinExp(Number(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--dg-teal-600)', cursor: 'pointer' }}
-            />
-          </div>
+          )}
+
+          {searchMode !== 'pool' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label className="dgsc-field-label" style={{ marginBottom: 0 }}><Briefcase size={12} />{t('minExperience')}</label>
+                <span className="dg-mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--dg-teal-700)' }}>
+                  {minExp}+ {t('years')}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="12"
+                value={minExp}
+                onChange={(e) => setMinExp(Number(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--dg-teal-600)', cursor: 'pointer' }}
+              />
+            </div>
+          )}
 
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -322,24 +390,26 @@ export function SearchConsole({ onSearch = () => {}, isSearching = false, select
             </div>
           </div>
 
-          <div>
-            <label className="dgsc-field-label"><Filter size={12} />{t('mustHaveSkills')}</label>
-            <div className="dgsc-tech-tags">
-              {TECH_TAGS.map((tag) => {
-                const isSelected = selectedTech.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleTech(tag)}
-                    className={'dgsc-tech-chip' + (isSelected ? ' dgsc-tech-chip-active' : '')}
-                  >
-                    {tag}
-                  </button>
-                );
-              })}
+          {searchMode !== 'pool' && (
+            <div>
+              <label className="dgsc-field-label"><Filter size={12} />{t('mustHaveSkills')}</label>
+              <div className="dgsc-tech-tags">
+                {TECH_TAGS.map((tag) => {
+                  const isSelected = selectedTech.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTech(tag)}
+                      className={'dgsc-tech-chip' + (isSelected ? ' dgsc-tech-chip-active' : '')}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

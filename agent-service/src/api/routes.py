@@ -67,6 +67,30 @@ async def run_search(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+class PoolSearchRequest(BaseModel):
+    query: str = Field(..., min_length=3, description="Job description or search prompt to match against the talent pool")
+    limit: int = Field(default=10, ge=1, le=50)
+
+
+@router.post("/api/pool/search", tags=["Sourcing"])
+async def search_talent_pool(
+    request: PoolSearchRequest,
+    _token: Annotated[dict, Depends(verify_jwt)],
+) -> dict:
+    from src.mcp_server.tools.candidate_pool import rerank_pool
+    try:
+        results = await rerank_pool(request.query, request.limit)
+        return {
+            "candidates": results,
+            "profiles": results,  # both keys for frontend compatibility with /api/search's shape
+            "count": len(results),
+            "source": "talent_pool",
+        }
+    except Exception as exc:
+        logger.error(f"[API] Pool search error: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.post("/api/score", tags=["Sourcing"])
 async def score_single_profile(
     request: ScoreRequest,

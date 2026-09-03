@@ -167,6 +167,7 @@ function DashboardContent() {
 
   // Track last search so the refresh button can re-run it
   const [lastSearch, setLastSearch] = useState(null);
+  const [searchMode, setSearchMode] = useState('source'); // 'source' | 'pool'
 
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -245,6 +246,9 @@ function DashboardContent() {
 
   const handleSearch = async (query, filters, targetJobId) => {
     setIsSearching(true);
+    if (filters?.searchMode) {
+      setSearchMode(filters.searchMode);
+    }
     // Save last search so the refresh button can re-run it
     setLastSearch({ query, filters, targetJobId });
     const activeJobId = targetJobId || selectedJobId || (jobDescriptions[0] ? jobDescriptions[0].id : 'general-search');
@@ -274,14 +278,19 @@ function DashboardContent() {
       // Record to search history
       const now = new Date();
       const timeStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const modeLabel = filters?.searchMode === 'pool' ? (lang === 'FR' ? '(vivier)' : '(pool)') : '';
       setSearchHistory(prev => [
         ...prev,
-        { query: query ? `[${jobLabel}] ${query}` : `Sourcing for ${jobLabel}`, date: timeStr, resultsCount: results.length }
+        { query: `${modeLabel} ${query ? `[${jobLabel}] ${query}` : `Sourcing for ${jobLabel}`}`.trim(), date: timeStr, resultsCount: results.length }
       ]);
 
-      const successMsg = lang === 'FR'
-        ? `L'agent IA a sourcé ${results.length} candidats pour "${jobLabel}".`
-        : `AI Agent sourced ${results.length} candidate profiles for "${jobLabel}".`;
+      const successMsg = filters?.searchMode === 'pool'
+        ? (lang === 'FR'
+            ? `${results.length} profil(s) trouvés dans votre vivier pour "${jobLabel}".`
+            : `Found ${results.length} profile(s) from your talent pool for "${jobLabel}".`)
+        : (lang === 'FR'
+            ? `L'agent IA a sourcé ${results.length} candidats pour "${jobLabel}".`
+            : `AI Agent sourced ${results.length} candidate profiles for "${jobLabel}".`);
       triggerToast(successMsg);
     } catch (err) {
       triggerToast(lang === 'FR' ? 'Recherche terminée.' : 'Search complete.');
@@ -676,6 +685,8 @@ function DashboardContent() {
               onSearch={handleSearch} 
               isSearching={isSearching} 
               selectedJob={jobDescriptions.find(j => j.id === selectedJobId) || jobDescriptions[0]}
+              searchMode={searchMode}
+              onSearchModeChange={setSearchMode}
             />
 
             {/* AI Agent Execution Pipeline Status Widget */}
@@ -762,11 +773,41 @@ function DashboardContent() {
 
             {/* Candidate Rendering Section */}
             {candidates.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 p-8 shadow-xs">
-                <Filter className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <h4 className="text-sm font-bold text-slate-700 font-jakarta">{t('noCandidatesMatched')}</h4>
-                <p className="text-xs text-slate-500 mt-1">{t('noCandidatesDesc')}</p>
-              </div>
+              searchMode === 'pool' ? (
+                <div className="text-center py-14 bg-white rounded-2xl border border-slate-200 p-8 shadow-xs max-w-xl mx-auto my-4">
+                  <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200/60 flex items-center justify-center mx-auto mb-4 text-teal-700">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 font-jakarta">
+                    {lang === 'FR' ? 'Aucun profil correspondant dans votre vivier' : 'No Profiles Found in Talent Pool'}
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                    {lang === 'FR'
+                      ? 'Votre vivier est encore vide ou aucun candidat enregistré ne correspond à ces termes. Lancez une recherche en mode "Sourcer de nouveaux profils" : chaque profil sourcé sera automatiquement mémorisé dans votre vivier.'
+                      : 'Your talent pool may be empty or no previously sourced candidates match these terms. Run a search in "Source new candidates" mode — every sourced profile automatically grows your persistent talent pool.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchMode('source');
+                      const activeJob = jobDescriptions.find(j => j.id === selectedJobId) || jobDescriptions[0];
+                      const q = lastSearch?.query || (activeJob ? activeJob.title : '');
+                      const f = { ...(lastSearch?.filters || {}), searchMode: 'source' };
+                      handleSearch(q, f, activeJob?.id);
+                    }}
+                    className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 px-4 py-2.5 rounded-xl cursor-pointer transition-colors shadow-xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                    <span>{lang === 'FR' ? 'Sourcer de nouveaux profils (IA)' : 'Source New Candidates (AI)'}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 p-8 shadow-xs">
+                  <Filter className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                  <h4 className="text-sm font-bold text-slate-700 font-jakarta">{t('noCandidatesMatched')}</h4>
+                  <p className="text-xs text-slate-500 mt-1">{t('noCandidatesDesc')}</p>
+                </div>
+              )
             ) : viewMode === 'grid' ? (
               /* GRID MODE */
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">

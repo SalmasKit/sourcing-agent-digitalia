@@ -115,6 +115,9 @@ async def lifespan(app: FastAPI):
     # Fail closed on missing JWT secret before accepting any traffic.
     _assert_jwt_secret_configured()
 
+    from src.mcp_server.tools.candidate_pool import assert_pgvector_available
+    await assert_pgvector_available()
+
     await _check_and_log_api_keys()
 
     settings = get_settings()

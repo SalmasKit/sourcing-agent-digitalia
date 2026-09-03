@@ -36,6 +36,7 @@ export function CandidateCard({
   isSavedForJob = false,
   onSaveForJob = () => { },
 }) {
+  const { lang } = useLanguage();
   const fontsLoaded = useRef(false);
   useEffect(() => {
     if (fontsLoaded.current) return;
@@ -168,7 +169,45 @@ export function CandidateCard({
                 onError={(e) => { e.target.onerror = null; e.target.src = getAvatarUrl(candidate.fullName, null); }}
               />
               <div style={{ minWidth: 0 }}>
-                <div className="dgc-name dg-display">{candidate.fullName}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span className="dgc-name dg-display">{candidate.fullName}</span>
+                  {candidate.source === 'talent_pool' && (
+                    <span
+                      style={{
+                        fontSize: '9.5px',
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 600,
+                        padding: '2px 7px',
+                        borderRadius: '6px',
+                        background: 'var(--dg-teal-100)',
+                        color: 'var(--dg-teal-700)',
+                        border: '1px solid rgba(14,124,140,0.25)',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={lang === 'FR' ? 'Issu de votre vivier de talents' : 'From your talent pool'}
+                    >
+                      {lang === 'FR' ? 'Du vivier' : 'From your talent pool'}
+                    </span>
+                  )}
+                  {candidate.isDuplicate && (
+                    <span
+                      style={{
+                        fontSize: '9.5px',
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 600,
+                        padding: '2px 7px',
+                        borderRadius: '6px',
+                        background: 'var(--dg-bronze-100)',
+                        color: 'var(--dg-bronze-700)',
+                        border: '1px solid rgba(180,101,15,0.25)',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={`Seen ${Math.max(2, Number(candidate.timesSeen) || 2)} times across sourcing sessions`}
+                    >
+                      Previously sourced — seen {Math.max(2, Number(candidate.timesSeen) || 2)}x
+                    </span>
+                  )}
+                </div>
                 <div className="dgc-headline">{candidate.headline}</div>
               </div>
             </div>

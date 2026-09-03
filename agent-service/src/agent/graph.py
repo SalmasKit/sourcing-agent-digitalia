@@ -12,6 +12,8 @@ from langgraph.graph.state import CompiledStateGraph
 from src.agent.prompts import CRITERIA_EXTRACTION_SYSTEM, CRITERIA_EXTRACTION_USER
 from src.agent.state import SourcingState
 from src.config import get_settings
+from src.mcp_server.tools.candidate_pool import store_candidate_pool_batch
+from src.mcp_server.tools.dedup import filter_and_record_duplicates
 from src.mcp_server.tools.enrich_profile import enrich_candidate
 from src.mcp_server.tools.score_profile import score_profiles_batch
 from src.mcp_server.tools.search_profiles import _ai_enrich_profile, search_profiles
@@ -245,6 +247,28 @@ async def enrich_node(state: SourcingState) -> SourcingState:
     }
 
 
+async def dedup_node(state: SourcingState) -> SourcingState:
+    """
+    Node 2.7 — Cross-search candidate deduplication.
+    Identifies candidates seen in prior searches and badges them with
+    is_duplicate=True and times_seen count without dropping them.
+    """
+    profiles = state.get("raw_profiles", [])
+    if not profiles:
+        return state
+
+    tagged = await filter_and_record_duplicates(profiles)
+    dup_count = sum(1 for p in tagged if p.get("is_duplicate"))
+    msg = f"Deduplication: {dup_count} of {len(tagged)} candidate(s) previously sourced."
+    logger.info(f"[Node 2.7] {msg}")
+
+    return {
+        **state,
+        "raw_profiles": tagged,
+        "messages": state["messages"] + [AIMessage(content=msg)],
+    }
+
+
 async def score_node(state: SourcingState) -> SourcingState:
     profiles = state.get("raw_profiles", [])
     if not profiles:
@@ -356,6 +380,9 @@ async def format_output(state: SourcingState) -> SourcingState:
             "skills": p.get("skills", []) if isinstance(p.get("skills"), list) else (p.get("skills", {}).get("skills", []) if isinstance(p.get("skills"), dict) else []),
             "experience_years": p.get("experience_years"),
             "languages": p.get("languages", []),
+            "is_duplicate": p.get("is_duplicate", False),
+            "times_seen": p.get("times_seen", 1),
+            "fingerprint": p.get("fingerprint"),
             "raw_data": p,
             "score": p.get("match_score", 0),
             "score_breakdown": {
@@ -366,6 +393,15 @@ async def format_output(state: SourcingState) -> SourcingState:
             },
         }
         formatted_profiles.append(formatted_p)
+
+    # Persist every sourced candidate into the semantic talent pool so future
+    # searches can re-rank against them without re-running SerpAPI/Groq.
+    # Fire-and-forget: pool storage failures must never break the response
+    # the recruiter is waiting on.
+    try:
+        await store_candidate_pool_batch(formatted_profiles)
+    except Exception as exc:
+        logger.warning(f"[format_output] Talent pool storage failed (non-fatal): {exc}")
 
     final_output = {
         "job_id": state.get("job_id"),
@@ -396,13 +432,15 @@ def build_sourcing_graph() -> CompiledStateGraph:  # type: ignore[type-arg]
     graph.add_node("interpret_request", interpret_request)
     graph.add_node("search_profiles", search_node)
     graph.add_node("enrich_node", enrich_node)
+    graph.add_node("dedup_node", dedup_node)
     graph.add_node("score_profiles", score_node)
     graph.add_node("format_output", format_output)
 
     graph.set_entry_point("interpret_request")
     graph.add_edge("interpret_request", "search_profiles")
     graph.add_edge("search_profiles", "enrich_node")
-    graph.add_edge("enrich_node", "score_profiles")
+    graph.add_edge("enrich_node", "dedup_node")
+    graph.add_edge("dedup_node", "score_profiles")
     graph.add_edge("score_profiles", "format_output")
     graph.add_edge("format_output", END)
 

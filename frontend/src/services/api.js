@@ -265,7 +265,72 @@ function parseExperienceYears(val, headline = '', summary = '') {
   return 3;
 }
 
+async function searchTalentPoolApi(searchQuery, filters = {}) {
+  const limit = Number(filters.maxResults || filters.limit) || 10;
+  try {
+    const response = await agentClient.post('/api/pool/search', {
+      query: searchQuery,
+      limit,
+    });
+    const profiles = response.data?.candidates || response.data?.profiles || [];
+    return profiles.map(p => {
+      const name = p.full_name || 'Candidate';
+      const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0284c7&color=fff&bold=true`;
+      const uniqueId = p.id && !p.id.startsWith('serpapi-')
+        ? p.id
+        : `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Math.abs(name.split('').reduce((a, c) => a + c.charCodeAt(0), 0))}`;
+      const exp = typeof p.experience_years === 'number' && !isNaN(p.experience_years)
+        ? p.experience_years
+        : parseExperienceYears(p.experience_years, p.headline, p.summary);
+      const cleanName = name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '');
+      const candEmail = p.email || p.email_address || (cleanName ? `${cleanName}@talent-candidate.ma` : `candidate-${uniqueId}@talent-candidate.ma`);
+      const cleanRole = (p.headline || 'Software Professional').split(' at ')[0].split(' chez ')[0].split(' - ')[0].split(' | ')[0].trim();
+      const companyName = p.current_company || p.currentCompany || 'Listed on LinkedIn Profile';
+      const defaultExpList = [
+        {
+          role: cleanRole,
+          company: companyName,
+          period: 'Current Position',
+          description: p.summary && p.summary !== p.headline ? p.summary : `Active ${cleanRole} position at ${companyName}. Full details on profile.`
+        }
+      ];
+      const candExperiences = Array.isArray(p.experiences) && p.experiences.length > 0
+        ? p.experiences
+        : defaultExpList;
+
+      return {
+        id: uniqueId,
+        fullName: name,
+        headline: p.headline,
+        location: p.location,
+        experienceYears: exp,
+        email: candEmail,
+        matchScore: p.pool_similarity || p.match_score || 0,
+        summary: p.summary || p.headline,
+        skills: Array.isArray(p.skills) ? p.skills : (p.skills?.skills || []),
+        linkedin: p.linkedin_url || p.source_url,
+        avatarUrl: p.avatar_url || defaultAvatar,
+        verifiedMatchReasons: [`${p.pool_similarity || p.match_score}% semantic match to your query — from your existing talent pool.`],
+        availability: p.availability || 'Open for Outreach (Contact Candidate)',
+        salaryExpectation: p.salary_expectation || p.salaryExpectation || (exp >= 5 ? '[Est. Market Benchmark] 25,000 - 34,000 MAD / mo' : '[Est. Market Benchmark] 16,000 - 24,000 MAD / mo'),
+        languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : [],
+        experiences: candExperiences,
+        source: 'talent_pool',
+        isDuplicate: false,
+        timesSeen: Number(p.times_seen) || 1,
+      };
+    });
+  } catch (err) {
+    console.warn('Talent pool search failed:', err.message);
+    return [];
+  }
+}
+
 export const searchCandidatesApi = async (searchQuery, filters = {}) => {
+  if (filters.searchMode === 'pool') {
+    return searchTalentPoolApi(searchQuery, filters);
+  }
+
   let fullPrompt = searchQuery || '';
 
   // Append location filter if specified
@@ -348,6 +413,8 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
           languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : [],
           experiences: candExperiences,
           source: p.source || 'serpapi',
+          isDuplicate: Boolean(p.is_duplicate),
+          timesSeen: Number(p.times_seen) || 1,
         };
       });
     }

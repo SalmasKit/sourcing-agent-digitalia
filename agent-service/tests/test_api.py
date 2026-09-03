@@ -2,6 +2,7 @@ import base64
 from unittest.mock import AsyncMock, patch
 
 import jwt
+import pytest
 from fastapi.testclient import TestClient
 
 from src.config import get_settings
@@ -88,3 +89,108 @@ def test_search_endpoint_error_propagation():
         assert response.status_code == 500
         data = response.json()
         assert "Invalid API Key" in data["detail"]
+
+
+def test_pool_search_endpoint_unauthorized():
+    """Verify that requests to pool search missing JWT Bearer token return 401."""
+    payload = {"query": "React Developer", "limit": 5}
+    response = client.post("/api/pool/search", json=payload)
+    assert response.status_code == 401
+
+
+def test_pool_search_endpoint_success():
+    """Verify that pool search queries rerank_pool and formats the response."""
+    canned_pool_results = [
+        {
+            "id": "p-100",
+            "full_name": "Pool Candidate",
+            "headline": "Senior Full-Stack Engineer",
+            "pool_similarity": 92,
+            "match_score": 92,
+            "source": "talent_pool",
+        }
+    ]
+    with patch(
+        "src.mcp_server.tools.candidate_pool.rerank_pool",
+        new_callable=AsyncMock,
+        return_value=canned_pool_results,
+    ) as mock_rerank:
+        payload = {"query": "Full-Stack Engineer", "limit": 5}
+        response = client.post("/api/pool/search", json=payload, headers=_make_auth_header())
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert data["source"] == "talent_pool"
+        assert len(data["candidates"]) == 1
+        assert len(data["profiles"]) == 1
+        assert data["candidates"][0]["full_name"] == "Pool Candidate"
+        mock_rerank.assert_awaited_once_with("Full-Stack Engineer", 5)
+
+
+def test_pool_search_endpoint_error():
+    """Verify that errors from rerank_pool return 500."""
+    with patch(
+        "src.mcp_server.tools.candidate_pool.rerank_pool",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("Database connection timed out"),
+    ):
+        payload = {"query": "Full-Stack Engineer", "limit": 5}
+        response = client.post("/api/pool/search", json=payload, headers=_make_auth_header())
+        assert response.status_code == 500
+        assert "Database connection timed out" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+@patch("src.agent.graph.store_candidate_pool_batch", new_callable=AsyncMock)
+async def test_format_output_persists_to_pool(mock_store):
+    from src.agent.graph import format_output
+
+    state = {
+        "raw_query": "Senior React Developer",
+        "job_id": "test-job-123",
+        "max_results": 2,
+        "criteria": {},
+        "raw_profiles": [],
+        "scored_profiles": [
+            {"id": "c1", "full_name": "Alice Dev", "match_score": 85},
+            {"id": "c2", "full_name": "Bob Lead", "match_score": 90},
+        ],
+        "final_output": {},
+        "messages": [],
+        "error": None,
+    }
+
+    result = await format_output(state)
+    assert "final_output" in result
+    assert len(result["final_output"]["profiles"]) == 2
+    mock_store.assert_awaited_once()
+    stored_profiles = mock_store.call_args[0][0]
+    assert len(stored_profiles) == 2
+    assert stored_profiles[0]["full_name"] == "Alice Dev"
+
+
+@pytest.mark.asyncio
+@patch("src.agent.graph.store_candidate_pool_batch", new_callable=AsyncMock, side_effect=Exception("DB pool down"))
+async def test_format_output_pool_failure_non_fatal(mock_store):
+    from src.agent.graph import format_output
+
+    state = {
+        "raw_query": "Senior React Developer",
+        "job_id": "test-job-123",
+        "max_results": 1,
+        "criteria": {},
+        "raw_profiles": [],
+        "scored_profiles": [
+            {"id": "c1", "full_name": "Alice Dev", "match_score": 85},
+        ],
+        "final_output": {},
+        "messages": [],
+        "error": None,
+    }
+
+    # Must NOT raise even if store_candidate_pool_batch raises
+    result = await format_output(state)
+    assert "final_output" in result
+    assert len(result["final_output"]["profiles"]) == 1
+
+
