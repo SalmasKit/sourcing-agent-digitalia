@@ -112,6 +112,27 @@ export function CandidateDetailModal({
   onDelete = () => { },
   onAddNote = () => { },
 }) {
+  const { lang } = useLanguage();
+  const isFR = lang === 'FR';
+  const labels = isFR ? {
+    matchScore: 'correspondance',
+    yearsExp: "ans d'exp.",
+    expectation: 'Prétention :',
+    availability: 'Disponibilité :',
+    editCandidate: 'Modifier',
+    deleteCandidate: 'Supprimer',
+    inShortlist: 'Présélectionné',
+    addToShortlist: 'Ajouter à la présélection',
+    professionalOverview: 'Profil professionnel',
+    aiEvaluation: 'Évaluation IA de correspondance',
+    verifiedSkills: 'Compétences vérifiées',
+    contacts: 'Coordonnées',
+    recruiterNotes: 'Notes du recruteur',
+    addNotePlaceholder: 'Ajouter une note sur ce candidat...',
+    saveNote: 'Enregistrer',
+    closeProfile: 'Fermer',
+  } : T;
+
   const [note, setNote] = useState('');
   const [outreachOpen, setOutreachOpen] = useState(false);
   const [outreachChannel, setOutreachChannel] = useState('linkedin');
@@ -183,7 +204,7 @@ export function CandidateDetailModal({
         .dg-display { font-family: var(--font-display); letter-spacing: -0.01em; }
 
         .dgm-overlay {
-          position: fixed; inset: 0; z-index: 50; overflow-y: auto;
+          position: fixed; inset: 0; z-index: 1000; overflow-y: auto;
           background: rgba(16,21,31,0.55); backdrop-filter: blur(3px);
           display: flex; align-items: center; justify-content: center; padding: 20px;
         }
@@ -290,12 +311,12 @@ export function CandidateDetailModal({
             <div style={{ minWidth: 0 }}>
               <div className="dgm-name-row">
                 <h2 className="dgm-name dg-display">{candidate.fullName}</h2>
-                <span className={`dgm-match-pill dgm-match-${tone}`}>{candidate.matchScore}% {T.matchScore}</span>
+                <span className={`dgm-match-pill dgm-match-${tone}`}>{candidate.matchScore}% {labels.matchScore}</span>
               </div>
               <div className="dgm-headline">{candidate.headline}</div>
               <div className="dgm-meta">
                 <span className="dgm-meta-item"><MapPin size={13} />{candidate.location}</span>
-                <span className="dgm-meta-item"><Briefcase size={13} />{candidate.experienceYears} {T.yearsExp}</span>
+                <span className="dgm-meta-item"><Briefcase size={13} />{candidate.experienceYears} {labels.yearsExp}</span>
               </div>
             </div>
           </div>
@@ -307,8 +328,8 @@ export function CandidateDetailModal({
         <div className="dgm-body">
           <div className="dgm-toolbar">
             <div className="dgm-toolbar-facts">
-              <span className="dgm-toolbar-fact"><DollarSign size={14} color="var(--dg-green-600)" /><strong>{T.expectation}</strong> {candidate.salaryExpectation || 'Negotiable'}</span>
-              <span className="dgm-toolbar-fact"><Calendar size={14} color="var(--dg-teal-600)" /><strong>{T.availability}</strong> {candidate.availability || 'Immediate'}</span>
+              <span className="dgm-toolbar-fact"><DollarSign size={14} color="var(--dg-green-600)" /><strong>{labels.expectation}</strong> {candidate.salaryExpectation || (isFR ? 'Négociable' : 'Negotiable')}</span>
+              <span className="dgm-toolbar-fact"><Calendar size={14} color="var(--dg-teal-600)" /><strong>{labels.availability}</strong> {candidate.availability || (isFR ? 'Immédiate' : 'Immediate')}</span>
             </div>
             <div className="dgm-toolbar-actions">
               {candidate.linkedin && (
@@ -341,17 +362,17 @@ export function CandidateDetailModal({
                 <Mail size={13} color="var(--dg-teal-600)" />
                 <span>Draft Email</span>
               </button>
-              <button className="dgm-btn" onClick={handleEditClick} title={T.editCandidate}>
-                <Edit size={13} color="var(--dg-teal-600)" /><span>{T.editCandidate}</span>
+              <button className="dgm-btn" onClick={handleEditClick} title={labels.editCandidate}>
+                <Edit size={13} color="var(--dg-teal-600)" /><span>{labels.editCandidate}</span>
               </button>
-              <button className="dgm-btn dgm-btn-danger" onClick={handleDeleteClick} title={T.deleteCandidate}>
-                <Trash2 size={13} /><span>{T.deleteCandidate}</span>
+              <button className="dgm-btn dgm-btn-danger" onClick={handleDeleteClick} title={labels.deleteCandidate}>
+                <Trash2 size={13} /><span>{labels.deleteCandidate}</span>
               </button>
               <button
                 className={'dgm-btn ' + (isShortlisted ? 'dgm-btn-shortlisted' : 'dgm-btn-shortlist')}
                 onClick={() => onToggleShortlist(candidate)}
               >
-                {isShortlisted ? (<><BookmarkCheck size={14} /><span>{T.inShortlist}</span></>) : (<><Bookmark size={14} /><span>{T.addToShortlist}</span></>)}
+                {isShortlisted ? (<><BookmarkCheck size={14} /><span>{labels.inShortlist}</span></>) : (<><Bookmark size={14} /><span>{labels.addToShortlist}</span></>)}
               </button>
             </div>
           </div>
@@ -469,12 +490,12 @@ export function CandidateDetailModal({
           )}
 
           <div>
-            <div className="dgm-section-label">{T.professionalOverview}</div>
+            <div className="dgm-section-label">{labels.professionalOverview}</div>
             <div className="dgm-box">{candidate.summary}</div>
           </div>
 
           <div className="dgm-ai-box">
-            <div className="dgm-ai-title"><Sparkles size={15} />{T.aiEvaluation}</div>
+            <div className="dgm-ai-title"><Sparkles size={15} />{labels.aiEvaluation}</div>
             <ul className="dgm-ai-list">
               {candidate.verifiedMatchReasons?.map((reason, idx) => (
                 <li className="dgm-ai-item" key={idx}>
@@ -486,9 +507,9 @@ export function CandidateDetailModal({
           </div>
 
           <div>
-            <div className="dgm-section-label">{T.verifiedSkills}</div>
+            <div className="dgm-section-label">{labels.verifiedSkills}</div>
             <div className="dgm-skills">
-              {candidate.skills.map((skill, idx) => (
+              {(Array.isArray(candidate.skills) ? candidate.skills : (typeof candidate.skills === 'string' ? candidate.skills.split(',').map(s => s.trim()).filter(Boolean) : [])).map((skill, idx) => (
                 <span className="dgm-skill" key={idx}>{skill}</span>
               ))}
             </div>
@@ -542,7 +563,7 @@ export function CandidateDetailModal({
 
 
           <div className="dgm-info-card">
-            <div className="dgm-info-label">{T.contacts}</div>
+            <div className="dgm-info-label">{labels.contacts}</div>
             <div className="dgm-contact-row">
               <Mail size={13} color="var(--dg-teal-600)" />
               {hasEmail ? (
@@ -593,13 +614,13 @@ export function CandidateDetailModal({
           </div>
 
           <div>
-            <div className="dgm-notes-title dg-display">{T.recruiterNotes}</div>
+            <div className="dgm-notes-title dg-display">{labels.recruiterNotes}</div>
             {candidate.notes && candidate.notes.length > 0 && (
               <div>
                 {candidate.notes.map((n) => (
                   <div className="dgm-note" key={n.id}>
                     <div>{n.text}</div>
-                    <div className="dgm-note-time">{formatNoteTimestamp(n, lang === 'FR')}</div>
+                    <div className="dgm-note-time">{formatNoteTimestamp(n, isFR)}</div>
                   </div>
                 ))}
               </div>
@@ -610,17 +631,17 @@ export function CandidateDetailModal({
                 type="text"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder={T.addNotePlaceholder}
+                placeholder={labels.addNotePlaceholder}
               />
               <button className="dgm-note-submit" type="submit">
-                <Send size={13} /><span>{T.saveNote}</span>
+                <Send size={13} /><span>{labels.saveNote}</span>
               </button>
             </form>
           </div>
         </div>
 
         <div className="dgm-footer">
-          <button className="dgm-footer-btn" onClick={onClose}>{T.closeProfile}</button>
+          <button className="dgm-footer-btn" onClick={onClose}>{labels.closeProfile}</button>
         </div>
       </div>
     </div>

@@ -157,10 +157,25 @@ export function KanbanPipeline({
         .dgkp-badge-green { background: var(--dg-green-100); color: var(--dg-green-700); }
         .dgkp-badge-danger { background: var(--dg-danger-bg); color: var(--dg-danger); }
 
-        .dgkp-board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; align-items: start; min-height: 520px; }
+        .dgkp-board {
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
+          overflow-x: auto;
+          padding-bottom: 14px;
+          min-height: 520px;
+          scrollbar-width: thin;
+          scrollbar-color: var(--dg-border-strong) transparent;
+        }
+        .dgkp-board::-webkit-scrollbar { height: 6px; }
+        .dgkp-board::-webkit-scrollbar-track { background: transparent; }
+        .dgkp-board::-webkit-scrollbar-thumb { background: var(--dg-border-strong); border-radius: 999px; }
+        .dgkp-board::-webkit-scrollbar-thumb:hover { background: var(--dg-ink-400); }
+
         .dgkp-col {
-          background: var(--dg-sunken); border: 1.5px dashed var(--dg-border); border-radius: 16px;
-          padding: 12px; min-height: 480px; display: flex; flex-direction: column; gap: 10px;
+          background: var(--dg-sunken); border: 1.5px dashed var(--dg-border); border-radius: 14px;
+          padding: 10px; min-height: 480px; width: 225px; min-width: 215px; max-width: 235px;
+          flex: 0 0 225px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;
           transition: background .15s ease, border-color .15s ease, transform .15s ease;
         }
         .dgkp-col-over {
@@ -169,62 +184,61 @@ export function KanbanPipeline({
         }
         .dgkp-col-head {
           display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px;
-          border-bottom: 1px solid var(--dg-border); margin-bottom: 4px;
+          border-bottom: 1px solid var(--dg-border); margin-bottom: 2px;
         }
-        .dgkp-col-title { font-size: 12px; font-weight: 700; color: var(--dg-ink-900); display: flex; align-items: center; gap: 6px; }
+        .dgkp-col-title { font-size: 11.5px; font-weight: 700; color: var(--dg-ink-900); display: flex; align-items: center; gap: 6px; }
 
         .dgkp-card {
-          background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 12px;
-          padding: 12px; display: flex; flex-direction: column; gap: 8px; cursor: grab;
+          background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 10px;
+          padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; cursor: grab;
+          width: 100%; box-sizing: border-box;
           box-shadow: 0 1px 3px rgba(16,21,31,0.04);
           transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
         }
-        .dgkp-card:hover { border-color: var(--dg-border-strong); box-shadow: 0 6px 16px -8px rgba(16,21,31,0.12); transform: translateY(-1px); }
+        .dgkp-card:hover { border-color: var(--dg-border-strong); box-shadow: 0 4px 12px -4px rgba(16,21,31,0.12); transform: translateY(-1px); }
         .dgkp-card:active { cursor: grabbing; opacity: 0.85; }
 
-        .dgkp-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-        .dgkp-person { display: flex; align-items: center; gap: 8px; min-width: 0; }
-        .dgkp-avatar { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; border: 1px solid var(--dg-border); flex-shrink: 0; }
-        .dgkp-name { font-size: 12px; font-weight: 700; color: var(--dg-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .dgkp-headline { font-size: 10px; color: var(--dg-ink-500); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dgkp-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+        .dgkp-person { display: flex; align-items: center; gap: 7px; min-width: 0; }
+        .dgkp-avatar { width: 28px; height: 28px; border-radius: 7px; object-fit: cover; border: 1px solid var(--dg-border); flex-shrink: 0; }
+        .dgkp-name { font-size: 11.5px; font-weight: 700; color: var(--dg-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dgkp-headline { font-size: 9.5px; color: var(--dg-ink-500); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .dgkp-score-pill {
-          font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: var(--dg-green-700);
+          font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--dg-green-700);
           background: var(--dg-green-100); border: 1px solid rgba(31,110,74,0.2);
-          padding: 2px 5px; border-radius: 6px; flex-shrink: 0;
+          padding: 1.5px 4.5px; border-radius: 5px; flex-shrink: 0;
         }
 
-        .dgkp-skills { display: flex; flex-wrap: wrap; gap: 4px; }
+        .dgkp-skills { display: flex; flex-wrap: wrap; gap: 3.5px; }
         .dgkp-skill {
-          font-family: var(--font-mono); font-size: 9px; font-weight: 500;
+          font-family: var(--font-mono); font-size: 8.5px; font-weight: 500;
           background: var(--dg-sunken); color: var(--dg-ink-700);
-          border: 1px solid var(--dg-border); padding: 2px 5px; border-radius: 5px;
+          border: 1px solid var(--dg-border); padding: 1px 4.5px; border-radius: 4px;
         }
 
         .dgkp-card-foot {
-          display: flex; align-items: center; justify-content: space-between; pt: 6px;
-          border-top: 1px solid var(--dg-border); margin-top: 2px;
+          display: flex; align-items: center; justify-content: space-between; pt: 5px;
+          border-top: 1px solid var(--dg-border); margin-top: 1px;
         }
         .dgkp-action-btn {
-          display: flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 700;
+          display: flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700;
           background: none; border: none; cursor: pointer; color: var(--dg-teal-700);
           transition: color .15s ease;
         }
         .dgkp-action-btn:hover { color: var(--dg-teal-700); text-decoration: underline; }
 
         .dgkp-empty-drop {
-          font-size: 10.5px; font-weight: 500; color: var(--dg-ink-400); text-align: center;
-          padding: 28px 8px; border: 1px dashed var(--dg-border-strong); border-radius: 10px;
+          font-size: 10px; font-weight: 500; color: var(--dg-ink-400); text-align: center;
+          padding: 24px 6px; border: 1px dashed var(--dg-border-strong); border-radius: 8px;
           background: rgba(255,255,255,0.4);
         }
 
         @media (max-width: 1080px) {
           .dgkp-summary-bar { grid-template-columns: repeat(3, 1fr); }
-          .dgkp-board { grid-template-columns: repeat(3, 1fr); gap: 14px; }
         }
         @media (max-width: 640px) {
           .dgkp-summary-bar { grid-template-columns: repeat(2, 1fr); }
-          .dgkp-board { grid-template-columns: 1fr; }
         }
       `}</style>
 
@@ -302,71 +316,98 @@ export function KanbanPipeline({
                   {t.dropHere}
                 </div>
               ) : (
-                stageCandidates.map((candidate) => (
-                  <div
-                    key={candidate.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, candidate.id)}
-                    className="dgkp-card"
-                  >
-                    <div className="dgkp-card-top">
-                      <div className="dgkp-person">
-                        <img
-                          src={getAvatarUrl(candidate.fullName, candidate.avatarUrl)}
-                          alt={candidate.fullName}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = getAvatarUrl(candidate.fullName, null);
-                          }}
-                          className="dgkp-avatar"
-                        />
-                        <div style={{ minWidth: 0 }}>
-                          <div className="dgkp-name dg-display">{candidate.fullName}</div>
-                          <div className="dgkp-headline">{candidate.headline}</div>
-                        </div>
-                      </div>
-                      <span className="dgkp-score-pill">
-                        {candidate.matchScore}%
-                      </span>
-                    </div>
+                stageCandidates.map((candidate) => {
+                  const candidateSkills = Array.isArray(candidate.skills)
+                    ? candidate.skills
+                    : (typeof candidate.skills === 'string'
+                      ? candidate.skills.split(',').map(s => s.trim()).filter(Boolean)
+                      : []);
 
-                    <div className="dgkp-skills">
-                      {candidate.skills.slice(0, 2).map((skill, idx) => (
-                        <span key={idx} className="dgkp-skill">{skill}</span>
-                      ))}
-                      {candidate.skills.length > 2 && (
-                        <span className="dgkp-skill">+{candidate.skills.length - 2}</span>
-                      )}
-                    </div>
-
-                    <div className="dgkp-card-foot">
-                      <button
-                        onClick={() => onViewDetails(candidate)}
-                        className="dgkp-action-btn"
+                  return (
+                    <div
+                      key={candidate.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, candidate.id)}
+                      className="dgkp-card"
+                    >
+                      <div
+                        className="dgkp-card-top"
+                        style={{ cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewDetails(candidate);
+                        }}
                       >
-                        <Eye size={11} />
-                        <span>{t.viewProfile}</span>
-                      </button>
+                        <div className="dgkp-person">
+                          <img
+                            src={getAvatarUrl(candidate.fullName, candidate.avatarUrl)}
+                            alt={candidate.fullName}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = getAvatarUrl(candidate.fullName, null);
+                            }}
+                            className="dgkp-avatar"
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div className="dgkp-name dg-display" title={candidate.fullName}>{candidate.fullName}</div>
+                            <div className="dgkp-headline" title={candidate.headline}>{candidate.headline}</div>
+                          </div>
+                        </div>
+                        <span className="dgkp-score-pill">
+                          {candidate.matchScore}%
+                        </span>
+                      </div>
 
-                      {stage.id !== 'hired' && stage.id !== 'rejected' && (
+                      {candidateSkills.length > 0 && (
+                        <div className="dgkp-skills">
+                          {candidateSkills.slice(0, 2).map((skill, idx) => (
+                            <span key={idx} className="dgkp-skill">{skill}</span>
+                          ))}
+                          {candidateSkills.length > 2 && (
+                            <span className="dgkp-skill">+{candidateSkills.length - 2}</span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="dgkp-card-foot">
                         <button
-                          onClick={() => {
-                            const stageOrder = ['new', 'contacted', 'interview', 'offer', 'hired'];
-                            const currIdx = stageOrder.indexOf(stage.id);
-                            if (currIdx !== -1 && currIdx < stageOrder.length - 1) {
-                              onUpdateStage(candidate.id, stageOrder[currIdx + 1]);
-                            }
+                          type="button"
+                          draggable={false}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewDetails(candidate);
                           }}
                           className="dgkp-action-btn"
-                          title="Advance to next stage"
                         >
-                          <span>{t.advanceNext}</span>
-                          <ChevronRight size={11} />
+                          <Eye size={11} />
+                          <span>{t.viewProfile}</span>
                         </button>
-                      )}
+
+                        {stage.id !== 'hired' && stage.id !== 'rejected' && (
+                          <button
+                            type="button"
+                            draggable={false}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const stageOrder = ['new', 'contacted', 'interview', 'offer', 'hired'];
+                              const currIdx = stageOrder.indexOf(stage.id);
+                              if (currIdx !== -1 && currIdx < stageOrder.length - 1) {
+                                onUpdateStage(candidate.id, stageOrder[currIdx + 1]);
+                              }
+                            }}
+                            className="dgkp-action-btn"
+                            title="Advance to next stage"
+                          >
+                            <span>{t.advanceNext}</span>
+                            <ChevronRight size={11} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           );
