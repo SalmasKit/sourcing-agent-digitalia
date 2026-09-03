@@ -26,7 +26,10 @@ async def test_generate_outreach_linkedin():
     mock_llm_response = AIMessage(
         content="Hi Alex, noticed your work on distributed systems. We're building next-gen cloud infra. Open to a quick chat?"
     )
-    with patch("src.mcp_server.tools.outreach.ChatGroq.ainvoke", new_callable=AsyncMock, return_value=mock_llm_response):
+    with (
+        patch("src.mcp_server.tools.outreach.settings.groq_api_key", "test-groq-key"),
+        patch("src.mcp_server.tools.outreach.ChatGroq.ainvoke", new_callable=AsyncMock, return_value=mock_llm_response),
+    ):
         candidate = {
             "full_name": "Alex Smith",
             "headline": "Senior Cloud Architect",
@@ -48,7 +51,10 @@ async def test_generate_outreach_email():
     )
     subject_response = AIMessage(content="Lead Cloud Engineer opportunity at TechCorp")
 
-    with patch("src.mcp_server.tools.outreach.ChatGroq.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+    with (
+        patch("src.mcp_server.tools.outreach.settings.groq_api_key", "test-groq-key"),
+        patch("src.mcp_server.tools.outreach.ChatGroq.ainvoke", new_callable=AsyncMock) as mock_ainvoke,
+    ):
         mock_ainvoke.side_effect = [draft_response, subject_response]
 
         candidate = {
