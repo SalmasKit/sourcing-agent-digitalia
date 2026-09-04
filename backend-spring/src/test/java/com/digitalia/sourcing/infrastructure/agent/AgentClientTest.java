@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -294,4 +295,23 @@ class AgentClientTest {
         assertEquals("v", resp.extractedCriteria().get("k"));
         assertTrue(resp.profiles().isEmpty());
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void executeSearch_whenPipelineExceedsGlobalTimeout_shouldThrowAgentServiceException() {
+        stubWebClientChain();
+        when(responseSpec.onStatus(any(Predicate.class), any(Function.class))).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(AgentClient.AgentSearchResponse.class))
+                .thenReturn(Mono.never());
+
+        AgentClient timeoutClient = new AgentClient(webClient, 50L);
+
+        StepVerifier.create(timeoutClient.executeSearch("Java Dev", UUID.randomUUID()))
+                .expectErrorSatisfies(ex -> {
+                    assertInstanceOf(AgentServiceException.class, ex);
+                    assertTrue(ex.getMessage().contains("timed out after 50ms including retries"));
+                })
+                .verify(Duration.ofSeconds(2));
+    }
 }
+

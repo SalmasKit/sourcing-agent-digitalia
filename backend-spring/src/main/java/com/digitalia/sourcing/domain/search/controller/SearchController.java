@@ -58,4 +58,15 @@ public class SearchController {
         SearchRequestDto dto = searchOrchestrationService.getSearchDetails(id, user);
         return ResponseEntity.ok(ApiResponse.success(dto, "Search details retrieved successfully"));
     }
+
+    @PostMapping("/{id}/retry")
+    @PreAuthorize("hasAnyRole('RECRUITER', 'HR_ADMIN', 'SUPER_ADMIN')")
+    @Operation(summary = "Retry a previously failed or existing search query")
+    public ResponseEntity<ApiResponse<SearchRequestDto>> retrySearch(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user) {
+        SearchRequestDto dto = searchOrchestrationService.retrySearch(id, user);
+        return ResponseEntity.ok(ApiResponse.success(dto, "Search request retried successfully"));
+    }
 }
+

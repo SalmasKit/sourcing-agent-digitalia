@@ -132,4 +132,23 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$.data.rawDescription").value("Dev Senior Python"))
                 .andExpect(jsonPath("$.data.status").value("RUNNING"));
     }
+
+    @Test
+    void retrySearch_shouldReturn200AndRetriedDto() throws Exception {
+        UUID searchId = UUID.randomUUID();
+        SearchRequestDto dto = new SearchRequestDto(
+                searchId, "Dev Senior Python", Map.of(), SearchStatus.RUNNING,
+                UUID.randomUUID(), Instant.now(), Instant.now()
+        );
+
+        when(searchOrchestrationService.retrySearch(eq(searchId), any())).thenReturn(dto);
+
+        mockMvc.perform(post("/api/v1/searches/{id}/retry", searchId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(searchId.toString()))
+                .andExpect(jsonPath("$.message").value("Search request retried successfully"));
+    }
 }
+

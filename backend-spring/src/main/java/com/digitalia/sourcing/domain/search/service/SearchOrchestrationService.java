@@ -45,7 +45,25 @@ public class SearchOrchestrationService {
         return mapToDto(savedRequest);
     }
 
-    public void triggerAgentSearch(UUID searchRequestId, String query) {
+    @Transactional
+    public SearchRequestDto retrySearch(UUID searchRequestId, User user) {
+        SearchRequest searchRequest = searchRequestRepository.findById(searchRequestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Search request not found"));
+
+        if (user.getRole() == Role.RECRUITER && !searchRequest.getCreatedBy().getId().equals(user.getId())) {
+            throw new AccessDeniedException("You do not have permission to retry this search");
+        }
+
+        if (searchRequest.getStatus() == SearchStatus.RUNNING) {
+            throw new IllegalStateException("Search is currently running");
+        }
+
+        log.info("Retrying search request ID: {} for user: {}", searchRequestId, user.getEmail());
+        triggerAgentSearch(searchRequest.getId(), searchRequest.getRawDescription());
+        return mapToDto(searchRequest);
+    }
+
+    private void triggerAgentSearch(UUID searchRequestId, String query) {
         log.info("Starting background agent search for request ID: {}", searchRequestId);
         
         searchRequestRepository.findById(searchRequestId).ifPresent(sr -> {

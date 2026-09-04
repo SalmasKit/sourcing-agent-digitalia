@@ -58,4 +58,29 @@ class JwtServiceTest {
 
         assertFalse(jwtService.isTokenValid(token, otherUser));
     }
+
+    @Test
+    void validateConfiguration_shouldFailWhenSecretBlank() {
+        JwtService service = new JwtService();
+        ReflectionTestUtils.setField(service, "secretKey", "   ");
+        assertThrows(IllegalStateException.class, service::validateConfiguration);
+    }
+
+    @Test
+    void validateConfiguration_shouldFailWhenDevSecretUsedInProduction() {
+        JwtService service = new JwtService();
+        ReflectionTestUtils.setField(service, "secretKey", JwtService.DEFAULT_DEV_SECRET);
+        org.springframework.mock.env.MockEnvironment env = new org.springframework.mock.env.MockEnvironment();
+        env.setActiveProfiles("prod");
+        ReflectionTestUtils.setField(service, "environment", env);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, service::validateConfiguration);
+        assertTrue(ex.getMessage().contains("default development JWT secret cannot be used in production"));
+    }
+
+    @Test
+    void validateConfiguration_shouldPassWithValidKey() {
+        assertDoesNotThrow(() -> jwtService.validateConfiguration());
+    }
 }
+

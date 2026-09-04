@@ -21,4 +21,9 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     @Modifying
     @Query("DELETE FROM RefreshToken r WHERE r.tokenHash = :tokenHash")
     void deleteByTokenHash(String tokenHash);
+
+    @Modifying
+    @Query("DELETE FROM RefreshToken r WHERE r.expiryDate < :now OR r.revoked = true")
+    int deleteByExpiryDateBeforeOrRevokedTrue(@org.springframework.data.repository.query.Param("now") java.time.Instant now);
 }
+

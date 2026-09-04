@@ -88,27 +88,38 @@ class SearchOrchestrationServiceTest {
     }
 
     @Test
-    void triggerAgentSearch_shouldSubscribeSuccessCallback() {
+    void retrySearch_shouldSubscribeSuccessCallback() {
         AgentClient.AgentSearchResponse agentResponse = new AgentClient.AgentSearchResponse(null, List.of());
 
         when(searchRequestRepository.findById(searchRequest.getId())).thenReturn(Optional.of(searchRequest));
         when(agentClient.executeSearch(anyString(), any(UUID.class))).thenReturn(Mono.just(agentResponse));
 
-        searchOrchestrationService.triggerAgentSearch(searchRequest.getId(), "Java Dev");
+        SearchRequestDto result = searchOrchestrationService.retrySearch(searchRequest.getId(), recruiterUser);
 
+        assertNotNull(result);
         verify(searchResultPersistenceService, times(1)).saveSearchResults(eq(searchRequest.getId()), eq(agentResponse));
     }
 
     @Test
-    void triggerAgentSearch_shouldSubscribeErrorCallback() {
+    void retrySearch_shouldSubscribeErrorCallback() {
         RuntimeException searchError = new RuntimeException("Agent connection refused");
 
         when(searchRequestRepository.findById(searchRequest.getId())).thenReturn(Optional.of(searchRequest));
         when(agentClient.executeSearch(anyString(), any(UUID.class))).thenReturn(Mono.error(searchError));
 
-        searchOrchestrationService.triggerAgentSearch(searchRequest.getId(), "Java Dev");
+        SearchRequestDto result = searchOrchestrationService.retrySearch(searchRequest.getId(), recruiterUser);
 
+        assertNotNull(result);
         verify(searchResultPersistenceService, times(1)).handleSearchFailure(eq(searchRequest.getId()), eq(searchError));
+    }
+
+    @Test
+    void retrySearch_unauthorizedRecruiter_shouldThrowAccessDeniedException() {
+        User otherRecruiter = User.builder().id(UUID.randomUUID()).role(Role.RECRUITER).email("other@test.com").build();
+        when(searchRequestRepository.findById(searchRequest.getId())).thenReturn(Optional.of(searchRequest));
+
+        assertThrows(AccessDeniedException.class, () ->
+                searchOrchestrationService.retrySearch(searchRequest.getId(), otherRecruiter));
     }
 
     @Test

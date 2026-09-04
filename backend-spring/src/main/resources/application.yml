@@ -38,13 +38,16 @@ server:
 app:
   jwt:
     # 256-bit key generated for HS256: must be base64-encoded and at least 256 bits (32 bytes) long.
-    # We will use a standard dev key here.
-    secret: ${JWT_SECRET:9a4f2c5d6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c}
+    # In production, this MUST be supplied via the JWT_SECRET environment variable.
+    # For local development, a default key is configured in application-dev.yml.
+    secret: ${JWT_SECRET:}
     access-token-expiration-ms: 900000 # 15 minutes
     refresh-token-expiration-ms: 604800000 # 7 days
+    cleanup-cron: "0 0 3 * * ?" # Daily purge of expired refresh tokens at 3 AM
   agent:
     url: ${AGENT_SERVICE_URL:http://localhost:8001}
-    timeout-ms: 60000 # 60 seconds for agent search query
+    timeout-ms: 60000 # 60 seconds per HTTP request attempt
+    global-timeout-ms: 90000 # 90 seconds global timeout wrapping retries
   cors:
     allowed-origins:
       - ${FRONTEND_CORS_ORIGIN:http://localhost:5173}
