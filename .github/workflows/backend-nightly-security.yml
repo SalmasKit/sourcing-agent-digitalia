@@ -1,0 +1,50 @@
+name: Nightly Deep Security Scan
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  owasp-scan:
+    name: OWASP Dependency-Check Deep Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache OWASP Dependency-Check database
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: owasp-nvd-data-${{ runner.os }}
+          restore-keys: |
+            owasp-nvd-data-${{ runner.os }}-
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          cd backend-spring
+          if [ -n "$NVD_API_KEY" ]; then
+            KEY_ARG="-DnvdApiKey=$NVD_API_KEY"
+          else
+            KEY_ARG=""
+          fi
+          mvn -B org.owasp:dependency-check-maven:check \
+            -DfailBuildOnCVSS=7 \
+            $KEY_ARG \
+            -DsuppressionFile=dependency-check-suppression.xml
+
+      - name: Upload Dependency-Check Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: backend-spring/target/dependency-check-report.html
+          retention-days: 30

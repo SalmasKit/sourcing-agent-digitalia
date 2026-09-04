@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
     <!--
-      Suppression rules for false positives can be defined here.
-      Example:
-      <suppress>
-         <notes><![CDATA[Explanation of why this CVE is a false positive or mitigated]]></notes>
-         <packageUrl regex="true">^pkg:maven/org\.example/.*$</packageUrl>
-         <cve>CVE-2024-XXXXX</cve>
-      </suppress>
+        Exemple de suppression — à décommenter et adapter le jour où le scan
+        signale un faux positif confirmé (CVE qui ne s'applique pas réellement
+        à la façon dont la dépendance est utilisée dans ce projet).
+
+        <suppress>
+            <notes><![CDATA[
+                Faux positif : CVE-XXXX-XXXXX concerne une fonctionnalité de
+                <nom-librairie> non utilisée dans ce projet (ex: un parseur XML
+                externe jamais invoqué). Vérifié le YYYY-MM-DD par <ton nom>.
+            ]]></notes>
+            <packageUrl regex="true">^pkg:maven/groupid/artifactid@.*$</packageUrl>
+            <cve>CVE-XXXX-XXXXX</cve>
+        </suppress>
     -->
+
 </suppressions>
