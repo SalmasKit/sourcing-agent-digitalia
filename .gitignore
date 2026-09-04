@@ -1,8 +1,15 @@
 # Java / Spring Boot
 target/
 *.class
-.mvn/
+.mvn/*
+!.mvn/wrapper/
 !.mvn/wrapper/maven-wrapper.jar
+**/.mvn/*
+!**/.mvn/wrapper/
+!**/.mvn/wrapper/maven-wrapper.jar
+!**/.mvn/wrapper/maven-wrapper.properties
+*testcontainers.properties
+
 
 # Python & Testing
 __pycache__/
@@ -19,9 +26,12 @@ node_modules/
 dist/
 build/
 
-# Private documentation
+# Documentation
 *.md
+!README.md
+!**/README.md
 !README.md.example
+!**/README.md.example
 
 # Environment & Secrets
 .env

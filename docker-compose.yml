@@ -55,6 +55,8 @@ services:
       - DB_PASSWORD=sourcing_password
       - AGENT_SERVICE_URL=http://agent-service:8001
       - FRONTEND_CORS_ORIGIN=http://localhost:5173
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
