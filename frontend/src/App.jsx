@@ -342,7 +342,7 @@ function DashboardContent() {
     } else {
       // First time sourcing this job — call the API
       const queryStr = job.description || `${job.title} ${(job.skills || []).join(' ')} ${job.location || ''}`.trim();
-      handleSearch(queryStr, { location: job.location, tech: job.skills, maxResults: lastSearch?.filters?.maxResults || 10 }, job.id);
+      handleSearch(queryStr, { location: job.location, tech: job.skills, maxResults: job.maxResults || lastSearch?.filters?.maxResults || 10 }, job.id);
     }
   };
 

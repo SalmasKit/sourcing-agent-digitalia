@@ -43,6 +43,9 @@ export function SearchConsole({
       if (selectedJob.skills && selectedJob.skills.length > 0) {
         setSelectedTech(selectedJob.skills);
       }
+      if (selectedJob.maxResults) {
+        setMaxResults(Number(selectedJob.maxResults));
+      }
       // Pre-fill the search query with the job's sourcing prompt/description
       const jobPrompt = selectedJob.description || selectedJob.prompt || '';
       if (jobPrompt.trim()) {

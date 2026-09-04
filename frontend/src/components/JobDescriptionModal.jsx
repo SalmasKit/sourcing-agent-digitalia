@@ -1,56 +1,110 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, FileText, Plus, Sparkles, CheckCircle2, RefreshCw, Wand2 } from 'lucide-react';
+import {
+  X,
+  FileText,
+  Plus,
+  Sparkles,
+  CheckCircle2,
+  RefreshCw,
+  Wand2,
+  Briefcase,
+  Clock,
+  Laptop,
+  Home,
+  User,
+  Users,
+  Award,
+  Crown,
+} from 'lucide-react';
+import { searchLocations } from '../utils/geocoding';
+
+const CONTRACT_ICON_MAP = {
+  Briefcase,
+  Clock,
+  Laptop,
+  Home,
+};
+
+const SENIORITY_ICONS = [User, Users, Award, Crown];
 
 const COPY = {
   EN: {
     editTitle: 'Edit job description',
     newTitle: 'New job description',
+    sectionBasics: 'Role basics',
+    sectionWhere: 'Where & what',
+    sectionBrief: 'Sourcing brief',
     professionTitle: 'Job title',
     titlePh: 'e.g. Digital Marketing Lead, Senior Full-Stack Engineer, HR Manager',
     seniority: 'Seniority level',
-    seniorityOpts: ['Junior (0\u20132 yrs)', 'Mid-level (2\u20135 yrs)', 'Senior (5\u20138 yrs)', 'Lead / Manager (8+ yrs)'],
+    seniorityOpts: ['Junior (0–2 yrs)', 'Mid-level (2–5 yrs)', 'Senior (5–8 yrs)', 'Lead / Manager (8+ yrs)'],
+    seniorityShort: ['Junior', 'Mid-level', 'Senior', 'Lead/Manager'],
     contractType: 'Contract type',
     contractOpts: ['Permanent (CDI)', 'Fixed-term (CDD)', 'Freelance / Contract', 'Remote full-time'],
+    contractIcons: {
+      'Permanent (CDI)': 'Briefcase',
+      'Fixed-term (CDD)': 'Clock',
+      'Freelance / Contract': 'Laptop',
+      'Remote full-time': 'Home',
+    },
     location: 'Target location',
-    locationPh: 'e.g. Casablanca, Paris, London, Remote',
-    skills: 'Required skills (comma-separated)',
-    skillsPh: 'e.g. Project Management, React, Financial Analysis, B2B Sales',
+    locationPh: 'Search city, region, or country...',
+    skills: 'Required skills',
+    skillsPh: 'Type a skill and press Enter...',
+    skillsAdded: 'Press Enter or comma to add a skill',
+    previewLabel: 'Search preview',
+    targetProfiles: 'Target candidates to source',
+    profilesUnit: 'profiles',
     helpDraft: 'Need help drafting the prompt?',
     generate: 'Generate prompt with AI',
-    generating: 'Generating\u2026',
+    generating: 'Generating…',
     reviewTitle: 'AI agent generated prompt',
     reviewTag: 'Review required',
     cancel: 'Cancel',
     approve: 'Approve and apply',
     descLabel: 'Job description / sourcing prompt',
-    descPh: 'Detailed responsibilities, expected competencies, and ideal candidate profile\u2026',
+    descPh: 'Detailed responsibilities, expected competencies, and ideal candidate profile…',
     saveChanges: 'Save changes',
     createAndSource: 'Create and start sourcing',
   },
   FR: {
     editTitle: 'Modifier la fiche de poste',
     newTitle: 'Nouvelle fiche de poste',
-    professionTitle: 'Intitul\u00e9 du poste',
-    titlePh: 'ex. Ing\u00e9nieur Backend Senior',
-    seniority: 'Niveau de s\u00e9niorit\u00e9',
-    seniorityOpts: ['Junior (0\u20132 ans)', 'Interm\u00e9diaire (2\u20135 ans)', 'Senior (5\u20138 ans)', 'Lead / Architecte (8+ ans)'],
+    sectionBasics: 'Informations du poste',
+    sectionWhere: 'Où & quoi',
+    sectionBrief: 'Brief de sourcing',
+    professionTitle: 'Intitulé du poste',
+    titlePh: 'ex. Ingénieur Backend Senior',
+    seniority: 'Niveau de séniorité',
+    seniorityOpts: ['Junior (0–2 ans)', 'Intermédiaire (2–5 ans)', 'Senior (5–8 ans)', 'Lead / Architecte (8+ ans)'],
+    seniorityShort: ['Junior', 'Intermédiaire', 'Senior', 'Lead/Architecte'],
     contractType: 'Type de contrat',
-    contractOpts: ['CDI', 'CDD', 'Freelance / Prestation', 'T\u00e9l\u00e9travail temps plein'],
+    contractOpts: ['CDI', 'CDD', 'Freelance / Prestation', 'Télétravail temps plein'],
+    contractIcons: {
+      'CDI': 'Briefcase',
+      'CDD': 'Clock',
+      'Freelance / Prestation': 'Laptop',
+      'Télétravail temps plein': 'Home',
+    },
     location: 'Localisation cible',
-    locationPh: 'ex. Casablanca, Rabat, t\u00e9l\u00e9travail, toutes localisations',
-    skills: 'Comp\u00e9tences requises (s\u00e9par\u00e9es par virgules)',
-    skillsPh: 'ex. React, Node.js, AWS',
-    helpDraft: 'Besoin d\u2019aide pour r\u00e9diger ?',
-    generate: 'G\u00e9n\u00e9rer le prompt par IA',
-    generating: 'G\u00e9n\u00e9ration\u2026',
-    reviewTitle: 'Prompt g\u00e9n\u00e9r\u00e9 par l\u2019agent IA',
-    reviewTag: 'V\u00e9rification requise',
+    locationPh: 'Rechercher une ville, région ou pays...',
+    skills: 'Compétences requises',
+    skillsPh: 'Tapez une compétence et appuyez sur Entrée...',
+    skillsAdded: 'Appuyez sur Entrée ou virgule pour ajouter',
+    previewLabel: 'Aperçu de la recherche',
+    targetProfiles: 'Nombre de candidats à sourcer',
+    profilesUnit: 'profils',
+    helpDraft: 'Besoin d’aide pour rédiger ?',
+    generate: 'Générer le prompt par IA',
+    generating: 'Génération…',
+    reviewTitle: 'Prompt généré par l’agent IA',
+    reviewTag: 'Vérification requise',
     cancel: 'Annuler',
     approve: 'Approuver et appliquer',
     descLabel: 'Description du poste / prompt de sourcing',
-    descPh: 'D\u00e9tail des responsabilit\u00e9s, stack technique attendue, profil id\u00e9al\u2026',
+    descPh: 'Détail des responsabilités, stack technique attendue, profil idéal…',
     saveChanges: 'Enregistrer les modifications',
-    createAndSource: 'Cr\u00e9er et lancer le sourcing',
+    createAndSource: 'Créer et lancer le sourcing',
   },
 };
 
@@ -62,20 +116,33 @@ export function JobDescriptionModal({
   editingJob = null,
   lang = 'EN',
 }) {
-  const t = COPY[lang];
+  const t = COPY[lang] || COPY.EN;
   const isFR = lang === 'FR';
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('All Locations');
-  const [skills, setSkills] = useState('');
-  const [seniority, setSeniority] = useState('Senior');
-  const [contractType, setContractType] = useState('Permanent (CDI)');
+  const [location, setLocation] = useState('');
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const locationDebounceRef = useRef(null);
+
+  const [skills, setSkills] = useState([]);
+  const [skillInput, setSkillInput] = useState('');
+  const [seniority, setSeniority] = useState(t.seniorityOpts[2]);
+  const [contractType, setContractType] = useState(t.contractOpts[0]);
+  const [maxResults, setMaxResults] = useState(10);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPromptPreview, setGeneratedPromptPreview] = useState(null);
   const [showPromptConfirm, setShowPromptConfirm] = useState(false);
   const fontsLoaded = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (locationDebounceRef.current) clearTimeout(locationDebounceRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded.current) return;
@@ -91,23 +158,83 @@ export function JobDescriptionModal({
     if (editingJob) {
       setTitle(String(editingJob.title || ''));
       setDescription(String(editingJob.description || ''));
-      setLocation(editingJob.location || 'All Locations');
-      setSkills(Array.isArray(editingJob.skills) ? editingJob.skills.join(', ') : (editingJob.skills || ''));
-      setSeniority(editingJob.seniority || 'Senior');
-      setContractType(editingJob.contractType || 'Permanent (CDI)');
+      setLocation(editingJob.location && editingJob.location !== 'All Locations' ? editingJob.location : '');
+      setSkills(
+        Array.isArray(editingJob.skills)
+          ? editingJob.skills
+          : (editingJob.skills || '')
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+      );
+      setSeniority(editingJob.seniority || t.seniorityOpts[2]);
+      setContractType(editingJob.contractType || t.contractOpts[0]);
+      setMaxResults(Number(editingJob.maxResults) || 10);
     } else {
       setTitle('');
       setDescription('');
-      setLocation('All Locations');
-      setSkills('');
-      setSeniority('Senior');
-      setContractType('Permanent (CDI)');
+      setLocation('');
+      setSkills([]);
+      setSkillInput('');
+      setSeniority(t.seniorityOpts[2]);
+      setContractType(t.contractOpts[0]);
+      setMaxResults(10);
     }
+    setLocationSuggestions([]);
+    setShowLocationDropdown(false);
     setGeneratedPromptPreview(null);
     setShowPromptConfirm(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingJob, isOpen]);
 
+  const handleLocationChange = (value) => {
+    setLocation(value);
+    setShowLocationDropdown(true);
+    if (locationDebounceRef.current) clearTimeout(locationDebounceRef.current);
+    if (!value || value.trim().length < 2) {
+      setLocationSuggestions([]);
+      return;
+    }
+    locationDebounceRef.current = setTimeout(async () => {
+      setIsLoadingLocations(true);
+      const results = await searchLocations(value, isFR ? 'fr' : 'en');
+      setLocationSuggestions(results);
+      setIsLoadingLocations(false);
+    }, 400);
+  };
+
+  const selectLocation = (suggestion) => {
+    setLocation(suggestion.label);
+    setShowLocationDropdown(false);
+    setLocationSuggestions([]);
+  };
+
   if (!isOpen) return null;
+
+  const addSkill = () => {
+    const val = skillInput.trim();
+    if (!val) return;
+    const parts = val.split(',').map((s) => s.trim()).filter(Boolean);
+    const newSkills = [...skills];
+    parts.forEach((p) => {
+      if (!newSkills.includes(p)) newSkills.push(p);
+    });
+    setSkills(newSkills);
+    setSkillInput('');
+  };
+
+  const removeSkill = (skillToRemove) => {
+    setSkills(skills.filter((s) => s !== skillToRemove));
+  };
+
+  const handleSkillKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addSkill();
+    } else if (e.key === 'Backspace' && !skillInput && skills.length > 0) {
+      setSkills(skills.slice(0, -1));
+    }
+  };
 
   const handleGeneratePrompt = () => {
     const safeTitle = String(title || '').trim();
@@ -115,12 +242,12 @@ export function JobDescriptionModal({
     setIsGenerating(true);
 
     window.setTimeout(() => {
-      const safeSkills = String(skills || '').trim();
-      const skillsList = safeSkills || (isFR ? 'React, Node.js, AWS' : 'React, Node.js, AWS');
+      const safeSkills = skills.join(', ');
+      const skillsList = safeSkills || 'React, Node.js, AWS';
       const locText = location && location !== 'All Locations' ? location : (isFR ? 'Toutes localisations' : 'All locations');
 
       const generated = isFR
-        ? `Recherche un profil ${seniority} ${safeTitle} bas\u00e9(e) \u00e0 ${locText} (${contractType}). Le candidat id\u00e9al poss\u00e8de une expertise approfondie en ${skillsList}. Missions principales\u00a0: conception et architecture d'applications haute performance, livraison CI/CD, et collaboration agile en \u00e9quipe pluridisciplinaire. Profil recherch\u00e9\u00a0: esprit d'initiative, ma\u00eetrise des bonnes pratiques de clean code et capacit\u00e9 \u00e0 encadrer des profils plus juniors.`
+        ? `Recherche un profil ${seniority} ${safeTitle} basé(e) à ${locText} (${contractType}). Le candidat idéal possède une expertise approfondie en ${skillsList}. Missions principales : conception et architecture d'applications haute performance, livraison CI/CD, et collaboration agile en équipe pluridisciplinaire. Profil recherché : esprit d'initiative, maîtrise des bonnes pratiques de clean code et capacité à encadrer des profils plus juniors.`
         : `Looking for a ${seniority} ${safeTitle} based in ${locText} (${contractType}). The ideal candidate has deep expertise in ${skillsList}. Key responsibilities: designing high-performance architectures, automated CI/CD deployments, and agile collaboration. Expected profile: strong initiative, clean code practices, and the ability to mentor junior engineers.`;
 
       setGeneratedPromptPreview(generated);
@@ -142,9 +269,9 @@ export function JobDescriptionModal({
     let safeDesc = String(description || '').trim();
     if (!safeDesc && generatedPromptPreview) safeDesc = String(generatedPromptPreview).trim();
     if (!safeDesc) {
-      const safeSkills = String(skills || '').trim();
+      const safeSkills = skills.join(', ');
       safeDesc = isFR
-        ? `Recherche un profil ${seniority} ${safeTitle} \u00e0 ${location} avec comp\u00e9tences en ${safeSkills || 'technologies cl\u00e9s'}.`
+        ? `Recherche un profil ${seniority} ${safeTitle} à ${location} avec compétences en ${safeSkills || 'technologies clés'}.`
         : `Sourcing for ${seniority} ${safeTitle} in ${location} with expertise in ${safeSkills || 'key technologies'}.`;
     }
 
@@ -152,10 +279,11 @@ export function JobDescriptionModal({
       id: editingJob ? editingJob.id : `job-${Date.now()}`,
       title: safeTitle,
       description: safeDesc,
-      location: location || 'All Locations',
-      skills: String(skills || '').split(',').map((s) => s.trim()).filter(Boolean),
+      location: location.trim() || 'All Locations',
+      skills: skills,
       seniority,
       contractType,
+      maxResults: Number(maxResults) || 10,
       status: editingJob ? editingJob.status : 'active',
     };
 
@@ -164,8 +292,12 @@ export function JobDescriptionModal({
 
     setTitle('');
     setDescription('');
-    setLocation('All Locations');
-    setSkills('');
+    setLocation('');
+    setLocationSuggestions([]);
+    setShowLocationDropdown(false);
+    setSkills([]);
+    setSkillInput('');
+    setMaxResults(10);
     setShowPromptConfirm(false);
     setGeneratedPromptPreview(null);
     onClose();
@@ -204,7 +336,6 @@ export function JobDescriptionModal({
         .dgj-close:hover { color: var(--dg-ink-700); background: var(--dg-sunken); }
 
         .dgj-form { padding: 22px; max-height: 78vh; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-        .dgj-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
         .dgj-label { display: block; font-size: 10px; font-weight: 700; color: var(--dg-ink-500); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
         .dgj-input, .dgj-select, .dgj-textarea {
@@ -215,6 +346,13 @@ export function JobDescriptionModal({
         .dgj-input:focus, .dgj-select:focus, .dgj-textarea:focus { border-color: var(--dg-teal-500); background: var(--dg-surface); }
         .dgj-textarea { resize: none; line-height: 1.5; }
         .dgj-select { cursor: pointer; }
+
+        .dgsc-tech-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+        .dgsc-tech-chip {
+          font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; padding: 3px 8px; border-radius: 6px;
+          border: 1px solid var(--dg-border); background: var(--dg-paper); color: var(--dg-ink-700);
+        }
+        .dgsc-tech-chip-active { background: var(--dg-teal-100); color: var(--dg-teal-700); border-color: rgba(14,124,140,0.3); }
 
         .dgj-ai-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .dgj-ai-hint { font-size: 11px; font-weight: 600; color: var(--dg-ink-400); }
@@ -256,10 +394,6 @@ export function JobDescriptionModal({
           transition: background .15s ease;
         }
         .dgj-submit:hover { background: #232C3A; }
-
-        @media (max-width: 520px) {
-          .dgj-row2 { grid-template-columns: 1fr; }
-        }
       `}</style>
 
       <div className="dgj-modal">
@@ -274,44 +408,296 @@ export function JobDescriptionModal({
         </div>
 
         <form className="dgj-form" onSubmit={handleSubmit}>
+          {/* Section 1: Role basics */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <div style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--dg-teal-600)' }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--dg-teal-700)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {t.sectionBasics}
+            </span>
+          </div>
+
           <div>
             <label className="dgj-label">{t.professionTitle} *</label>
-            <input className="dgj-input" type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.titlePh} />
+            <input
+              className="dgj-input"
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={t.titlePh}
+            />
           </div>
 
-          <div className="dgj-row2">
-            <div>
-              <label className="dgj-label">{t.seniority}</label>
-              <select className="dgj-select" value={seniority} onChange={(e) => setSeniority(e.target.value)}>
-                {t.seniorityOpts.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="dgj-label">{t.contractType}</label>
-              <select className="dgj-select" value={contractType} onChange={(e) => setContractType(e.target.value)}>
-                {t.contractOpts.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
+          <div>
+            <label className="dgj-label">{t.seniority}</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+              {t.seniorityOpts.map((opt, idx) => {
+                const isSelected =
+                  seniority === opt ||
+                  (seniority && (opt.startsWith(seniority) || (t.seniorityShort[idx] && seniority.includes(t.seniorityShort[idx]))));
+                const Icon = SENIORITY_ICONS[idx] || User;
+                const years = opt.match(/\((.*?)\)/)?.[1] || '';
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setSeniority(opt)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                      padding: '10px 6px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      border: isSelected ? '1.5px solid var(--dg-teal-600)' : '1px solid var(--dg-border)',
+                      background: isSelected ? 'var(--dg-teal-100)' : 'var(--dg-paper)',
+                      color: isSelected ? 'var(--dg-teal-700)' : 'var(--dg-ink-500)',
+                      transition: 'all .15s ease',
+                    }}
+                  >
+                    <Icon size={16} style={{ color: isSelected ? 'var(--dg-teal-600)' : 'var(--dg-ink-400)' }} />
+                    <span style={{ fontSize: 10, fontWeight: isSelected ? 700 : 600, textAlign: 'center', lineHeight: 1.3 }}>
+                      {t.seniorityShort[idx]}
+                    </span>
+                    {years && (
+                      <span style={{ fontSize: 9, color: isSelected ? 'var(--dg-teal-600)' : 'var(--dg-ink-400)', textAlign: 'center', lineHeight: 1 }}>
+                        {years}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="dgj-row2">
-            <div>
-              <label className="dgj-label">{t.location}</label>
-              <input className="dgj-input" type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t.locationPh} />
+          <div>
+            <label className="dgj-label">{t.contractType}</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              {t.contractOpts.map((opt) => {
+                const isSelected =
+                  contractType === opt ||
+                  (contractType && (opt.includes(contractType) || contractType.includes(opt)));
+                const iconName = t.contractIcons?.[opt];
+                const Icon = CONTRACT_ICON_MAP[iconName] || Briefcase;
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setContractType(opt)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      border: isSelected ? '1.5px solid var(--dg-teal-600)' : '1px solid var(--dg-border)',
+                      background: isSelected ? 'var(--dg-teal-100)' : 'var(--dg-paper)',
+                      color: isSelected ? 'var(--dg-teal-700)' : 'var(--dg-ink-700)',
+                      transition: 'all .15s ease',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <Icon size={16} style={{ flexShrink: 0, color: isSelected ? 'var(--dg-teal-600)' : 'var(--dg-ink-400)' }} />
+                    <span style={{ fontSize: 11.5, fontWeight: isSelected ? 700 : 500, lineHeight: 1.2 }}>
+                      {opt}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-            <div>
-              <label className="dgj-label">{t.skills}</label>
-              <input className="dgj-input" type="text" value={skills} onChange={(e) => setSkills(e.target.value)} placeholder={t.skillsPh} />
+          </div>
+
+          {/* Section 2: Where & what */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+            <div style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--dg-teal-600)' }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--dg-teal-700)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {t.sectionWhere}
+            </span>
+          </div>
+
+          <div>
+            <label className="dgj-label">{t.location}</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                className="dgj-input"
+                type="text"
+                value={location}
+                onChange={(e) => handleLocationChange(e.target.value)}
+                onFocus={() => location.length >= 2 && setShowLocationDropdown(true)}
+                onBlur={() => setTimeout(() => setShowLocationDropdown(false), 150)}
+                placeholder={t.locationPh}
+                autoComplete="off"
+              />
+              {showLocationDropdown && (isLoadingLocations || locationSuggestions.length > 0) && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: 4,
+                    zIndex: 10,
+                    background: 'var(--dg-surface)',
+                    border: '1px solid var(--dg-border)',
+                    borderRadius: '10px',
+                    boxShadow: '0 8px 24px -8px rgba(16,21,31,0.18)',
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {isLoadingLocations ? (
+                    <div style={{ padding: '10px 12px', fontSize: '11.5px', color: 'var(--dg-ink-400)' }}>
+                      {isFR ? 'Recherche...' : 'Searching...'}
+                    </div>
+                  ) : (
+                    locationSuggestions.map((s, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => selectLocation(s)}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '9px 12px',
+                          border: 'none',
+                          background: 'none',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          color: 'var(--dg-ink-700)',
+                          borderBottom: idx < locationSuggestions.length - 1 ? '1px solid var(--dg-border)' : 'none',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'var(--dg-sunken)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'none';
+                        }}
+                        onMouseDown={(e) => e.preventDefault()}
+                      >
+                        {s.label}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
+          </div>
+
+          <div>
+            <label className="dgj-label">{t.skills}</label>
+            <div
+              className="dgsc-tech-tags"
+              style={{
+                padding: '8px 10px',
+                background: 'var(--dg-paper)',
+                border: '1px solid var(--dg-border)',
+                borderRadius: '10px',
+                minHeight: '42px',
+                alignItems: 'center',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 5,
+              }}
+            >
+              {skills.map((skill) => (
+                <span
+                  key={skill}
+                  className="dgsc-tech-chip dgsc-tech-chip-active"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                >
+                  {skill}
+                  <button
+                    type="button"
+                    onClick={() => removeSkill(skill)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'inherit',
+                    }}
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              ))}
+              <input
+                type="text"
+                value={skillInput}
+                onChange={(e) => setSkillInput(e.target.value)}
+                onKeyDown={handleSkillKeyDown}
+                onBlur={addSkill}
+                placeholder={skills.length === 0 ? t.skillsPh : t.skillsAdded}
+                style={{
+                  border: 'none',
+                  outline: 'none',
+                  background: 'none',
+                  fontSize: '12px',
+                  flex: 1,
+                  minWidth: '130px',
+                  color: 'var(--dg-ink-900)',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Live Search Preview */}
+          {(title.trim() || skills.length > 0) && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 6,
+                padding: '8px 10px',
+                background: 'var(--dg-sunken)',
+                borderRadius: '8px',
+                fontSize: '10.5px',
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--dg-ink-500)',
+              }}
+            >
+              <Sparkles size={12} color="var(--dg-teal-600)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>
+                <strong style={{ color: 'var(--dg-teal-700)' }}>{t.previewLabel}:</strong> site:linkedin.com/in {(seniority || '').split(' ')[0]} "{title || '...'}"
+                {skills.length > 0 && ` (${skills.slice(0, 3).join(' OR ')})`}
+                {location !== 'All Locations' && location ? ` ${location}` : ''}
+                <span style={{ color: 'var(--dg-teal-700)', fontWeight: 600 }}> • {maxResults} {t.profilesUnit}</span>
+              </span>
+            </div>
+          )}
+
+          {/* Section 3: Sourcing brief */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+            <div style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--dg-teal-600)' }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--dg-teal-700)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {t.sectionBrief}
+            </span>
           </div>
 
           <div className="dgj-ai-row">
             <span className="dgj-ai-hint">{t.helpDraft}</span>
-            <button type="button" className="dgj-ai-btn" onClick={handleGeneratePrompt} disabled={isGenerating || !title.trim()}>
+            <button
+              type="button"
+              className="dgj-ai-btn"
+              onClick={handleGeneratePrompt}
+              disabled={isGenerating || !title.trim()}
+            >
               {isGenerating ? (
-                <><RefreshCw size={13} className="dgj-spin" /><span>{t.generating}</span></>
+                <>
+                  <RefreshCw size={13} className="dgj-spin" />
+                  <span>{t.generating}</span>
+                </>
               ) : (
-                <><Wand2 size={13} /><span>{t.generate}</span></>
+                <>
+                  <Wand2 size={13} />
+                  <span>{t.generate}</span>
+                </>
               )}
             </button>
           </div>
@@ -319,7 +705,10 @@ export function JobDescriptionModal({
           {showPromptConfirm && generatedPromptPreview && (
             <div className="dgj-review">
               <div className="dgj-review-head">
-                <span className="dgj-review-title"><Sparkles size={14} />{t.reviewTitle}</span>
+                <span className="dgj-review-title">
+                  <Sparkles size={14} />
+                  {t.reviewTitle}
+                </span>
                 <span className="dgj-review-tag">{t.reviewTag}</span>
               </div>
               <textarea
@@ -329,9 +718,20 @@ export function JobDescriptionModal({
                 onChange={(e) => setGeneratedPromptPreview(e.target.value)}
               />
               <div className="dgj-review-actions">
-                <button type="button" className="dgj-review-cancel" onClick={() => setShowPromptConfirm(false)}>{t.cancel}</button>
-                <button type="button" className="dgj-review-approve" onClick={handleConfirmPrompt}>
-                  <CheckCircle2 size={13} /><span>{t.approve}</span>
+                <button
+                  type="button"
+                  className="dgj-review-cancel"
+                  onClick={() => setShowPromptConfirm(false)}
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="button"
+                  className="dgj-review-approve"
+                  onClick={handleConfirmPrompt}
+                >
+                  <CheckCircle2 size={13} />
+                  <span>{t.approve}</span>
                 </button>
               </div>
             </div>
@@ -346,6 +746,49 @@ export function JobDescriptionModal({
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t.descPh}
             />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label className="dgj-label" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Users size={12} />
+                {t.targetProfiles}
+              </label>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--dg-teal-700)' }}>
+                {maxResults} {t.profilesUnit}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="25"
+              value={maxResults}
+              onChange={(e) => setMaxResults(Number(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--dg-teal-600)', cursor: 'pointer', marginBottom: 6 }}
+            />
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[3, 5, 10, 15, 20].map((count) => {
+                const isSelected = maxResults === count;
+                return (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => setMaxResults(count)}
+                    className={'dgsc-tech-chip' + (isSelected ? ' dgsc-tech-chip-active' : '')}
+                    style={{
+                      flex: 1,
+                      textAlign: 'center',
+                      padding: '6px 0',
+                      fontSize: 11,
+                      fontWeight: isSelected ? 700 : 500,
+                      borderRadius: 8,
+                    }}
+                  >
+                    {count}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <button type="submit" className="dgj-submit">
