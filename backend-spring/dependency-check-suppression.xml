@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!--
+      Suppression rules for false positives can be defined here.
+      Example:
+      <suppress>
+         <notes><![CDATA[Explanation of why this CVE is a false positive or mitigated]]></notes>
+         <packageUrl regex="true">^pkg:maven/org\.example/.*$</packageUrl>
+         <cve>CVE-2024-XXXXX</cve>
+      </suppress>
+    -->
+</suppressions>

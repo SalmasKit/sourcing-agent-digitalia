@@ -11,15 +11,15 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
  * Base integration test class for the persistence layer.
- * Spawns a real PostgreSQL container with pgvector and executes Flyway migrations.
+ * Uses the Testcontainers "singleton container" pattern: the container is
+ * started once via a static initializer and stays alive for the whole JVM
+ * fork (all IT classes share it), avoiding the mismatch between Spring's
+ * cached ApplicationContext and a container restarted per test class.
  */
-@Testcontainers(disabledWithoutDocker = true)
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
@@ -28,13 +28,18 @@ import org.testcontainers.utility.DockerImageName;
 @EnabledIf("isDockerAvailable")
 public abstract class AbstractRepositoryIT {
 
-    @Container
     @ServiceConnection
     protected static final PostgreSQLContainer<?> postgres =
             new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16"))
                     .withDatabaseName("sourcing_test_db")
                     .withUsername("sourcing_user")
                     .withPassword("sourcing_password");
+
+    static {
+        if (isDockerAvailable()) {
+            postgres.start();
+        }
+    }
 
     static boolean isDockerAvailable() {
         try {

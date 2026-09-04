@@ -30,6 +30,7 @@
 		<jacoco.skip>false</jacoco.skip>
 		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
 		<sonar.version>4.0.0.4121</sonar.version>
+		<owasp.version>10.0.4</owasp.version>
 	</properties>
 
 	<dependencies>
@@ -302,6 +303,17 @@
 				<groupId>org.sonarsource.scanner.maven</groupId>
 				<artifactId>sonar-maven-plugin</artifactId>
 				<version>${sonar.version}</version>
+			</plugin>
+
+			<!-- ===== OWASP DEPENDENCY-CHECK ===== -->
+			<plugin>
+				<groupId>org.owasp</groupId>
+				<artifactId>dependency-check-maven</artifactId>
+				<version>${owasp.version}</version>
+				<configuration>
+					<failBuildOnCVSS>7</failBuildOnCVSS>
+					<suppressionFile>dependency-check-suppression.xml</suppressionFile>
+				</configuration>
 			</plugin>
 
 		</plugins>
