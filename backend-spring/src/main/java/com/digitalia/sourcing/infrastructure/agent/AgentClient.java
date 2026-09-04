@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.digitalia.sourcing.shared.exception.AgentServiceException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ public class AgentClient {
     private final WebClient agentWebClient;
     private final long globalTimeoutMs;
 
+    @Autowired
     public AgentClient(WebClient agentWebClient,
                        @Value("${app.agent.global-timeout-ms:90000}") long globalTimeoutMs) {
         this.agentWebClient = agentWebClient;
@@ -36,14 +38,14 @@ public class AgentClient {
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    public record AgentSearchRequest(String query, UUID searchRequestId, int maxResults) {
+    public static record AgentSearchRequest(String query, UUID searchRequestId, int maxResults) {
         public AgentSearchRequest(String query, UUID searchRequestId) {
             this(query, searchRequestId, 20);
         }
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    public record AgentProfileResponse(
+    public static record AgentProfileResponse(
             String sourcePlatform,
             String sourceUrl,
             String fullName,
@@ -57,7 +59,7 @@ public class AgentClient {
     ) {}
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    public record AgentSearchResponse(
+    public static record AgentSearchResponse(
             Map<String, Object> extractedCriteria,
             List<AgentProfileResponse> profiles
     ) {}

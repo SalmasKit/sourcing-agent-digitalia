@@ -37,7 +37,6 @@ server:
 
 app:
   jwt:
-    # 256-bit key generated for HS256: must be base64-encoded and at least 256 bits (32 bytes) long.
     # In production, this MUST be supplied via the JWT_SECRET environment variable.
     # For local development, a default key is configured in application-dev.yml.
     secret: ${JWT_SECRET:}

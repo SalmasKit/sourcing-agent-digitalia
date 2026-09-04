@@ -55,6 +55,7 @@ class AgentClientTest {
         agentClient = new AgentClient(webClient);
     }
 
+    @SuppressWarnings("unchecked")
     private void stubWebClientChain() {
         when(webClient.post()).thenReturn(requestBodyUriSpec);
         when(requestBodyUriSpec.uri("/api/v1/agent/search")).thenReturn(requestBodySpec);
