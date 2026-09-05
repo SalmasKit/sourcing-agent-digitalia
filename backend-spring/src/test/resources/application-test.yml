@@ -19,3 +19,7 @@ app:
     refresh-token-expiration-ms: 604800000
   rate-limit:
     enabled: false
+  metrics:
+    scraper:
+      username: prometheus
+      password: test-scraper-password
