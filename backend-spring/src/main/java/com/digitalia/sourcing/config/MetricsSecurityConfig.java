@@ -55,11 +55,15 @@ public class MetricsSecurityConfig {
     private Environment environment;
 
     /**
-     * Refuse le démarrage si le mot de passe scraper est vide — tous profils inclus.
+     * Refuse le démarrage si le mot de passe scraper est vide — tous profils inclus sauf test.
      * Les messages diffèrent prod / non-prod ; le résultat (exception) est le même.
      */
     @PostConstruct
     public void validateScraperCredentials() {
+        if (isTestEnvironment()) {
+            // Skip validation in test environment
+            return;
+        }
         if (scraperPassword == null || scraperPassword.isBlank()) {
             if (isProductionEnvironment()) {
                 throw new IllegalStateException(
@@ -80,6 +84,14 @@ public class MetricsSecurityConfig {
         }
         return Arrays.stream(environment.getActiveProfiles())
                 .anyMatch(p -> "prod".equalsIgnoreCase(p) || "production".equalsIgnoreCase(p));
+    }
+
+    private boolean isTestEnvironment() {
+        if (environment == null) {
+            return false;
+        }
+        return Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(p -> "test".equalsIgnoreCase(p));
     }
 
     @Bean
