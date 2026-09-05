@@ -46,7 +46,7 @@ services:
     pull_policy: never
     container_name: sourcing-backend-spring
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -57,11 +57,47 @@ services:
       - FRONTEND_CORS_ORIGIN=http://localhost:5173
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
       - JWT_SECRET=${JWT_SECRET}
+      - METRICS_SCRAPER_USERNAME=${METRICS_SCRAPER_USERNAME:-prometheus}
+      - METRICS_SCRAPER_PASSWORD=${METRICS_SCRAPER_PASSWORD}
+      - APP_RATE_LIMIT_REQUESTS_PER_MINUTE=10000
     depends_on:
       postgres:
         condition: service_healthy
       agent-service:
         condition: service_started
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    container_name: sourcing-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    environment:
+      SCRAPER_PASSWORD: ${METRICS_SCRAPER_PASSWORD}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mkdir -p /tmp/prometheus-secrets
+        printf '%s' "$$SCRAPER_PASSWORD" > /tmp/prometheus-secrets/password
+        exec /bin/prometheus --config.file=/etc/prometheus/prometheus.yml --web.enable-lifecycle
+    depends_on:
+      - backend-spring
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: sourcing-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
 
   frontend:
     image: sourcing-frontend:latest
@@ -75,3 +111,4 @@ services:
 
 volumes:
   postgres_data:
+  grafana-data:

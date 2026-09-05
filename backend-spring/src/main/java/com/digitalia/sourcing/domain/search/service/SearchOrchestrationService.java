@@ -17,6 +17,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.util.UUID;
 
 @Slf4j
@@ -27,6 +29,7 @@ public class SearchOrchestrationService {
     private final SearchRequestRepository searchRequestRepository;
     private final SearchResultPersistenceService searchResultPersistenceService;
     private final AgentClient agentClient;
+    private final MeterRegistry meterRegistry;
 
     @Transactional
     public SearchRequestDto initiateSearch(CreateSearchRequest dto, User user) {
@@ -37,6 +40,7 @@ public class SearchOrchestrationService {
                 .build();
 
         SearchRequest savedRequest = searchRequestRepository.save(searchRequest);
+        meterRegistry.counter("sourcing.searches.initiated").increment();
         log.info("Saved search request with ID: {} for user: {}", savedRequest.getId(), user.getEmail());
 
         // Trigger agent search asynchronously via reactive pipeline
@@ -71,10 +75,20 @@ public class SearchOrchestrationService {
             searchRequestRepository.save(sr);
         });
 
+        Timer.Sample sample = Timer.start(meterRegistry);
+
         agentClient.executeSearch(query, searchRequestId)
                 .subscribe(
-                        response -> searchResultPersistenceService.saveSearchResults(searchRequestId, response),
-                        error -> searchResultPersistenceService.handleSearchFailure(searchRequestId, error)
+                        response -> {
+                            sample.stop(meterRegistry.timer("sourcing.agent.client.duration"));
+                            meterRegistry.counter("sourcing.searches.completed").increment();
+                            searchResultPersistenceService.saveSearchResults(searchRequestId, response);
+                        },
+                        error -> {
+                            sample.stop(meterRegistry.timer("sourcing.agent.client.duration", "outcome", "error"));
+                            meterRegistry.counter("sourcing.searches.failed").increment();
+                            searchResultPersistenceService.handleSearchFailure(searchRequestId, error);
+                        }
                 );
     }
 

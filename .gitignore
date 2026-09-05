@@ -37,6 +37,7 @@ build/
 .env
 .env.*
 !.env.example
+observability/prometheus/secrets/
 
 # Logs & Temporary files
 *.log

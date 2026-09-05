@@ -2,6 +2,8 @@ package com.digitalia.sourcing.infrastructure.ratelimit;
 
 import com.digitalia.sourcing.shared.response.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -26,16 +28,23 @@ public class RateLimitingInterceptor implements HandlerInterceptor {
     private final int maxRequestsPerWindow;
     private final long windowMs;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
-    public RateLimitingInterceptor(RateLimiter rateLimiter, int maxRequestsPerWindow, long windowMs, ObjectMapper objectMapper) {
+    public RateLimitingInterceptor(RateLimiter rateLimiter, int maxRequestsPerWindow, long windowMs,
+                                   ObjectMapper objectMapper, MeterRegistry meterRegistry) {
         this.rateLimiter = rateLimiter;
         this.maxRequestsPerWindow = maxRequestsPerWindow;
         this.windowMs = windowMs;
         this.objectMapper = objectMapper;
+        this.meterRegistry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+    }
+
+    public RateLimitingInterceptor(RateLimiter rateLimiter, int maxRequestsPerWindow, long windowMs, ObjectMapper objectMapper) {
+        this(rateLimiter, maxRequestsPerWindow, windowMs, objectMapper, new SimpleMeterRegistry());
     }
 
     public RateLimitingInterceptor(int maxRequestsPerWindow, long windowMs, ObjectMapper objectMapper) {
-        this(new InMemoryRateLimiter(), maxRequestsPerWindow, windowMs, objectMapper);
+        this(new InMemoryRateLimiter(), maxRequestsPerWindow, windowMs, objectMapper, new SimpleMeterRegistry());
     }
 
     @Override
@@ -51,6 +60,7 @@ public class RateLimitingInterceptor implements HandlerInterceptor {
         response.setHeader("X-RateLimit-Reset", String.valueOf(result.windowStartEpochMs() + windowMs));
 
         if (!result.allowed()) {
+            meterRegistry.counter("sourcing.ratelimit.rejected").increment();
             log.warn("Rate limit exceeded for IP: {} ({} requests in window)", clientIp, result.count());
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);

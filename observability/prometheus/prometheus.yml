@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'sourcing-backend'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['backend-spring:8080']
+    # Credentials: username in plain text (not sensitive), password from file
+    basic_auth:
+      username: prometheus
+      password_file: /tmp/prometheus-secrets/password

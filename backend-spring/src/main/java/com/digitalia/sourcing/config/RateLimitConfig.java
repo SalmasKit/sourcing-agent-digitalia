@@ -4,6 +4,8 @@ import com.digitalia.sourcing.infrastructure.ratelimit.InMemoryRateLimiter;
 import com.digitalia.sourcing.infrastructure.ratelimit.RateLimiter;
 import com.digitalia.sourcing.infrastructure.ratelimit.RateLimitingInterceptor;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -50,8 +52,9 @@ public class RateLimitConfig implements WebMvcConfigurer {
         public RateLimitingInterceptor rateLimitingInterceptor(
                 RateLimiter rateLimiter,
                 @Value("${app.rate-limit.requests-per-minute:60}") int requestsPerMinute,
-                ObjectMapper objectMapper) {
-            return new RateLimitingInterceptor(rateLimiter, requestsPerMinute, 60_000L, objectMapper);
+                ObjectMapper objectMapper,
+                ObjectProvider<MeterRegistry> meterRegistryProvider) {
+            return new RateLimitingInterceptor(rateLimiter, requestsPerMinute, 60_000L, objectMapper, meterRegistryProvider.getIfAvailable());
         }
     }
 }
