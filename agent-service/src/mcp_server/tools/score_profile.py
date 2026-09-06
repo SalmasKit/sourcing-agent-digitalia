@@ -39,7 +39,9 @@ def _build_job_context(criteria: dict) -> str:
     if seniority := criteria.get("seniority"):
         parts.append(f"Seniority: {seniority}")
     if skills := criteria.get("required_skills"):
-        parts.append(f"Required skills: {', '.join(skills)}")
+        parts.append(f"Required skills (must-have): {', '.join(skills)}")
+    if nice := criteria.get("nice_to_have_skills"):
+        parts.append(f"Nice-to-have skills (bonus, not disqualifying): {', '.join(nice)}")
     if location := criteria.get("location"):
         parts.append(f"Location: {location}")
     if min_exp := criteria.get("min_experience_years"):
@@ -123,6 +125,49 @@ def _baseline_skill_check(required_skill: str, full_corpus: str, profile_skills:
     return False
 
 
+def _compute_skill_score(
+    required_skills: list[str],
+    matched_skills: list[str],
+    nice_to_have_skills: list[str],
+    full_corpus: str,
+    profile_skills: list[str],
+) -> tuple[int, list[str]]:
+    """
+    Weighted skill score: the first 3 required skills carry more weight
+    (assumed to be the most critical, since recruiters usually list them
+    in priority order), the rest count equally. Nice-to-have skills add
+    a capped bonus rather than diluting the required-skills denominator.
+    """
+    if not required_skills:
+        # When no required skills, base score is 70 with nice-to-have bonus
+        nice_matched = [
+            s for s in nice_to_have_skills
+            if _baseline_skill_check(s, full_corpus, profile_skills)
+        ]
+        bonus = 0
+        if nice_to_have_skills:
+            bonus = (len(nice_matched) / len(nice_to_have_skills)) * 10
+        return round(min(100, 70 + bonus)), nice_matched
+
+    weights = [3, 2, 1] + [1] * max(0, len(required_skills) - 3)
+    total_weight = sum(weights)
+    matched_weight = sum(
+        w for skill, w in zip(required_skills, weights)
+        if skill in matched_skills
+    )
+    base = (matched_weight / total_weight) * 100
+
+    nice_matched = [
+        s for s in nice_to_have_skills
+        if _baseline_skill_check(s, full_corpus, profile_skills)
+    ]
+    bonus = 0
+    if nice_to_have_skills:
+        bonus = (len(nice_matched) / len(nice_to_have_skills)) * 10
+
+    return round(min(100, base + bonus)), nice_matched
+
+
 async def score_profile(
     profile: dict[str, Any],
     criteria: dict[str, Any],
@@ -153,6 +198,7 @@ async def score_profile(
 
     # 2. Baseline skill check across profile corpus
     required_skills = criteria.get("required_skills", []) or []
+    nice_to_have_skills = criteria.get("nice_to_have_skills", []) or []
     full_corpus, profile_skills = _build_candidate_corpus(profile)
 
     matched_skills = [
@@ -161,8 +207,9 @@ async def score_profile(
     ]
     missing_skills = [s for s in required_skills if s not in matched_skills]
 
-    skill_match_ratio = len(matched_skills) / len(required_skills) if required_skills else 0.5
-    skill_score = round(skill_match_ratio * 100)
+    skill_score, nice_to_have_matched = _compute_skill_score(
+        required_skills, matched_skills, nice_to_have_skills, full_corpus, profile_skills
+    )
 
     # 3. Experience score
     min_exp = criteria.get("min_experience_years") or 0
@@ -311,6 +358,13 @@ async def score_profile(
 
 
 async def score_profiles_batch(profiles: list[dict], criteria: dict) -> list[dict]:
+    """
+    Batch score profiles without LLM rationale for performance and cost efficiency.
+    
+    The weighted baseline scoring (title*0.35 + skill*0.30 + exp*0.20 + location*0.15)
+    provides good enough results for initial candidate ranking. LLM rationale is
+    reserved for single-profile detailed scoring via /api/score endpoint.
+    """
     import asyncio
     scored = await asyncio.gather(*[score_profile(p, criteria, use_llm_rationale=False) for p in profiles])
     return sorted(scored, key=lambda p: p.get("match_score", 0), reverse=True)

@@ -49,9 +49,12 @@ const COPY = {
     },
     location: 'Target location',
     locationPh: 'Search city, region, or country...',
-    skills: 'Required skills',
+    skills: 'Required skills (must-have)',
     skillsPh: 'Type a skill and press Enter...',
     skillsAdded: 'Press Enter or comma to add a skill',
+    niceToHaveSkills: 'Nice-to-have skills (bonus)',
+    niceToHaveSkillsPh: 'Optional skills that add value...',
+    niceToHaveSkillsAdded: 'Press Enter or comma to add',
     previewLabel: 'Search preview',
     targetProfiles: 'Target candidates to source',
     profilesUnit: 'profiles',
@@ -88,9 +91,12 @@ const COPY = {
     },
     location: 'Localisation cible',
     locationPh: 'Rechercher une ville, région ou pays...',
-    skills: 'Compétences requises',
+    skills: 'Compétences requises (obligatoires)',
     skillsPh: 'Tapez une compétence et appuyez sur Entrée...',
     skillsAdded: 'Appuyez sur Entrée ou virgule pour ajouter',
+    niceToHaveSkills: 'Compétences souhaitables (bonus)',
+    niceToHaveSkillsPh: 'Compétences optionnelles qui ajoutent de la valeur...',
+    niceToHaveSkillsAdded: 'Appuyez sur Entrée ou virgule pour ajouter',
     previewLabel: 'Aperçu de la recherche',
     targetProfiles: 'Nombre de candidats à sourcer',
     profilesUnit: 'profils',
@@ -129,6 +135,8 @@ export function JobDescriptionModal({
 
   const [skills, setSkills] = useState([]);
   const [skillInput, setSkillInput] = useState('');
+  const [niceToHaveSkills, setNiceToHaveSkills] = useState([]);
+  const [niceToHaveSkillInput, setNiceToHaveSkillInput] = useState('');
   const [seniority, setSeniority] = useState(t.seniorityOpts[2]);
   const [contractType, setContractType] = useState(t.contractOpts[0]);
   const [maxResults, setMaxResults] = useState(10);
@@ -160,12 +168,17 @@ export function JobDescriptionModal({
       setDescription(String(editingJob.description || ''));
       setLocation(editingJob.location && editingJob.location !== 'All Locations' ? editingJob.location : '');
       setSkills(
-        Array.isArray(editingJob.skills)
-          ? editingJob.skills
+        Array.isArray(editingJob.requiredSkills)
+          ? editingJob.requiredSkills
           : (editingJob.skills || '')
               .split(',')
               .map((s) => s.trim())
               .filter(Boolean)
+      );
+      setNiceToHaveSkills(
+        Array.isArray(editingJob.niceToHaveSkills)
+          ? editingJob.niceToHaveSkills
+          : []
       );
       setSeniority(editingJob.seniority || t.seniorityOpts[2]);
       setContractType(editingJob.contractType || t.contractOpts[0]);
@@ -176,6 +189,8 @@ export function JobDescriptionModal({
       setLocation('');
       setSkills([]);
       setSkillInput('');
+      setNiceToHaveSkills([]);
+      setNiceToHaveSkillInput('');
       setSeniority(t.seniorityOpts[2]);
       setContractType(t.contractOpts[0]);
       setMaxResults(10);
@@ -236,6 +251,31 @@ export function JobDescriptionModal({
     }
   };
 
+  const addNiceToHaveSkill = () => {
+    const val = niceToHaveSkillInput.trim();
+    if (!val) return;
+    const parts = val.split(',').map((s) => s.trim()).filter(Boolean);
+    const newSkills = [...niceToHaveSkills];
+    parts.forEach((p) => {
+      if (!newSkills.includes(p)) newSkills.push(p);
+    });
+    setNiceToHaveSkills(newSkills);
+    setNiceToHaveSkillInput('');
+  };
+
+  const removeNiceToHaveSkill = (skillToRemove) => {
+    setNiceToHaveSkills(niceToHaveSkills.filter((s) => s !== skillToRemove));
+  };
+
+  const handleNiceToHaveSkillKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addNiceToHaveSkill();
+    } else if (e.key === 'Backspace' && !niceToHaveSkillInput && niceToHaveSkills.length > 0) {
+      setNiceToHaveSkills(niceToHaveSkills.slice(0, -1));
+    }
+  };
+
   const handleGeneratePrompt = () => {
     const safeTitle = String(title || '').trim();
     if (!safeTitle) return;
@@ -245,10 +285,20 @@ export function JobDescriptionModal({
       const safeSkills = skills.join(', ');
       const skillsList = safeSkills || 'React, Node.js, AWS';
       const locText = location && location !== 'All Locations' ? location : (isFR ? 'Toutes localisations' : 'All locations');
+      const niceSkillsList = niceToHaveSkills.length > 0 ? niceToHaveSkills.join(', ') : null;
 
-      const generated = isFR
-        ? `Recherche un profil ${seniority} ${safeTitle} basé(e) à ${locText} (${contractType}). Le candidat idéal possède une expertise approfondie en ${skillsList}. Missions principales : conception et architecture d'applications haute performance, livraison CI/CD, et collaboration agile en équipe pluridisciplinaire. Profil recherché : esprit d'initiative, maîtrise des bonnes pratiques de clean code et capacité à encadrer des profils plus juniors.`
-        : `Looking for a ${seniority} ${safeTitle} based in ${locText} (${contractType}). The ideal candidate has deep expertise in ${skillsList}. Key responsibilities: designing high-performance architectures, automated CI/CD deployments, and agile collaboration. Expected profile: strong initiative, clean code practices, and the ability to mentor junior engineers.`;
+      let generated;
+      if (isFR) {
+        generated = `Recherche un profil ${seniority} ${safeTitle} basé(e) à ${locText} (${contractType}). Le candidat idéal possède une expertise approfondie en ${skillsList}. Missions principales : conception et architecture d'applications haute performance, livraison CI/CD, et collaboration agile en équipe pluridisciplinaire. Profil recherché : esprit d'initiative, maîtrise des bonnes pratiques de clean code et capacité à encadrer des profils plus juniors.`;
+        if (niceSkillsList) {
+          generated += ` Compétences souhaitables en plus : ${niceSkillsList}.`;
+        }
+      } else {
+        generated = `Looking for a ${seniority} ${safeTitle} based in ${locText} (${contractType}). The ideal candidate has deep expertise in ${skillsList}. Key responsibilities: designing high-performance architectures, automated CI/CD deployments, and agile collaboration. Expected profile: strong initiative, clean code practices, and the ability to mentor junior engineers.`;
+        if (niceSkillsList) {
+          generated += ` Bonus skills that add value: ${niceSkillsList}.`;
+        }
+      }
 
       setGeneratedPromptPreview(generated);
       setShowPromptConfirm(true);
@@ -275,12 +325,24 @@ export function JobDescriptionModal({
         : `Sourcing for ${seniority} ${safeTitle} in ${location} with expertise in ${safeSkills || 'key technologies'}.`;
     }
 
+    // Always append nice-to-have skills as an explicit clause, regardless of
+    // which description path was used above — otherwise chips filled in the
+    // UI silently never reach the backend's criteria extraction.
+    if (niceToHaveSkills.length > 0 && !safeDesc.toLowerCase().includes(niceToHaveSkills[0].toLowerCase())) {
+      const niceClause = isFR
+        ? ` Compétences souhaitables en plus : ${niceToHaveSkills.join(', ')}.`
+        : ` Bonus skills that add value: ${niceToHaveSkills.join(', ')}.`;
+      safeDesc = `${safeDesc}${niceClause}`;
+    }
+
     const jobData = {
       id: editingJob ? editingJob.id : `job-${Date.now()}`,
       title: safeTitle,
       description: safeDesc,
       location: location.trim() || 'All Locations',
-      skills: skills,
+      requiredSkills: skills,
+      niceToHaveSkills: niceToHaveSkills,
+      skills: skills, // Keep for backward compatibility
       seniority,
       contractType,
       maxResults: Number(maxResults) || 10,
@@ -297,6 +359,8 @@ export function JobDescriptionModal({
     setShowLocationDropdown(false);
     setSkills([]);
     setSkillInput('');
+    setNiceToHaveSkills([]);
+    setNiceToHaveSkillInput('');
     setMaxResults(10);
     setShowPromptConfirm(false);
     setGeneratedPromptPreview(null);
@@ -647,6 +711,66 @@ export function JobDescriptionModal({
             </div>
           </div>
 
+          <div>
+            <label className="dgj-label">{t.niceToHaveSkills}</label>
+            <div
+              className="dgsc-tech-tags"
+              style={{
+                padding: '8px 10px',
+                background: 'var(--dg-paper)',
+                border: '1px solid var(--dg-border)',
+                borderRadius: '10px',
+                minHeight: '42px',
+                alignItems: 'center',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 5,
+              }}
+            >
+              {niceToHaveSkills.map((skill) => (
+                <span
+                  key={skill}
+                  className="dgsc-tech-chip"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                >
+                  {skill}
+                  <button
+                    type="button"
+                    onClick={() => removeNiceToHaveSkill(skill)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'inherit',
+                    }}
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              ))}
+              <input
+                type="text"
+                value={niceToHaveSkillInput}
+                onChange={(e) => setNiceToHaveSkillInput(e.target.value)}
+                onKeyDown={handleNiceToHaveSkillKeyDown}
+                onBlur={addNiceToHaveSkill}
+                placeholder={niceToHaveSkills.length === 0 ? t.niceToHaveSkillsPh : t.niceToHaveSkillsAdded}
+                style={{
+                  border: 'none',
+                  outline: 'none',
+                  background: 'none',
+                  fontSize: '12px',
+                  flex: 1,
+                  minWidth: '130px',
+                  color: 'var(--dg-ink-900)',
+                }}
+              />
+            </div>
+          </div>
+
           {/* Live Search Preview */}
           {(title.trim() || skills.length > 0) && (
             <div
@@ -665,9 +789,11 @@ export function JobDescriptionModal({
               <Sparkles size={12} color="var(--dg-teal-600)" style={{ flexShrink: 0, marginTop: 1 }} />
               <span>
                 <strong style={{ color: 'var(--dg-teal-700)' }}>{t.previewLabel}:</strong> site:linkedin.com/in {(seniority || '').split(' ')[0]} "{title || '...'}"
-                {skills.length > 0 && ` (${skills.slice(0, 3).join(' OR ')})`}
+                {skills.length > 0 && ` (${skills.slice(0, 3).join(' AND ')})`}
+                {niceToHaveSkills.length > 0 && ` (${niceToHaveSkills.slice(0, 3).join(' OR ')})`}
                 {location !== 'All Locations' && location ? ` ${location}` : ''}
                 <span style={{ color: 'var(--dg-teal-700)', fontWeight: 600 }}> • {maxResults} {t.profilesUnit}</span>
+                {(seniority || '').match(/\((.*?)\)/)?.[1] && <span style={{ color: 'var(--dg-ink-400)', marginLeft: 6 }}>({(seniority || '').match(/\((.*?)\)/)?.[1]})</span>}
               </span>
             </div>
           )}
