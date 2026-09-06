@@ -23,9 +23,11 @@ def test_health_endpoint():
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "ok"
+    assert data["status"] in ("ok", "degraded")  # degraded if DB is down
     assert "data_sources" in data
     assert isinstance(data["data_sources"], dict)
+    assert "database_connected" in data
+    assert isinstance(data["database_connected"], bool)
 
 
 def test_models_endpoint():

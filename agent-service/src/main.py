@@ -20,7 +20,10 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from prometheus_fastapi_instrumentator import Instrumentator
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
+from src.api.limiter import limiter
 from src.api.routes import router
 from src.config import get_settings
 
@@ -186,6 +189,10 @@ app = FastAPI(
 )
 
 _settings = get_settings()
+
+# Set up rate limiting with shared limiter instance
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add request-ID middleware
 app.middleware("http")(_request_id_middleware)

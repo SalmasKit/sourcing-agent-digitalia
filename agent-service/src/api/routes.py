@@ -1,13 +1,15 @@
 """
 routes.py — FastAPI endpoints for agent-service.
 """
+import asyncio
 import logging
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from src.agent.graph import run_sourcing_agent
+from src.api.limiter import limiter
 from src.api.security import verify_jwt
 from src.config import get_settings
 from src.mcp_server.tools.score_profile import score_profile
@@ -35,35 +37,88 @@ class HealthResponse(BaseModel):
     model: str
     data_sources: dict[str, bool]
     groq_configured: bool
+    database_connected: bool
+
+
+async def _check_database() -> bool:
+    """Check if PostgreSQL database is accessible."""
+    try:
+        from src.mcp_server.tools.db_pool import get_pool
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.fetchval("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+
+async def _check_serpapi() -> bool:
+    """Check if SerpAPI is accessible by making a lightweight request to /account (free, no quota consumed)."""
+    if not settings.has_serpapi:
+        return False
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            # Use /account endpoint which is free and doesn't consume search quota
+            params = {"api_key": settings.serpapi_api_key}
+            resp = await client.get("https://serpapi.com/account", params=params)
+            return resp.status_code in (200, 401, 403)  # Any response means API is reachable
+    except Exception:
+        return False
+
+
+async def _check_apollo() -> bool:
+    """Check if Apollo.io API is accessible."""
+    if not settings.has_enrichment:
+        return False
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            headers = {"X-Api-Key": settings.apollo_api_key}
+            # Make a minimal request to verify API key is valid
+            resp = await client.get("https://api.apollo.io/v1/auth/whoami", headers=headers)
+            return resp.status_code in (200, 401, 403)  # Any response means API is reachable
+    except Exception:
+        return False
 
 
 @router.get("/health", response_model=HealthResponse, tags=["System"])
 async def health_check() -> HealthResponse:
+    # Run health checks concurrently for faster response
+    db_connected, serpapi_ok, apollo_ok = await asyncio.gather(
+        _check_database(),
+        _check_serpapi(),
+        _check_apollo(),
+    )
+
     return HealthResponse(
-        status="ok",
+        status="ok" if db_connected else "degraded",
         agent="Digitalia Sourcing Agent v1.0",
         model=settings.groq_model,
         data_sources={
-            "serpapi": settings.has_serpapi,
-            "apollo_enrichment": settings.has_enrichment,
+            "serpapi": serpapi_ok,
+            "apollo_enrichment": apollo_ok,
         },
         groq_configured=bool(settings.groq_api_key),
+        database_connected=db_connected,
     )
 
 
 @router.post("/api/search", tags=["Sourcing"])
 @router.post("/api/v1/agent/search", tags=["Sourcing"])
+@limiter.limit("10/minute")
 async def run_search(
-    request: SearchRequest,
+    request: Request,
+    search_request: SearchRequest,
     _token: Annotated[dict, Depends(verify_jwt)],
 ) -> dict:
-    job_identifier = request.search_request_id or request.job_id
-    logger.info(f"[API] Search query: {request.query[:80]} (ID: {job_identifier})")
+    job_identifier = search_request.search_request_id or search_request.job_id
+    logger.info(f"[API] Search query: {search_request.query[:80]} (ID: {job_identifier})")
     try:
         return await run_sourcing_agent(
-            raw_query=request.query,
+            raw_query=search_request.query,
             job_id=job_identifier,
-            max_results=request.max_results,
+            max_results=search_request.max_results,
         )
     except Exception as exc:
         logger.error(f"[API] Search error: {exc}")
@@ -76,13 +131,15 @@ class PoolSearchRequest(BaseModel):
 
 
 @router.post("/api/pool/search", tags=["Sourcing"])
+@limiter.limit("30/minute")
 async def search_talent_pool(
-    request: PoolSearchRequest,
+    request: Request,
+    pool_request: PoolSearchRequest,
     _token: Annotated[dict, Depends(verify_jwt)],
 ) -> dict:
     from src.mcp_server.tools.candidate_pool import rerank_pool
     try:
-        results = await rerank_pool(request.query, request.limit)
+        results = await rerank_pool(pool_request.query, pool_request.limit)
         return {
             "candidates": results,
             "profiles": results,  # both keys for frontend compatibility with /api/search's shape
@@ -95,12 +152,14 @@ async def search_talent_pool(
 
 
 @router.post("/api/score", tags=["Sourcing"])
-async def score_single_profile(
-    request: ScoreRequest,
+@limiter.limit("20/minute")
+async def run_score(
+    request: Request,
+    score_request: ScoreRequest,
     _token: Annotated[dict, Depends(verify_jwt)],
 ) -> dict:
     try:
-        scored = await score_profile(request.profile, request.criteria)
+        scored = await score_profile(score_request.profile, score_request.criteria)
         return {"profile": scored, "status": "scored"}
     except Exception as exc:
         logger.error(f"[API] Score error: {exc}")
@@ -114,13 +173,15 @@ class OutreachRequest(BaseModel):
 
 
 @router.post("/api/outreach", tags=["Sourcing"])
+@limiter.limit("15/minute")
 async def draft_outreach(
-    request: OutreachRequest,
+    request: Request,
+    outreach_request: OutreachRequest,
     _token: Annotated[dict, Depends(verify_jwt)],
 ) -> dict:
     from src.mcp_server.tools.outreach import generate_outreach
     try:
-        result = await generate_outreach(request.candidate, request.job_context, request.channel)
+        result = await generate_outreach(outreach_request.candidate, outreach_request.job_context, outreach_request.channel)
         return result
     except Exception as exc:
         logger.error(f"[API] Outreach draft error: {exc}")

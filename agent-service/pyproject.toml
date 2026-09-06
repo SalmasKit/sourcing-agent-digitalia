@@ -25,6 +25,7 @@ dependencies = [
     "PyJWT>=2.8.0",
     "prometheus-client>=0.21.0",
     "prometheus-fastapi-instrumentator>=7.0.0",
+    "slowapi>=0.1.9",
 ]
 
 [project.optional-dependencies]
