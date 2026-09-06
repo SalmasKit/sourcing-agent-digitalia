@@ -48,7 +48,12 @@ async def test_filter_and_record_duplicates_first_and_second_visit():
     )
     mock_conn.close = AsyncMock()
 
-    with patch("src.mcp_server.tools.dedup._get_conn", new_callable=AsyncMock, return_value=mock_conn):
+    mock_pool = MagicMock()
+    mock_pool.acquire = AsyncMock()
+    mock_pool.acquire.__aenter__ = AsyncMock(return_value=mock_conn)
+    mock_pool.acquire.__aexit__ = AsyncMock()
+
+    with patch("src.mcp_server.tools.dedup.get_pool", new_callable=AsyncMock, return_value=mock_pool):
         profiles = [
             {"id": "p1", "full_name": "Alice", "linkedin_url": "https://linkedin.com/in/alice"},
             {"id": "p2", "full_name": "Alice", "linkedin_url": "https://linkedin.com/in/alice"},
@@ -64,7 +69,7 @@ async def test_filter_and_record_duplicates_first_and_second_visit():
 
 @pytest.mark.asyncio
 async def test_filter_and_record_duplicates_db_error_fallback():
-    with patch("src.mcp_server.tools.dedup._get_conn", side_effect=Exception("Database connection timeout")):
+    with patch("src.mcp_server.tools.dedup.get_pool", side_effect=Exception("Database connection timeout")):
         profiles = [{"id": "p1", "full_name": "Bob"}]
         tagged = await filter_and_record_duplicates(profiles)
 
