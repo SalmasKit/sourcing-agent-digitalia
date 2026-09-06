@@ -4,6 +4,7 @@ Tests for candidate_pool.py — Persistent semantic talent pool tool.
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 import json
+import numpy as np
 
 
 class TestFailOrWarnPgvector:
@@ -44,7 +45,7 @@ class TestStoreCandidateEmbedding:
         mock_pool = AsyncMock()
         mock_conn = AsyncMock()
         
-        with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
+        with patch("src.mcp_server.tools.candidate_pool.get_pool", new_callable=AsyncMock) as mock_get_pool:
             mock_get_pool.return_value = mock_pool
             # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
@@ -63,7 +64,7 @@ class TestStoreCandidateEmbedding:
         mock_pool = AsyncMock()
         mock_conn = AsyncMock()
         
-        with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
+        with patch("src.mcp_server.tools.candidate_pool.get_pool", new_callable=AsyncMock) as mock_get_pool:
             mock_get_pool.return_value = mock_pool
             # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
@@ -130,7 +131,7 @@ class TestRerankPool:
             {"profile_json": '{"name": "John"}', "similarity": 0.75}
         ]
         
-        with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
+        with patch("src.mcp_server.tools.candidate_pool.get_pool", new_callable=AsyncMock) as mock_get_pool:
             mock_get_pool.return_value = mock_pool
             # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
@@ -154,7 +155,7 @@ class TestRerankPool:
             {"profile_json": '{"name": "John"}', "similarity": 0.9}
         ]
         
-        with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
+        with patch("src.mcp_server.tools.candidate_pool.get_pool", new_callable=AsyncMock) as mock_get_pool:
             mock_get_pool.return_value = mock_pool
             # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
@@ -174,7 +175,7 @@ class TestRerankPool:
     @pytest.mark.asyncio
     async def test_rerank_database_error(self):
         """Test handling of database connection errors."""
-        with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
+        with patch("src.mcp_server.tools.candidate_pool.get_pool", new_callable=AsyncMock) as mock_get_pool:
             mock_get_pool.side_effect = Exception("DB error")
             
             from src.mcp_server.tools.candidate_pool import rerank_pool
@@ -192,7 +193,7 @@ class TestRerankPool:
             {"profile_json": '{"name": "John"}', "similarity": 0.9}
         ]
         
-        with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
+        with patch("src.mcp_server.tools.candidate_pool.get_pool", new_callable=AsyncMock) as mock_get_pool:
             mock_get_pool.return_value = mock_pool
             # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
@@ -223,7 +224,7 @@ class TestAssertPgvectorAvailable:
         mock_conn.execute.return_value = None
         mock_conn.fetchval.return_value = True
         
-        with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
+        with patch("src.mcp_server.tools.candidate_pool.get_pool", new_callable=AsyncMock) as mock_get_pool:
             mock_get_pool.return_value = mock_pool
             # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
@@ -240,7 +241,7 @@ class TestAssertPgvectorAvailable:
         mock_conn = AsyncMock()
         mock_conn.execute.side_effect = Exception("Extension not found")
         
-        with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
+        with patch("src.mcp_server.tools.candidate_pool.get_pool", new_callable=AsyncMock) as mock_get_pool:
             mock_get_pool.return_value = mock_pool
             # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
@@ -259,7 +260,7 @@ class TestAssertPgvectorAvailable:
         mock_conn = AsyncMock()
         mock_conn.execute.side_effect = Exception("Extension not found")
         
-        with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
+        with patch("src.mcp_server.tools.candidate_pool.get_pool", new_callable=AsyncMock) as mock_get_pool:
             mock_get_pool.return_value = mock_pool
             # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
