@@ -58,6 +58,19 @@ class Settings(BaseSettings):
                     "Set to the same value as JWT_SECRET in the Spring Boot env.",
     )
 
+    # Metrics scraper authentication — must match Spring Boot's METRICS_SCRAPER_* credentials.
+    # Used to protect /metrics endpoint from unauthorized access.
+    metrics_scraper_username: str = Field(
+        default="",
+        description="Username for Prometheus metrics scraper (Basic Auth). "
+                    "Set to the same value as METRICS_SCRAPER_USERNAME in Spring Boot env.",
+    )
+    metrics_scraper_password: str = Field(
+        default="",
+        description="Password for Prometheus metrics scraper (Basic Auth). "
+                    "Set to the same value as METRICS_SCRAPER_PASSWORD in Spring Boot env.",
+    )
+
     # Profile Enrichment (Apollo.io)
     apollo_api_key: str = Field(default="", description="Apollo.io API key for candidate enrichment")
     enrichment_enabled: bool = True

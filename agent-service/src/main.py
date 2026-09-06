@@ -3,7 +3,9 @@ main.py — FastAPI entrypoint for Digitalia Sourcing Agent Service.
 """
 import logging
 import os
+import secrets
 import sys
+import uuid
 from contextlib import asynccontextmanager
 
 # Allow running as `python main.py` from inside src/ OR
@@ -14,8 +16,10 @@ if _root not in sys.path:
     sys.path.insert(0, _root)
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.api.routes import router
 from src.config import get_settings
@@ -27,6 +31,46 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 logger = logging.getLogger("agent-service")
+settings = get_settings()
+
+_metrics_basic = HTTPBasic()
+
+def verify_metrics_scraper(credentials: HTTPBasicCredentials = Depends(_metrics_basic)) -> None:
+    """Verify Basic Auth credentials for Prometheus metrics scraper."""
+    expected_user = settings.metrics_scraper_username
+    expected_pass = settings.metrics_scraper_password
+    is_user_ok = secrets.compare_digest(credentials.username, expected_user)
+    is_pass_ok = secrets.compare_digest(credentials.password, expected_pass)
+    if not (is_user_ok and is_pass_ok):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
+
+async def _request_id_middleware(request: Request, call_next):
+    """
+    Request-ID middleware that:
+    1. Generates a unique request ID if not present
+    2. Honors incoming x-request-id header for request correlation
+    3. Adds request ID to response headers and logs
+    """
+    request_id = request.headers.get("x-request-id")
+    if not request_id:
+        request_id = str(uuid.uuid4())
+
+    # Store in request state for access in endpoints
+    request.state.request_id = request_id
+
+    # Log with request ID
+    logger.info(f"[{request_id}] {request.method} {request.url.path}")
+
+    response = await call_next(request)
+
+    # Add request ID to response headers
+    response.headers["x-request-id"] = request_id
+
+    return response
 
 
 def _assert_jwt_secret_configured() -> None:
@@ -142,6 +186,28 @@ app = FastAPI(
 )
 
 _settings = get_settings()
+
+# Add request-ID middleware
+app.middleware("http")(_request_id_middleware)
+
+# Set up Prometheus instrumentation
+instrumentator = Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    should_group_untemplated=True,
+    excluded_handlers=["/metrics"],
+    env_var_name="METRICS_ENABLED",
+    metric_namespace="agent_service",
+)
+instrumentator.instrument(app)
+
+# Expose metrics with Basic Auth protection
+@app.get("/metrics", dependencies=[Depends(verify_metrics_scraper)], include_in_schema=False)
+async def metrics():
+    """Prometheus metrics endpoint protected by Basic Auth."""
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+    from starlette.responses import Response
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 # CORS — never combine "*" with allow_credentials=True.
 # Per the CORS spec, browsers refuse to honor a wildcard origin on credentialed

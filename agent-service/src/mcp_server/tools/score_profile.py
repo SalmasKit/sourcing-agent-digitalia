@@ -4,6 +4,7 @@ score_profile.py — MCP Tool for scoring candidate profiles.
 import json
 import logging
 import re
+import time
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -13,6 +14,7 @@ from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
 from src.agent.prompts import SCORING_SYSTEM, SCORING_USER
 from src.config import get_settings
 from src.embeddings.client import compute_similarity
+from src.metrics import score_duration
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -365,6 +367,16 @@ async def score_profiles_batch(profiles: list[dict], criteria: dict) -> list[dic
     provides good enough results for initial candidate ranking. LLM rationale is
     reserved for single-profile detailed scoring via /api/score endpoint.
     """
-    import asyncio
-    scored = await asyncio.gather(*[score_profile(p, criteria, use_llm_rationale=False) for p in profiles])
-    return sorted(scored, key=lambda p: p.get("match_score", 0), reverse=True)
+    start_time = time.time()
+    status = "success"
+
+    try:
+        import asyncio
+        scored = await asyncio.gather(*[score_profile(p, criteria, use_llm_rationale=False) for p in profiles])
+        return sorted(scored, key=lambda p: p.get("match_score", 0), reverse=True)
+    except Exception as exc:
+        status = "error"
+        raise
+    finally:
+        duration = time.time() - start_time
+        score_duration.labels(status=status).observe(duration)

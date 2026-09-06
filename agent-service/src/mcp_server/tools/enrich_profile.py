@@ -12,6 +12,7 @@ import asyncio
 import calendar
 import logging
 import re
+import time
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -19,6 +20,7 @@ import httpx
 from pydantic import BaseModel, field_validator
 
 from src.config import get_settings
+from src.metrics import apollo_quota_rejections, enrich_duration
 from src.mcp_server.tools.db_pool import get_pool
 
 logger = logging.getLogger(__name__)
@@ -542,83 +544,101 @@ async def enrich_candidate(linkedin_url: str, snippet_hint: str = "") -> Enriche
     Fetch structured LinkedIn data for a candidate via Apollo.io.
     Returns None when services are unavailable or no match is found.
     """
-    # --- Guard: URL must look like a LinkedIn profile ---
-    raw_url = (linkedin_url or "").strip()
-    if not raw_url or "linkedin.com/in/" not in raw_url.lower():
-        logger.debug(f"[enrich_candidate] Skipping — not a LinkedIn profile URL: {raw_url!r}")
-        return None
+    start_time = time.time()
+    status = "success"
 
-    # --- Canonicalize LinkedIn URL (strip ma., /en, /fr) ---
-    url = clean_canonical_linkedin_url(raw_url)
-
-    # --- Guard: enrichment must be enabled ---
-    if not settings.has_enrichment:
-        logger.debug("[enrich_candidate] Enrichment disabled via config — skipping.")
-        return None
-
-    apollo_key = (settings.apollo_api_key or "").strip()
-    if not apollo_key:
-        logger.debug("[enrich_candidate] No Apollo.io API key configured.")
-        return None
-
-    # --- Quota check (atomic DB upsert) ---
-    allowed = await QuotaManager.check_and_increment()
-    if not allowed:
-        return None
-
-    # --- Query Apollo.io People Match API ---
     try:
-        async with httpx.AsyncClient(timeout=12.0) as client:
-            headers = {
-                "Content-Type": "application/json",
-                "Cache-Control": "no-cache",
-                "X-Api-Key": apollo_key,
-            }
-            payload_data = {"linkedin_url": url}
-            apollo_resp = await client.post(
-                "https://api.apollo.io/v1/people/match",
-                headers=headers,
-                json=payload_data,
-            )
-
-        if apollo_resp.status_code == 200:
-            data = apollo_resp.json()
-            person = data.get("person")
-            if person and isinstance(person, dict):
-                enriched = _parse_apollo_person(person, snippet_hint=snippet_hint)
-                if enriched and (enriched.experience or enriched.education or enriched.skills):
-                    logger.info(
-                        f"🔑 [API Monitor] 🟢 Apollo.io: Successfully enriched '{enriched.full_name}' — "
-                        f"{len(enriched.experience)} exp, {len(enriched.education)} edu, {len(enriched.skills)} skills."
-                    )
-                    return enriched
-
-            # 200 but no valid person matched
-            await _decrement_quota_on_failure()
+        # --- Guard: URL must look like a LinkedIn profile ---
+        raw_url = (linkedin_url or "").strip()
+        if not raw_url or "linkedin.com/in/" not in raw_url.lower():
+            logger.debug(f"[enrich_candidate] Skipping — not a LinkedIn profile URL: {raw_url!r}")
+            status = "skipped"
             return None
 
-        if apollo_resp.status_code == 429:
-            logger.warning(f"🔑 [API Monitor] ⚠️ Apollo.io: 429 Rate limit reached (Key: {apollo_key[:6]}...).")
-            await _decrement_quota_on_failure()
+        # --- Canonicalize LinkedIn URL (strip ma., /en, /fr) ---
+        url = clean_canonical_linkedin_url(raw_url)
+
+        # --- Guard: enrichment must be enabled ---
+        if not settings.has_enrichment:
+            logger.debug("[enrich_candidate] Enrichment disabled via config — skipping.")
+            status = "disabled"
             return None
 
-        if apollo_resp.status_code in (401, 402, 403):
-            logger.error(f"🔑 [API Monitor] 🔴 Apollo.io: Quota Exhausted / Invalid Key (HTTP {apollo_resp.status_code}).")
-            await _decrement_quota_on_failure()
+        apollo_key = (settings.apollo_api_key or "").strip()
+        if not apollo_key:
+            logger.debug("[enrich_candidate] No Apollo.io API key configured.")
+            status = "no_key"
             return None
 
-        logger.debug(f"🔑 [API Monitor] ℹ️ Apollo.io: Status {apollo_resp.status_code} for {url}.")
-        await _decrement_quota_on_failure()
-        return None
+        # --- Quota check (atomic DB upsert) ---
+        allowed = await QuotaManager.check_and_increment()
+        if not allowed:
+            status = "quota_exceeded"
+            apollo_quota_rejections.inc()
+            return None
 
-    except httpx.TimeoutException:
-        logger.warning(f"[enrich_candidate] Timeout fetching {url} from Apollo.io.")
-        await _decrement_quota_on_failure()
-        return None
-    except Exception as apollo_err:
-        logger.warning(f"🔑 [API Monitor] ⚠️ Apollo.io request error: {apollo_err}")
-        await _decrement_quota_on_failure()
-        return None
+        # --- Query Apollo.io People Match API ---
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                headers = {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "no-cache",
+                    "X-Api-Key": apollo_key,
+                }
+                payload_data = {"linkedin_url": url}
+                apollo_resp = await client.post(
+                    "https://api.apollo.io/v1/people/match",
+                    headers=headers,
+                    json=payload_data,
+                )
+
+            if apollo_resp.status_code == 200:
+                data = apollo_resp.json()
+                person = data.get("person")
+                if person and isinstance(person, dict):
+                    enriched = _parse_apollo_person(person, snippet_hint=snippet_hint)
+                    if enriched and (enriched.experience or enriched.education or enriched.skills):
+                        logger.info(
+                            f"🔑 [API Monitor] 🟢 Apollo.io: Successfully enriched '{enriched.full_name}' — "
+                            f"{len(enriched.experience)} exp, {len(enriched.education)} edu, {len(enriched.skills)} skills."
+                        )
+                        return enriched
+
+                # 200 but no valid person matched
+                await _decrement_quota_on_failure()
+                status = "no_match"
+                return None
+
+            if apollo_resp.status_code == 429:
+                logger.warning(f"🔑 [API Monitor] ⚠️ Apollo.io: 429 Rate limit reached (Key: {apollo_key[:6]}...).")
+                apollo_quota_rejections.inc()
+                await _decrement_quota_on_failure()
+                status = "rate_limited"
+                return None
+
+            if apollo_resp.status_code in (401, 402, 403):
+                logger.error(f"🔑 [API Monitor] 🔴 Apollo.io: Quota Exhausted / Invalid Key (HTTP {apollo_resp.status_code}).")
+                apollo_quota_rejections.inc()
+                await _decrement_quota_on_failure()
+                status = "quota_exhausted"
+                return None
+
+            logger.debug(f"🔑 [API Monitor] ℹ️ Apollo.io: Status {apollo_resp.status_code} for {url}.")
+            await _decrement_quota_on_failure()
+            status = f"error_{apollo_resp.status_code}"
+            return None
+
+        except Exception as exc:
+            logger.warning(f"[enrich_candidate] Apollo.io request failed: {exc}")
+            await _decrement_quota_on_failure()
+            status = "exception"
+            return None
+    except Exception as exc:
+        status = "exception"
+        raise
+    finally:
+        duration = time.time() - start_time
+        enrich_duration.labels(status=status).observe(duration)
 
 
 async def enrich_profile(linkedin_url: str, snippet_hint: str = "") -> dict[str, Any] | None:

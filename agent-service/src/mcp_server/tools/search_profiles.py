@@ -15,6 +15,7 @@ from langchain_groq import ChatGroq
 
 from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
 from src.config import get_settings
+from src.metrics import serpapi_failures
 from src.mcp_server.tools.enrich_profile import ExperienceEntry, clean_4_line_summary
 
 logger = logging.getLogger(__name__)
@@ -316,6 +317,7 @@ async def _serpapi_search(criteria: dict, limit: int = 10) -> list[dict]:
             if response.status_code != 200:
                 err_msg = f"🔑 [API Monitor] 🔴 SerpAPI: Returned HTTP {response.status_code} — {response.text[:200]}"
                 logger.error(err_msg)
+                serpapi_failures.labels(error_type=f"http_{response.status_code}").inc()
                 raise RuntimeError(err_msg)
 
             data = response.json()
@@ -325,6 +327,7 @@ async def _serpapi_search(criteria: dict, limit: int = 10) -> list[dict]:
                     logger.info(f"🔑 [API Monitor] ℹ️ SerpAPI: Google returned 0 results for query: {query}")
                     break
                 logger.error(f"🔑 [API Monitor] 🔴 SerpAPI error: {err_msg}")
+                serpapi_failures.labels(error_type="api_error").inc()
                 raise RuntimeError(f"SerpAPI error: {err_msg}")
 
 

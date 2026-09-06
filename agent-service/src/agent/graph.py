@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+import time
 from typing import Any, cast
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -13,6 +14,7 @@ from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
 from src.agent.prompts import CRITERIA_EXTRACTION_SYSTEM, CRITERIA_EXTRACTION_USER
 from src.agent.state import SourcingState
 from src.config import get_settings
+from src.metrics import search_duration
 from src.mcp_server.tools.candidate_pool import store_candidate_pool_batch
 from src.mcp_server.tools.dedup import filter_and_record_duplicates
 from src.mcp_server.tools.enrich_profile import enrich_candidate
@@ -473,22 +475,33 @@ async def run_sourcing_agent(
     job_id: str | None = None,
     max_results: int = 10,
 ) -> dict:
-    initial_state: SourcingState = {
-        "raw_query": raw_query,
-        "job_id": job_id,
-        "max_results": max_results,
-        "criteria": {},
-        "raw_profiles": [],
-        "scored_profiles": [],
-        "final_output": {},
-        "messages": [],
-        "error": None,
-    }
-    result = await sourcing_graph.ainvoke(initial_state)
-    if result.get("error"):
-        logger.error(f"[Agent] Sourcing agent execution failed: {result['error']}")
-        raise RuntimeError(result["error"])
-    return result.get("final_output", {})
+    start_time = time.time()
+    status = "success"
+
+    try:
+        initial_state: SourcingState = {
+            "raw_query": raw_query,
+            "job_id": job_id,
+            "max_results": max_results,
+            "criteria": {},
+            "raw_profiles": [],
+            "scored_profiles": [],
+            "final_output": {},
+            "messages": [],
+            "error": None,
+        }
+        result = await sourcing_graph.ainvoke(initial_state)
+        if result.get("error"):
+            logger.error(f"[Agent] Sourcing agent execution failed: {result['error']}")
+            status = "error"
+            raise RuntimeError(result["error"])
+        return result.get("final_output", {})
+    except Exception as exc:
+        status = "error"
+        raise
+    finally:
+        duration = time.time() - start_time
+        search_duration.labels(status=status).observe(duration)
 
 
 def _extract_min_experience_from_query(query: str) -> int | None:

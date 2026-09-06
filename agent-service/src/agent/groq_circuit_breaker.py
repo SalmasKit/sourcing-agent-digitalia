@@ -5,6 +5,8 @@ Shared across all Groq call sites in the agent service.
 import logging
 import time
 
+from src.metrics import groq_circuit_breaker_trips
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,6 +32,7 @@ class GroqCircuitBreaker:
         self._rate_limited = True
         self._reset_time = time.time() + self._cooldown_seconds
         logger.warning(f"[GroqCircuitBreaker] Rate limit detected, activating circuit breaker for {self._cooldown_seconds}s")
+        groq_circuit_breaker_trips.inc()
     
     def check_and_trigger_from_exception(self, exc: Exception) -> bool:
         """

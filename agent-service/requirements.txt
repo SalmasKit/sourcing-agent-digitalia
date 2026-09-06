@@ -15,3 +15,5 @@ asyncpg>=0.29.0
 sqlalchemy[asyncio]>=2.0.30
 orjson>=3.10.0
 PyJWT>=2.8.0
+prometheus-client>=0.20.0
+prometheus-fastapi-instrumentator>=7.0.0
