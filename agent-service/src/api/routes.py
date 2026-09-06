@@ -33,7 +33,7 @@ class HealthResponse(BaseModel):
     status: str
     agent: str
     model: str
-    data_source: str
+    data_sources: dict[str, bool]
     groq_configured: bool
 
 
@@ -43,7 +43,10 @@ async def health_check() -> HealthResponse:
         status="ok",
         agent="Digitalia Sourcing Agent v1.0",
         model=settings.groq_model,
-        data_source="serpapi",
+        data_sources={
+            "serpapi": settings.has_serpapi,
+            "apollo_enrichment": settings.has_enrichment,
+        },
         groq_configured=bool(settings.groq_api_key),
     )
 
@@ -129,5 +132,8 @@ async def list_models() -> dict:
     return {
         "current_model": settings.groq_model,
         "embedding_model": settings.embedding_model,
-        "data_source": "serpapi",
+        "data_sources": {
+            "serpapi": settings.has_serpapi,
+            "apollo_enrichment": settings.has_enrichment,
+        },
     }

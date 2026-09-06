@@ -13,6 +13,8 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
 
     steps:
     - name: Checkout repository
@@ -34,7 +36,23 @@ jobs:
         cd agent-service
         ruff check src
 
-    - name: Run Pytest
+    - name: Run Pytest with Coverage
       run: |
         cd agent-service
-        pytest
+        pytest --cov=src --cov-report=xml --cov-report=term --cov-fail-under=70
+
+    - name: Run Trivy Vulnerability Scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: 'agent-service'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+      continue-on-error: true
+
+    - name: Upload Trivy Results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'

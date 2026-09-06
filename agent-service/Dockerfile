@@ -2,6 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
 # ── Layer 1: all packages except numpy ──────────────────────────────────────
 # Each wheel here is < 3 MB; --timeout 300 / --retries 10 handles WSL2 stalls.
 # This layer is cached independently, so a numpy failure won't evict it.
@@ -43,6 +46,15 @@ RUN pip install --no-cache-dir \
     --retries 5 \
     --no-build-isolation \
     .
+
+# Change ownership of /app to non-root user
+RUN chown -R appuser:appuser /app
+
+# Set HOME to /app for model caching (sentence-transformers uses ~/.cache)
+ENV HOME=/app
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE 8001
 

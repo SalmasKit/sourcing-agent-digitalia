@@ -119,7 +119,12 @@ def _baseline_skill_check(required_skill: str, full_corpus: str, profile_skills:
         if not t:
             continue
         if len(t) <= 3:
-            if re.search(r"\b" + re.escape(t) + r"\b", full_corpus):
+            # For short terms with symbols (C++, C#, .NET), \b word boundary fails
+            # because symbols are non-word chars. Use simple containment instead.
+            if any(not c.isalnum() for c in t):
+                if t in full_corpus:
+                    return True
+            elif re.search(r"\b" + re.escape(t) + r"\b", full_corpus):
                 return True
         elif t in full_corpus:
             return True
