@@ -23,7 +23,6 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from pythonjsonlogger import jsonlogger
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-
 from src.api.limiter import limiter
 from src.api.routes import router
 from src.config import get_settings
