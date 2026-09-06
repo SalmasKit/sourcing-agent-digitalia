@@ -197,7 +197,6 @@ instrumentator = Instrumentator(
     should_group_untemplated=True,
     excluded_handlers=["/metrics"],
     env_var_name="METRICS_ENABLED",
-    metric_namespace="agent_service",
 )
 instrumentator.instrument(app)
 
