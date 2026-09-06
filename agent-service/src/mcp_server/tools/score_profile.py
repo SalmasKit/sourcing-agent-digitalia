@@ -9,12 +9,16 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 
+from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
 from src.agent.prompts import SCORING_SYSTEM, SCORING_USER
 from src.config import get_settings
 from src.embeddings.client import compute_similarity
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Global circuit breaker instance
+_groq_breaker = get_groq_circuit_breaker()
 
 
 def _get_llm() -> ChatGroq | None:
@@ -212,7 +216,12 @@ async def score_profile(
 
     # 6. LLM intelligent semantic evaluation
     llm_data = {}
-    llm = _get_llm() if use_llm_rationale else None
+    # Skip the LLM rationale call entirely while the circuit breaker is open —
+    # same short-circuit pattern used in graph.py / outreach.py / search_profiles.py,
+    # so a Groq 429 doesn't get hammered again on every profile in a batch.
+    llm = _get_llm() if (use_llm_rationale and not _groq_breaker.is_rate_limited()) else None
+    if use_llm_rationale and llm is None and settings.groq_api_key and _groq_breaker.is_rate_limited():
+        logger.debug(f"[score_profile] Groq rate-limited (circuit breaker) — skipping LLM rationale for {profile.get('full_name')}.")
     if llm:
         try:
             # Package full candidate context (including experiences list) for the LLM
@@ -256,7 +265,7 @@ async def score_profile(
             json_match = re.search(r"\{.*\}", raw, re.DOTALL)
             if json_match:
                 llm_data = json.loads(json_match.group())
-                
+
                 # Adopt LLM's dynamic semantic skill verification
                 if isinstance(llm_data.get("matched_skills"), list) and llm_data["matched_skills"]:
                     matched_skills = llm_data["matched_skills"]
@@ -268,7 +277,8 @@ async def score_profile(
                 llm_score = llm_data.get("match_score", base_score)
                 base_score = int((base_score * 0.4) + (llm_score * 0.6))
         except Exception as exc:
-            logger.warning(f"LLM rationale failed for {profile.get('full_name')}: {exc}")
+            if not _groq_breaker.check_and_trigger_from_exception(exc):
+                logger.warning(f"LLM rationale failed for {profile.get('full_name')}: {exc}")
 
     # Recommendation tier
     if base_score >= 80:
@@ -304,4 +314,3 @@ async def score_profiles_batch(profiles: list[dict], criteria: dict) -> list[dic
     import asyncio
     scored = await asyncio.gather(*[score_profile(p, criteria, use_llm_rationale=False) for p in profiles])
     return sorted(scored, key=lambda p: p.get("match_score", 0), reverse=True)
-

@@ -13,6 +13,7 @@ import httpx
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 
+from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
 from src.config import get_settings
 from src.mcp_server.tools.enrich_profile import ExperienceEntry, clean_4_line_summary
 
@@ -49,7 +50,8 @@ def _parse_json_from_llm(raw: str) -> Any:
     return None
 
 
-_groq_rate_limited: bool = False  # circuit breaker — set True on 429
+# Global circuit breaker instance
+_groq_breaker = get_groq_circuit_breaker()
 
 
 def _get_llm():
@@ -66,8 +68,7 @@ def _get_llm():
 
 async def _ai_enrich_profile(profile: dict) -> dict:
     """Use Groq AI to build comprehensive structured experiences, educations, skills, and summary."""
-    global _groq_rate_limited
-    if _groq_rate_limited:
+    if _groq_breaker.is_rate_limited():
         logger.debug("[_ai_enrich_profile] Groq rate-limited (circuit breaker) — skipping.")
         return profile
     llm = _get_llm()
@@ -147,7 +148,12 @@ LinkedIn Extensions: {extensions_text}"""
             raw_text = str(response.content)
             data = _parse_json_from_llm(raw_text)
         except Exception as exc:
-            logger.warning(f"AI enrichment failed for {full_name}: {exc}")
+            # Check for rate limit error (429) and trigger circuit breaker
+            if _groq_breaker.check_and_trigger_from_exception(exc):
+                # Circuit breaker was triggered
+                pass
+            else:
+                logger.warning(f"AI enrichment failed for {full_name}: {exc}")
 
 
     if data and isinstance(data, dict):

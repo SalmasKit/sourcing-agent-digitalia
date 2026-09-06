@@ -14,10 +14,14 @@ from typing import Any, Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 
+from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Global circuit breaker instance
+_groq_breaker = get_groq_circuit_breaker()
 
 OUTREACH_SYSTEM_LINKEDIN = """You are a recruiter writing a short LinkedIn connection/InMail message.
 Rules:
@@ -62,6 +66,10 @@ async def generate_outreach(
     if not settings.groq_api_key:
         raise RuntimeError("GROQ_API_KEY not configured — cannot draft outreach.")
 
+    if _groq_breaker.is_rate_limited():
+        logger.warning("[generate_outreach] Groq rate-limited (circuit breaker) — cannot draft outreach.")
+        raise RuntimeError("Groq API rate-limited — cannot draft outreach at this time.")
+
     llm = ChatGroq(
         api_key=settings.groq_api_key,
         model=settings.groq_model,
@@ -78,9 +86,14 @@ async def generate_outreach(
 
 We are recruiting for: {job_title} at {company}."""
 
-    messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
-    response = await llm.ainvoke(messages)
-    raw_draft = _clean_llm_text(response)
+    try:
+        messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
+        response = await llm.ainvoke(messages)
+        raw_draft = _clean_llm_text(response)
+    except Exception as exc:
+        if not _groq_breaker.check_and_trigger_from_exception(exc):
+            logger.error(f"[generate_outreach] LLM call failed: {exc}")
+        raise RuntimeError(f"Failed to draft outreach: {exc}")
 
     subject = ""
     draft = raw_draft

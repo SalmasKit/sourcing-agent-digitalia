@@ -13,6 +13,7 @@ from typing import Any
 import asyncpg
 
 from src.config import get_settings
+from src.mcp_server.tools.db_pool import get_pool
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -56,16 +57,6 @@ def _canonical_fingerprint(profile: dict[str, Any]) -> str:
     return f"nc:{hashlib.md5(seed, usedforsecurity=False).hexdigest()[:12]}"
 
 
-async def _get_conn() -> asyncpg.Connection:
-    global _table_initialized
-    dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
-    conn = await asyncpg.connect(dsn, timeout=5.0)
-    if not _table_initialized:
-        await conn.execute(_DDL)
-        _table_initialized = True
-    return conn
-
-
 async def filter_and_record_duplicates(profiles: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Mark each profile with `is_duplicate` (bool) and `times_seen` (int),
@@ -78,7 +69,7 @@ async def filter_and_record_duplicates(profiles: list[dict[str, Any]]) -> list[d
         return profiles
 
     try:
-        conn = await _get_conn()
+        pool = await get_pool()
     except Exception as exc:
         logger.warning(f"[Dedup] Database unavailable for deduplication: {exc}. Passing profiles through.")
         for p in profiles:
@@ -87,25 +78,30 @@ async def filter_and_record_duplicates(profiles: list[dict[str, Any]]) -> list[d
         return profiles
 
     try:
-        for p in profiles:
-            fp = _canonical_fingerprint(p)
-            row = await conn.fetchrow(
-                """
-                INSERT INTO seen_candidates (fingerprint, linkedin_url, full_name)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (fingerprint) DO UPDATE
-                    SET last_seen = now(),
-                        times_seen = seen_candidates.times_seen + 1
-                RETURNING times_seen;
-                """,
-                fp,
-                p.get("linkedin_url") or "",
-                p.get("full_name") or "",
-            )
-            times = row["times_seen"] if row else 1
-            p["is_duplicate"] = times > 1
-            p["times_seen"] = times
-            p["fingerprint"] = fp
+        async with pool.acquire() as conn:
+            if not _table_initialized:
+                await conn.execute(_DDL)
+                _table_initialized = True
+
+            for p in profiles:
+                fp = _canonical_fingerprint(p)
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO seen_candidates (fingerprint, linkedin_url, full_name)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (fingerprint) DO UPDATE
+                        SET last_seen = now(),
+                            times_seen = seen_candidates.times_seen + 1
+                    RETURNING times_seen;
+                    """,
+                    fp,
+                    p.get("linkedin_url") or "",
+                    p.get("full_name") or "",
+                )
+                times = row["times_seen"] if row else 1
+                p["is_duplicate"] = times > 1
+                p["times_seen"] = times
+                p["fingerprint"] = fp
 
         return profiles
     except Exception as exc:
@@ -114,5 +110,3 @@ async def filter_and_record_duplicates(profiles: list[dict[str, Any]]) -> list[d
             p.setdefault("is_duplicate", False)
             p.setdefault("times_seen", 1)
         return profiles
-    finally:
-        await conn.close()

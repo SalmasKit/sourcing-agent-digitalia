@@ -128,6 +128,9 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Embeddings pre-load warning: {exc}")
 
     yield
+
+    from src.mcp_server.tools.db_pool import close_pool
+    await close_pool()
     logger.info("Sourcing Agent Service — Shutdown")
 
 

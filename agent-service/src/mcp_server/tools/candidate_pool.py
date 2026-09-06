@@ -13,6 +13,7 @@ import asyncpg
 
 from src.config import get_settings
 from src.embeddings.client import _get_model
+from src.mcp_server.tools.db_pool import get_pool
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -56,48 +57,17 @@ async def assert_pgvector_available() -> None:
     but the extension is not yet enabled. Both are the liveness signal — the
     cast does not return a quiet NULL.
     """
-    dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
     try:
-        conn = await asyncpg.connect(dsn, timeout=5.0)
-    except Exception as exc:
-        _fail_or_warn_pgvector(
-            f"Database unreachable at startup — talent pool disabled ({exc})",
-            exc,
-        )
-        return
-
-    try:
-        await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-        await conn.fetchval("SELECT '[0,0,0]'::vector IS NOT NULL")
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+            await conn.fetchval("SELECT '[0,0,0]'::vector IS NOT NULL")
     except Exception as exc:
         _fail_or_warn_pgvector(
             "pgvector extension is not available. "
             "Install pgvector on Postgres and run CREATE EXTENSION vector.",
             exc,
         )
-    finally:
-        await conn.close()
-
-
-async def _get_conn() -> asyncpg.Connection:
-    global _table_initialized
-    dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
-    conn = await asyncpg.connect(dsn, timeout=5.0)
-    if not _table_initialized:
-        await conn.execute(_DDL)
-        try:
-            # ivfflat needs enough rows at build time to pick good centroids;
-            # on first run against an empty table the index quality is mediocre.
-            await conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS candidate_embeddings_vec_idx
-                ON candidate_embeddings USING ivfflat (embedding vector_cosine_ops);
-                """
-            )
-        except Exception as exc:
-            logger.warning(f"[CandidatePool] IVFFlat index initialization note: {exc}")
-        _table_initialized = True
-    return conn
 
 
 async def store_candidate_embedding(candidate: dict[str, Any]) -> None:
@@ -125,8 +95,21 @@ async def store_candidate_embedding(candidate: dict[str, Any]) -> None:
             logger.warning(f"[CandidatePool] Failed to compute embedding for {candidate_id}: {exc}")
 
     try:
-        conn = await _get_conn()
-        try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            if not _table_initialized:
+                await conn.execute(_DDL)
+                try:
+                    await conn.execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS candidate_embeddings_vec_idx
+                        ON candidate_embeddings USING ivfflat (embedding vector_cosine_ops);
+                        """
+                    )
+                except Exception as exc:
+                    logger.warning(f"[CandidatePool] IVFFlat index initialization note: {exc}")
+                _table_initialized = True
+            
             query = """
                 INSERT INTO candidate_embeddings (candidate_id, profile_json, embedding)
                 VALUES ($1, $2, $3)
@@ -136,8 +119,6 @@ async def store_candidate_embedding(candidate: dict[str, Any]) -> None:
                         created_at = now();
             """
             await conn.execute(query, str(candidate_id), json.dumps(candidate), vec_str)
-        finally:
-            await conn.close()
     except Exception as exc:
         logger.warning(f"[CandidatePool] Could not store candidate {candidate_id} in pool: {exc}")
 
@@ -166,69 +147,81 @@ async def rerank_pool(job_query: str, limit: int = 10) -> list[dict[str, Any]]:
             logger.warning(f"[CandidatePool] Query embedding failed: {exc}")
 
     try:
-        conn = await _get_conn()
+        pool = await get_pool()
     except Exception as exc:
         logger.error(f"[CandidatePool] Database connection failed during rerank: {exc}")
         return []
 
     try:
-        if query_vec_str:
+        async with pool.acquire() as conn:
+            if not _table_initialized:
+                await conn.execute(_DDL)
+                try:
+                    await conn.execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS candidate_embeddings_vec_idx
+                        ON candidate_embeddings USING ivfflat (embedding vector_cosine_ops);
+                        """
+                    )
+                except Exception as exc:
+                    logger.warning(f"[CandidatePool] IVFFlat index initialization note: {exc}")
+                _table_initialized = True
+
+            if query_vec_str:
+                rows = await conn.fetch(
+                    """
+                    SELECT profile_json,
+                           1 - (embedding <=> $1) AS similarity
+                    FROM candidate_embeddings
+                    WHERE embedding IS NOT NULL
+                    ORDER BY embedding <=> $1
+                    LIMIT $2;
+                    """,
+                    query_vec_str,
+                    limit,
+                )
+                results = []
+                for r in rows:
+                    try:
+                        profile = json.loads(r["profile_json"])
+                        sim = max(0.0, min(1.0, float(r["similarity"])))
+                        score = round(sim * 100)
+                        profile["pool_similarity"] = score
+                        profile["match_score"] = score
+                        profile["source"] = profile.get("source") or "talent_pool"
+                        results.append(profile)
+                    except Exception as parse_err:
+                        logger.warning(f"[CandidatePool] Failed parsing profile JSON: {parse_err}")
+                return results
+
+            # Fallback: if embedding model is not yet loaded, perform text ILIKE matching
+            keywords = [w.strip() for w in job_query.split() if len(w.strip()) > 2][:4]
+            conditions: list[str] = []
+            params: list[Any] = []
+            for i, kw in enumerate(keywords, start=1):
+                conditions.append(f"profile_json::text ILIKE ${i}")
+                params.append(f"%{kw}%")
+            where_clause = " OR ".join(conditions) or "TRUE"
+            params.append(limit)
             rows = await conn.fetch(
-                """
-                SELECT profile_json,
-                       1 - (embedding <=> $1) AS similarity
+                f"""
+                SELECT profile_json, 0.75 AS similarity
                 FROM candidate_embeddings
-                WHERE embedding IS NOT NULL
-                ORDER BY embedding <=> $1
-                LIMIT $2;
+                WHERE {where_clause}
+                ORDER BY created_at DESC
+                LIMIT ${len(params)};
                 """,
-                query_vec_str,
-                limit,
+                *params,
             )
             results = []
             for r in rows:
-                try:
-                    profile = json.loads(r["profile_json"])
-                    sim = max(0.0, min(1.0, float(r["similarity"])))
-                    score = round(sim * 100)
-                    profile["pool_similarity"] = score
-                    profile["match_score"] = score
-                    profile["source"] = profile.get("source") or "talent_pool"
-                    results.append(profile)
-                except Exception as parse_err:
-                    logger.warning(f"[CandidatePool] Failed parsing profile JSON: {parse_err}")
+                profile = json.loads(r["profile_json"])
+                profile["pool_similarity"] = 75
+                profile["match_score"] = 75
+                profile["source"] = profile.get("source") or "talent_pool"
+                results.append(profile)
             return results
-
-        # Fallback: if embedding model is not yet loaded, perform text ILIKE matching
-        keywords = [w.strip() for w in job_query.split() if len(w.strip()) > 2][:4]
-        conditions: list[str] = []
-        params: list[Any] = []
-        for i, kw in enumerate(keywords, start=1):
-            conditions.append(f"profile_json::text ILIKE ${i}")
-            params.append(f"%{kw}%")
-        where_clause = " OR ".join(conditions) or "TRUE"
-        params.append(limit)
-        rows = await conn.fetch(
-            f"""
-            SELECT profile_json, 0.75 AS similarity
-            FROM candidate_embeddings
-            WHERE {where_clause}
-            ORDER BY created_at DESC
-            LIMIT ${len(params)};
-            """,
-            *params,
-        )
-        results = []
-        for r in rows:
-            profile = json.loads(r["profile_json"])
-            profile["pool_similarity"] = 75
-            profile["match_score"] = 75
-            profile["source"] = profile.get("source") or "talent_pool"
-            results.append(profile)
-        return results
 
     except Exception as exc:
         logger.error(f"[CandidatePool] Error querying candidate pool: {exc}")
         return []
-    finally:
-        await conn.close()

@@ -20,6 +20,7 @@ import httpx
 from pydantic import BaseModel, field_validator
 
 from src.config import get_settings
+from src.mcp_server.tools.db_pool import get_pool
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -114,11 +115,9 @@ class QuotaManager:
             if cls._table_ready:
                 return  # double-checked locking
             try:
-                conn: asyncpg.Connection = await asyncpg.connect(
-                    settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
-                )
-                await conn.execute(_DDL)
-                await conn.close()
+                pool = await get_pool()
+                async with pool.acquire() as conn:
+                    await conn.execute(_DDL)
                 cls._table_ready = True
                 logger.info("[QuotaManager] enrichment_quotas table ready.")
             except Exception as exc:
@@ -133,14 +132,12 @@ class QuotaManager:
         """Return how many enrichment calls have been made this month."""
         try:
             await cls._ensure_table()
-            conn: asyncpg.Connection = await asyncpg.connect(
-                settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
-            )
-            row = await conn.fetchrow(
-                "SELECT calls_used FROM enrichment_quotas WHERE month = $1",
-                _current_month_key(),
-            )
-            await conn.close()
+            pool = await get_pool()
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT calls_used FROM enrichment_quotas WHERE month = $1",
+                    _current_month_key(),
+                )
             return row["calls_used"] if row else 0
         except Exception as exc:
             logger.warning(f"[QuotaManager] current_usage error: {exc}")
@@ -160,10 +157,8 @@ class QuotaManager:
 
         try:
             await cls._ensure_table()
-            conn: asyncpg.Connection = await asyncpg.connect(
-                settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
-            )
-            try:
+            pool = await get_pool()
+            async with pool.acquire() as conn:
                 # Atomic UPSERT — only increments when under quota
                 row = await conn.fetchrow(
                     """
@@ -186,8 +181,6 @@ class QuotaManager:
                     return False
                 logger.debug(f"[QuotaManager] Quota used: {row['calls_used']}/{quota} ({month})")
                 return True
-            finally:
-                await conn.close()
 
         except Exception as exc:
             # If DB is unreachable, allow the call to proceed (fail open) and log.
@@ -205,18 +198,16 @@ async def _decrement_quota_on_failure() -> None:
     """
     month = _current_month_key()
     try:
-        conn: asyncpg.Connection = await asyncpg.connect(
-            settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
-        )
-        await conn.execute(
-            """
-            UPDATE enrichment_quotas
-               SET calls_used = GREATEST(0, calls_used - 1)
-             WHERE month = $1
-            """,
-            month,
-        )
-        await conn.close()
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE enrichment_quotas
+                   SET calls_used = GREATEST(0, calls_used - 1)
+                 WHERE month = $1
+                """,
+                month,
+            )
     except Exception as exc:
         logger.debug(f"[_decrement_quota_on_failure] Could not rollback quota: {exc}")
 

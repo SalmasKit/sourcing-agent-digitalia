@@ -9,6 +9,7 @@ from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
 from src.agent.prompts import CRITERIA_EXTRACTION_SYSTEM, CRITERIA_EXTRACTION_USER
 from src.agent.state import SourcingState
 from src.config import get_settings
@@ -20,6 +21,9 @@ from src.mcp_server.tools.search_profiles import _ai_enrich_profile, search_prof
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Global circuit breaker instance
+_groq_breaker = get_groq_circuit_breaker()
 
 
 def _get_llm(max_tokens: int = 1024) -> ChatGroq | None:
@@ -67,6 +71,16 @@ async def interpret_request(state: SourcingState) -> SourcingState:
             "criteria": fallback,
             "messages": state["messages"] + [AIMessage(content="Fallback criteria extracted (Groq API key absent).")],
             "error": "GROQ_API_KEY absent",
+        }
+
+    if _groq_breaker.is_rate_limited():
+        logger.warning("[Node 1] Groq rate-limited (circuit breaker) — using fallback criteria.")
+        fallback = _build_fallback_criteria(state["raw_query"])
+        return {
+            **state,
+            "criteria": fallback,
+            "messages": state["messages"] + [AIMessage(content="Fallback criteria extracted (Groq rate-limited).")],
+            "error": "GROQ_RATE_LIMITED",
         }
 
     try:
@@ -119,7 +133,8 @@ async def interpret_request(state: SourcingState) -> SourcingState:
             "error": None,
         }
     except Exception as exc:
-        logger.error(f"[Node 1] Failed: {exc}")
+        if not _groq_breaker.check_and_trigger_from_exception(exc):
+            logger.error(f"[Node 1] Failed: {exc}")
         fallback = _build_fallback_criteria(state["raw_query"])
         return {
             **state,
