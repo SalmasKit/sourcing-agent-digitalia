@@ -27,11 +27,18 @@ from src.api.limiter import limiter
 from src.api.routes import router
 from src.config import get_settings
 
+# Configure structured JSON logging
+from pythonjsonlogger import jsonlogger
+
+json_handler = logging.StreamHandler(sys.stdout)
+json_handler.setFormatter(jsonlogger.JsonFormatter(
+    fmt='%(asctime)s %(name)s %(levelname)s %(message)s',
+    timestamp=True,
+))
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    datefmt="%H:%M:%S",
-    stream=sys.stdout,
+    handlers=[json_handler],
 )
 logger = logging.getLogger("agent-service")
 settings = get_settings()

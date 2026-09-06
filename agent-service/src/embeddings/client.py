@@ -6,11 +6,15 @@ import logging
 from functools import lru_cache
 
 import numpy as np
+from cachetools import TTLCache
 
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Cache for embedding results (TTL: 1 hour, max 5000 entries)
+_embedding_cache = TTLCache(maxsize=5000, ttl=3600)
 
 
 @lru_cache(maxsize=1)
@@ -36,9 +40,19 @@ def _cosine_similarity(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
 
 
 async def compute_similarity(text_a: str, text_b: str) -> float:
+    # Create cache key from sorted texts to ensure (a,b) and (b,a) hit same cache entry
+    cache_key = tuple(sorted([text_a, text_b]))
+    
+    # Check cache first
+    cached = _embedding_cache.get(cache_key)
+    if cached is not None:
+        return cached
+    
     model = _get_model(settings.embedding_model)
     if model is None:
-        return _keyword_overlap_similarity(text_a, text_b)
+        result = _keyword_overlap_similarity(text_a, text_b)
+        _embedding_cache[cache_key] = result
+        return result
 
     loop = asyncio.get_event_loop()
 
@@ -46,7 +60,9 @@ async def compute_similarity(text_a: str, text_b: str) -> float:
         embeddings = model.encode([text_a, text_b], convert_to_numpy=True, normalize_embeddings=True)
         return _cosine_similarity(np.asarray(embeddings[0]), np.asarray(embeddings[1]))
 
-    return await loop.run_in_executor(None, _encode)
+    result = await loop.run_in_executor(None, _encode)
+    _embedding_cache[cache_key] = result
+    return result
 
 
 def _keyword_overlap_similarity(text_a: str, text_b: str) -> float:

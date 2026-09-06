@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 import httpx
+from cachetools import TTLCache
 from pydantic import BaseModel, field_validator
 
 from src.config import get_settings
@@ -25,6 +26,9 @@ from src.metrics import apollo_quota_rejections, enrich_duration
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Cache for Apollo.io enrichment results (TTL: 24 hours, max 1000 entries)
+_apollo_cache = TTLCache(maxsize=1000, ttl=86400)
 
 # ---------------------------------------------------------------------------
 # Pydantic schemas
@@ -577,6 +581,13 @@ async def enrich_candidate(linkedin_url: str, snippet_hint: str = "") -> Enriche
             apollo_quota_rejections.inc()
             return None
 
+        # --- Check cache after all guards ---
+        cached = _apollo_cache.get(url)
+        if cached is not None:
+            logger.debug(f"[enrich_candidate] Cache hit for {url}")
+            status = "cached"
+            return cached
+
         # --- Query Apollo.io People Match API ---
         try:
             async with httpx.AsyncClient(timeout=12.0) as client:
@@ -598,6 +609,8 @@ async def enrich_candidate(linkedin_url: str, snippet_hint: str = "") -> Enriche
                 if person and isinstance(person, dict):
                     enriched = _parse_apollo_person(person, snippet_hint=snippet_hint)
                     if enriched and (enriched.experience or enriched.education or enriched.skills):
+                        # Store in cache for future requests
+                        _apollo_cache[url] = enriched
                         logger.info(
                             f"🔑 [API Monitor] 🟢 Apollo.io: Successfully enriched '{enriched.full_name}' — "
                             f"{len(enriched.experience)} exp, {len(enriched.education)} edu, {len(enriched.skills)} skills."
