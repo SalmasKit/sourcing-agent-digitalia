@@ -97,7 +97,7 @@ class TestGetModel:
         """Test getting default model."""
         with patch("src.embeddings.client.settings") as mock_settings:
             mock_settings.embedding_model = "all-MiniLM-L6-v2"
-            with patch("src.embeddings.client.SentenceTransformer") as mock_transformer:
+            with patch("sentence_transformers.SentenceTransformer") as mock_transformer:
                 mock_transformer.return_value = MagicMock()
                 from src.embeddings.client import _get_model
                 # Clear cache before test
@@ -109,7 +109,7 @@ class TestGetModel:
         """Test getting custom model."""
         with patch("src.embeddings.client.settings") as mock_settings:
             mock_settings.embedding_model = "custom-model"
-            with patch("src.embeddings.client.SentenceTransformer") as mock_transformer:
+            with patch("sentence_transformers.SentenceTransformer") as mock_transformer:
                 mock_transformer.return_value = MagicMock()
                 from src.embeddings.client import _get_model
                 # Clear cache before test
@@ -121,7 +121,7 @@ class TestGetModel:
         """Test model loading failure returns None."""
         with patch("src.embeddings.client.settings") as mock_settings:
             mock_settings.embedding_model = "all-MiniLM-L6-v2"
-            with patch("src.embeddings.client.SentenceTransformer") as mock_transformer:
+            with patch("sentence_transformers.SentenceTransformer") as mock_transformer:
                 mock_transformer.side_effect = Exception("Load failed")
                 from src.embeddings.client import _get_model
                 # Clear cache before test

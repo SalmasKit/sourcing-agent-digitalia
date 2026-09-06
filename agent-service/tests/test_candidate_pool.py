@@ -46,7 +46,9 @@ class TestStoreCandidateEmbedding:
         
         with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
             mock_get_pool.return_value = mock_pool
+            # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
+            mock_pool.acquire.return_value.__aexit__.return_value = None
             
             from src.mcp_server.tools.candidate_pool import store_candidate_embedding
             await store_candidate_embedding(candidate)
@@ -63,7 +65,9 @@ class TestStoreCandidateEmbedding:
         
         with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
             mock_get_pool.return_value = mock_pool
+            # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
+            mock_pool.acquire.return_value.__aexit__.return_value = None
             with patch("src.mcp_server.tools.candidate_pool._get_model") as mock_get_model:
                 mock_get_model.return_value = None
                 
@@ -128,7 +132,9 @@ class TestRerankPool:
         
         with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
             mock_get_pool.return_value = mock_pool
+            # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
+            mock_pool.acquire.return_value.__aexit__.return_value = None
             with patch("src.mcp_server.tools.candidate_pool._get_model") as mock_get_model:
                 mock_get_model.return_value = None
                 
@@ -150,10 +156,12 @@ class TestRerankPool:
         
         with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
             mock_get_pool.return_value = mock_pool
+            # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
+            mock_pool.acquire.return_value.__aexit__.return_value = None
             with patch("src.mcp_server.tools.candidate_pool._get_model") as mock_get_model:
                 mock_model = MagicMock()
-                mock_model.encode.return_value = [0.1] * 384
+                mock_model.encode.return_value = np.array([0.1] * 384)
                 mock_get_model.return_value = mock_model
                 
                 from src.mcp_server.tools.candidate_pool import rerank_pool
@@ -186,10 +194,12 @@ class TestRerankPool:
         
         with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
             mock_get_pool.return_value = mock_pool
+            # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
+            mock_pool.acquire.return_value.__aexit__.return_value = None
             with patch("src.mcp_server.tools.candidate_pool._get_model") as mock_get_model:
                 mock_model = MagicMock()
-                mock_model.encode.return_value = [0.1] * 384
+                mock_model.encode.return_value = np.array([0.1] * 384)
                 mock_get_model.return_value = mock_model
                 
                 from src.mcp_server.tools.candidate_pool import rerank_pool
@@ -215,7 +225,9 @@ class TestAssertPgvectorAvailable:
         
         with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
             mock_get_pool.return_value = mock_pool
+            # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
+            mock_pool.acquire.return_value.__aexit__.return_value = None
             
             from src.mcp_server.tools.candidate_pool import assert_pgvector_available
             # Should not raise
@@ -230,7 +242,9 @@ class TestAssertPgvectorAvailable:
         
         with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
             mock_get_pool.return_value = mock_pool
+            # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
+            mock_pool.acquire.return_value.__aexit__.return_value = None
             with patch("src.mcp_server.tools.candidate_pool.settings") as mock_settings:
                 mock_settings.app_env = "production"
                 
@@ -247,7 +261,9 @@ class TestAssertPgvectorAvailable:
         
         with patch("src.mcp_server.tools.candidate_pool.get_pool") as mock_get_pool:
             mock_get_pool.return_value = mock_pool
+            # Properly mock async context manager
             mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
+            mock_pool.acquire.return_value.__aexit__.return_value = None
             with patch("src.mcp_server.tools.candidate_pool.settings") as mock_settings:
                 mock_settings.app_env = "development"
                 

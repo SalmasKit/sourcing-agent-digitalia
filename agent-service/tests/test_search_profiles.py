@@ -122,7 +122,7 @@ class TestBuildSearchQuery:
 
     def test_build_query_with_skills(self):
         """Test query building with skills."""
-        criteria = {"job_title": "Software Engineer", "skills": ["Python", "Django"]}
+        criteria = {"job_title": "Software Engineer", "required_skills": ["Python", "Django"]}
         from src.mcp_server.tools.search_profiles import _build_search_query
         query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
