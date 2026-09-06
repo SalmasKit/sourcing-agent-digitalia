@@ -49,9 +49,7 @@ async def test_filter_and_record_duplicates_first_and_second_visit():
     mock_conn.close = AsyncMock()
 
     mock_pool = MagicMock()
-    mock_pool.acquire = AsyncMock()
-    mock_pool.acquire.__aenter__ = AsyncMock(return_value=mock_conn)
-    mock_pool.acquire.__aexit__ = AsyncMock()
+    mock_pool.acquire = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_conn), __aexit__=AsyncMock()))
 
     with patch("src.mcp_server.tools.dedup.get_pool", new_callable=AsyncMock, return_value=mock_pool):
         profiles = [
