@@ -10,13 +10,13 @@ import logging
 import re
 from typing import Any
 
-import asyncpg
-
 from src.config import get_settings
 from src.mcp_server.tools.db_pool import get_pool
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+_table_initialized = False
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS seen_candidates (

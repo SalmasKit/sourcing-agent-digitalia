@@ -4,7 +4,6 @@ Shared across all Groq call sites in the agent service.
 """
 import logging
 import time
-from typing import Any
 
 logger = logging.getLogger(__name__)
 

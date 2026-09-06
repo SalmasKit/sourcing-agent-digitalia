@@ -9,14 +9,14 @@ import json
 import logging
 from typing import Any
 
-import asyncpg
-
 from src.config import get_settings
 from src.embeddings.client import _get_model
 from src.mcp_server.tools.db_pool import get_pool
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+_table_initialized = False
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS candidate_embeddings (
@@ -26,8 +26,6 @@ CREATE TABLE IF NOT EXISTS candidate_embeddings (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 """
-
-_table_initialized = False
 
 
 def _fail_or_warn_pgvector(message: str, exc: Exception) -> None:

@@ -152,7 +152,7 @@ def _compute_skill_score(
     weights = [3, 2, 1] + [1] * max(0, len(required_skills) - 3)
     total_weight = sum(weights)
     matched_weight = sum(
-        w for skill, w in zip(required_skills, weights)
+        w for skill, w in zip(required_skills, weights, strict=True)
         if skill in matched_skills
     )
     base = (matched_weight / total_weight) * 100

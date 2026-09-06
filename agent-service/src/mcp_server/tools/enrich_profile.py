@@ -15,7 +15,6 @@ import re
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-import asyncpg
 import httpx
 from pydantic import BaseModel, field_validator
 

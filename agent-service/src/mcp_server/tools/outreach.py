@@ -93,7 +93,7 @@ We are recruiting for: {job_title} at {company}."""
     except Exception as exc:
         if not _groq_breaker.check_and_trigger_from_exception(exc):
             logger.error(f"[generate_outreach] LLM call failed: {exc}")
-        raise RuntimeError(f"Failed to draft outreach: {exc}")
+        raise RuntimeError(f"Failed to draft outreach: {exc}") from exc
 
     subject = ""
     draft = raw_draft
