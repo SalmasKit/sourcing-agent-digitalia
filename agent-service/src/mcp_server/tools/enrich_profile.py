@@ -20,8 +20,8 @@ import httpx
 from pydantic import BaseModel, field_validator
 
 from src.config import get_settings
-from src.metrics import apollo_quota_rejections, enrich_duration
 from src.mcp_server.tools.db_pool import get_pool
+from src.metrics import apollo_quota_rejections, enrich_duration
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -633,7 +633,7 @@ async def enrich_candidate(linkedin_url: str, snippet_hint: str = "") -> Enriche
             await _decrement_quota_on_failure()
             status = "exception"
             return None
-    except Exception as exc:
+    except Exception:
         status = "exception"
         raise
     finally:

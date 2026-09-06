@@ -15,8 +15,8 @@ from langchain_groq import ChatGroq
 
 from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
 from src.config import get_settings
-from src.metrics import serpapi_failures
 from src.mcp_server.tools.enrich_profile import ExperienceEntry, clean_4_line_summary
+from src.metrics import serpapi_failures
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

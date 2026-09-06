@@ -379,7 +379,7 @@ async def score_profiles_batch(profiles: list[dict], criteria: dict) -> list[dic
         import asyncio
         scored = await asyncio.gather(*[score_profile(p, criteria, use_llm_rationale=False) for p in profiles])
         return sorted(scored, key=lambda p: p.get("match_score", 0), reverse=True)
-    except Exception as exc:
+    except Exception:
         status = "error"
         raise
     finally:

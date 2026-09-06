@@ -14,12 +14,12 @@ from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
 from src.agent.prompts import CRITERIA_EXTRACTION_SYSTEM, CRITERIA_EXTRACTION_USER
 from src.agent.state import SourcingState
 from src.config import get_settings
-from src.metrics import search_duration
 from src.mcp_server.tools.candidate_pool import store_candidate_pool_batch
 from src.mcp_server.tools.dedup import filter_and_record_duplicates
 from src.mcp_server.tools.enrich_profile import enrich_candidate
 from src.mcp_server.tools.score_profile import score_profiles_batch
 from src.mcp_server.tools.search_profiles import _ai_enrich_profile, search_profiles
+from src.metrics import search_duration
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -496,7 +496,7 @@ async def run_sourcing_agent(
             status = "error"
             raise RuntimeError(result["error"])
         return result.get("final_output", {})
-    except Exception as exc:
+    except Exception:
         status = "error"
         raise
     finally:
