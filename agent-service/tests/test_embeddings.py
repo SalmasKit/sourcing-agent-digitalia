@@ -100,6 +100,8 @@ class TestGetModel:
             with patch("src.embeddings.client.SentenceTransformer") as mock_transformer:
                 mock_transformer.return_value = MagicMock()
                 from src.embeddings.client import _get_model
+                # Clear cache before test
+                _get_model.cache_clear()
                 result = _get_model()
                 assert result is not None
 
@@ -110,6 +112,8 @@ class TestGetModel:
             with patch("src.embeddings.client.SentenceTransformer") as mock_transformer:
                 mock_transformer.return_value = MagicMock()
                 from src.embeddings.client import _get_model
+                # Clear cache before test
+                _get_model.cache_clear()
                 result = _get_model("custom-model")
                 assert result is not None
 
@@ -120,6 +124,8 @@ class TestGetModel:
             with patch("src.embeddings.client.SentenceTransformer") as mock_transformer:
                 mock_transformer.side_effect = Exception("Load failed")
                 from src.embeddings.client import _get_model
+                # Clear cache before test
+                _get_model.cache_clear()
                 result = _get_model()
                 assert result is None
 

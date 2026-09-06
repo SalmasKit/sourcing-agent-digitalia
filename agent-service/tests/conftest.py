@@ -35,10 +35,11 @@ def reset_embedding_cache():
 @pytest.fixture(autouse=True)
 def reset_groq_circuit_breaker():
     """Reset the Groq circuit breaker state between tests to prevent flaky tests."""
-    from src.agent.groq_circuit_breaker import _global_breaker
-    _global_breaker.reset()
+    from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
+    breaker = get_groq_circuit_breaker()
+    breaker.reset()
     yield
-    _global_breaker.reset()
+    breaker.reset()
 
 
 @pytest.fixture(autouse=True)

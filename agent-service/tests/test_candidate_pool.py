@@ -198,7 +198,8 @@ class TestRerankPool:
                 # Verify limit was passed to query
                 assert mock_conn.fetch.called
                 call_args = mock_conn.fetch.call_args
-                assert call_args[0][2] == 3  # limit parameter
+                # call_args[0] is (query_vec_str, limit)
+                assert call_args[0][1] == 3  # limit parameter
 
 
 class TestAssertPgvectorAvailable:
