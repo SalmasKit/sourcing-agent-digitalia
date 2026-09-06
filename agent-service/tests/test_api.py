@@ -24,7 +24,8 @@ def test_health_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["data_source"] == "serpapi"
+    assert "data_sources" in data
+    assert isinstance(data["data_sources"], dict)
 
 
 def test_models_endpoint():
@@ -33,7 +34,8 @@ def test_models_endpoint():
     data = response.json()
     assert "current_model" in data
     assert "embedding_model" in data
-    assert data["data_source"] == "serpapi"
+    assert "data_sources" in data
+    assert isinstance(data["data_sources"], dict)
 
 
 def test_search_endpoint_unauthorized():

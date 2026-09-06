@@ -156,7 +156,7 @@ def _compute_skill_score(
             bonus = (len(nice_matched) / len(nice_to_have_skills)) * 10
         return round(min(100, 70 + bonus)), nice_matched
 
-    weights = [3, 2, 1] + [1] * max(0, len(required_skills) - 3)
+    weights = [3, 2, 1][:len(required_skills)] + [1] * max(0, len(required_skills) - 3)
     total_weight = sum(weights)
     matched_weight = sum(
         w for skill, w in zip(required_skills, weights, strict=True)

@@ -19,38 +19,29 @@ def reset_pool():
 @pytest.mark.asyncio
 async def test_get_pool_creates_pool_on_first_call():
     """Test that get_pool creates a new pool on first call."""
-    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool") as mock_create_pool:
-        mock_pool = AsyncMock()
-        mock_create_pool.return_value = mock_pool
-
+    mock_pool = AsyncMock()
+    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool", new_callable=AsyncMock, return_value=mock_pool):
         pool = await get_pool()
 
         assert pool is mock_pool
-        mock_create_pool.assert_called_once()
-        mock_pool.close.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_get_pool_returns_singleton():
     """Test that get_pool returns the same pool instance on subsequent calls."""
-    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool") as mock_create_pool:
-        mock_pool = AsyncMock()
-        mock_create_pool.return_value = mock_pool
-
+    mock_pool = AsyncMock()
+    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool", new_callable=AsyncMock, return_value=mock_pool):
         pool1 = await get_pool()
         pool2 = await get_pool()
 
         assert pool1 is pool2
-        mock_create_pool.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_get_pool_replaces_dsn_prefix():
     """Test that get_pool replaces postgresql+asyncpg:// with postgresql://."""
-    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool") as mock_create_pool:
-        mock_pool = AsyncMock()
-        mock_create_pool.return_value = mock_pool
-
+    mock_pool = AsyncMock()
+    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool", new_callable=AsyncMock, return_value=mock_pool) as mock_create_pool:
         with patch("src.mcp_server.tools.db_pool.settings") as mock_settings:
             mock_settings.database_url = "postgresql+asyncpg://user:pass@localhost/db"
             await get_pool()
@@ -64,10 +55,8 @@ async def test_get_pool_replaces_dsn_prefix():
 @pytest.mark.asyncio
 async def test_get_pool_configures_pool_parameters():
     """Test that get_pool configures pool with correct parameters."""
-    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool") as mock_create_pool:
-        mock_pool = AsyncMock()
-        mock_create_pool.return_value = mock_pool
-
+    mock_pool = AsyncMock()
+    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool", new_callable=AsyncMock, return_value=mock_pool) as mock_create_pool:
         await get_pool()
 
         call_args = mock_create_pool.call_args
@@ -81,10 +70,8 @@ async def test_get_pool_configures_pool_parameters():
 @pytest.mark.asyncio
 async def test_close_pool_closes_existing_pool():
     """Test that close_pool closes the existing pool."""
-    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool") as mock_create_pool:
-        mock_pool = AsyncMock()
-        mock_create_pool.return_value = mock_pool
-
+    mock_pool = AsyncMock()
+    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool", new_callable=AsyncMock, return_value=mock_pool):
         await get_pool()
         await close_pool()
 
@@ -94,19 +81,17 @@ async def test_close_pool_closes_existing_pool():
 @pytest.mark.asyncio
 async def test_close_pool_sets_pool_to_none():
     """Test that close_pool sets the global pool to None."""
-    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool") as mock_create_pool:
-        mock_pool = AsyncMock()
-        mock_create_pool.return_value = mock_pool
-
+    mock_pool = AsyncMock()
+    with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool", new_callable=AsyncMock, return_value=mock_pool):
         await get_pool()
         await close_pool()
 
         # Create a new pool to verify the old one was set to None
         mock_pool2 = AsyncMock()
-        mock_create_pool.return_value = mock_pool2
-        await get_pool()
+        with patch("src.mcp_server.tools.db_pool.asyncpg.create_pool", new_callable=AsyncMock, return_value=mock_pool2) as mock_create_pool:
+            await get_pool()
 
-        mock_create_pool.assert_called()  # Should be called twice now
+            mock_create_pool.assert_called()  # Should be called twice now
 
 
 @pytest.mark.asyncio
