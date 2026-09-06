@@ -190,8 +190,8 @@ async def search_profiles(criteria: dict[str, Any], limit: int = 10) -> list[dic
     return await _serpapi_search(criteria, limit)
 
 
-def _build_search_query(criteria: dict) -> str:
-    """Build SerpAPI search query from job criteria."""
+def _build_search_query(criteria: dict) -> tuple[str, str, str]:
+    """Build SerpAPI search query from job criteria. Returns (query, gl_code, location)."""
     raw_job_title = (criteria.get("job_title") or "Professional").strip()
     skills_list = criteria.get("required_skills", [])
 
@@ -296,11 +296,11 @@ def _build_search_query(criteria: dict) -> str:
 
     query = " ".join(query_parts).strip()
     logger.info(f"SerpAPI search query: {query}")
-    return query
+    return query, gl_code, location
 
 
 async def _serpapi_search(criteria: dict, limit: int = 10) -> list[dict]:
-    query = _build_search_query(criteria)
+    query, gl_code, location = _build_search_query(criteria)
 
     profiles = []
     seen_urls = set()

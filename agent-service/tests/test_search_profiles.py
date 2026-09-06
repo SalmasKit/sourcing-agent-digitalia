@@ -99,7 +99,7 @@ class TestBuildSearchQuery:
         """Test basic query building with just a job title."""
         criteria = {"job_title": "Software Engineer"}
         from src.mcp_server.tools.search_profiles import _build_search_query
-        query = _build_search_query(criteria)
+        query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
         assert "Software Engineer" in query
 
@@ -107,15 +107,16 @@ class TestBuildSearchQuery:
         """Test query building with location."""
         criteria = {"job_title": "Software Engineer", "location": "Casablanca"}
         from src.mcp_server.tools.search_profiles import _build_search_query
-        query = _build_search_query(criteria)
+        query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
         assert "Casablanca" in query
+        assert location == "Casablanca"
 
     def test_build_query_with_seniority(self):
         """Test query building with seniority level."""
         criteria = {"job_title": "Software Engineer", "seniority": "Senior"}
         from src.mcp_server.tools.search_profiles import _build_search_query
-        query = _build_search_query(criteria)
+        query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
         assert "Senior" in query
 
@@ -123,7 +124,7 @@ class TestBuildSearchQuery:
         """Test query building with skills."""
         criteria = {"job_title": "Software Engineer", "skills": ["Python", "Django"]}
         from src.mcp_server.tools.search_profiles import _build_search_query
-        query = _build_search_query(criteria)
+        query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
         assert "Python" in query or "Django" in query
 
@@ -131,35 +132,37 @@ class TestBuildSearchQuery:
         """Test that Morocco locations use 'ma' country code."""
         criteria = {"job_title": "Software Engineer", "location": "Casablanca"}
         from src.mcp_server.tools.search_profiles import _build_search_query
-        query = _build_search_query(criteria)
+        query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
+        assert gl_code == "ma"
 
     def test_build_query_french_location_code(self):
         """Test that France locations use 'fr' country code."""
         criteria = {"job_title": "Software Engineer", "location": "Paris"}
         from src.mcp_server.tools.search_profiles import _build_search_query
-        query = _build_search_query(criteria)
+        query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
+        assert gl_code == "fr"
 
     def test_build_query_empty_location_any(self):
         """Test that empty/any locations don't add location term."""
         criteria = {"job_title": "Software Engineer", "location": "any"}
         from src.mcp_server.tools.search_profiles import _build_search_query
-        query = _build_search_query(criteria)
+        query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
 
     def test_build_query_digital_marketing_synonyms(self):
         """Test French/English synonyms for Digital Marketing in MA/FR."""
         criteria = {"job_title": "Digital Marketing Manager", "location": "Casablanca"}
         from src.mcp_server.tools.search_profiles import _build_search_query
-        query = _build_search_query(criteria)
+        query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
 
     def test_build_query_data_scientist_synonyms(self):
         """Test French/English synonyms for Data Scientist in MA/FR."""
         criteria = {"job_title": "Data Scientist", "location": "Paris"}
         from src.mcp_server.tools.search_profiles import _build_search_query
-        query = _build_search_query(criteria)
+        query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
 
 
