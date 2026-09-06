@@ -45,6 +45,11 @@ class GroqCircuitBreaker:
             return True
         return False
 
+    def reset(self) -> None:
+        """Force-reset the breaker to a clean, non-rate-limited state (test isolation)."""
+        self._rate_limited = False
+        self._reset_time = 0.0
+
 
 # Global singleton instance
 _global_breaker: GroqCircuitBreaker | None = None
