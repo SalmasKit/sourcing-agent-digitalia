@@ -10,10 +10,6 @@ on:
       - 'agent-service/**'
       - '.github/workflows/agent-ci.yml'
 
-permissions:
-  contents: read
-  security-events: write
-
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -52,9 +48,3 @@ jobs:
         output: 'trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
       continue-on-error: true
-
-    - name: Upload Trivy Results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v4
-      if: always() && hashFiles('trivy-results.sarif') != ''
-      with:
-        sarif_file: 'trivy-results.sarif'
