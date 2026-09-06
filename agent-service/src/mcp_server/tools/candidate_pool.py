@@ -16,8 +16,6 @@ from src.mcp_server.tools.db_pool import get_pool
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-_table_initialized = False
-
 _DDL = """
 CREATE TABLE IF NOT EXISTS candidate_embeddings (
     candidate_id TEXT PRIMARY KEY,
@@ -95,18 +93,17 @@ async def store_candidate_embedding(candidate: dict[str, Any]) -> None:
     try:
         pool = await get_pool()
         async with pool.acquire() as conn:
-            if not _table_initialized:
-                await conn.execute(_DDL)
-                try:
-                    await conn.execute(
-                        """
-                        CREATE INDEX IF NOT EXISTS candidate_embeddings_vec_idx
-                        ON candidate_embeddings USING ivfflat (embedding vector_cosine_ops);
-                        """
-                    )
-                except Exception as exc:
-                    logger.warning(f"[CandidatePool] IVFFlat index initialization note: {exc}")
-                _table_initialized = True
+            # Ensure table exists (idempotent)
+            await conn.execute(_DDL)
+            try:
+                await conn.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS candidate_embeddings_vec_idx
+                    ON candidate_embeddings USING ivfflat (embedding vector_cosine_ops);
+                    """
+                )
+            except Exception as exc:
+                logger.warning(f"[CandidatePool] IVFFlat index initialization note: {exc}")
             
             query = """
                 INSERT INTO candidate_embeddings (candidate_id, profile_json, embedding)
@@ -152,18 +149,17 @@ async def rerank_pool(job_query: str, limit: int = 10) -> list[dict[str, Any]]:
 
     try:
         async with pool.acquire() as conn:
-            if not _table_initialized:
-                await conn.execute(_DDL)
-                try:
-                    await conn.execute(
-                        """
-                        CREATE INDEX IF NOT EXISTS candidate_embeddings_vec_idx
-                        ON candidate_embeddings USING ivfflat (embedding vector_cosine_ops);
-                        """
-                    )
-                except Exception as exc:
-                    logger.warning(f"[CandidatePool] IVFFlat index initialization note: {exc}")
-                _table_initialized = True
+            # Ensure table exists (idempotent)
+            await conn.execute(_DDL)
+            try:
+                await conn.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS candidate_embeddings_vec_idx
+                    ON candidate_embeddings USING ivfflat (embedding vector_cosine_ops);
+                    """
+                )
+            except Exception as exc:
+                logger.warning(f"[CandidatePool] IVFFlat index initialization note: {exc}")
 
             if query_vec_str:
                 rows = await conn.fetch(

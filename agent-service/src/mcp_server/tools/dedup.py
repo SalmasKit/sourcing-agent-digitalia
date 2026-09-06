@@ -16,8 +16,6 @@ from src.mcp_server.tools.db_pool import get_pool
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-_table_initialized = False
-
 _DDL = """
 CREATE TABLE IF NOT EXISTS seen_candidates (
     fingerprint TEXT PRIMARY KEY,
@@ -79,9 +77,8 @@ async def filter_and_record_duplicates(profiles: list[dict[str, Any]]) -> list[d
 
     try:
         async with pool.acquire() as conn:
-            if not _table_initialized:
-                await conn.execute(_DDL)
-                _table_initialized = True
+            # Ensure table exists (idempotent)
+            await conn.execute(_DDL)
 
             for p in profiles:
                 fp = _canonical_fingerprint(p)
