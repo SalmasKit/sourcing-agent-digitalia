@@ -6,7 +6,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.5.18</version>
+		<version>3.2.5</version>
 		<relativePath/>
 	</parent>
 
@@ -28,6 +28,7 @@
 		<springdoc.version>2.7.0</springdoc.version>
 		<mapstruct.version>1.6.2</mapstruct.version>
 		<testcontainers.version>1.20.3</testcontainers.version>
+		<flyway.version>10.18.0</flyway.version>
 		<!-- Plugin versions & quality gates -->
 		<jacoco.version>0.8.12</jacoco.version>
 		<jacoco.skip>false</jacoco.skip>
@@ -74,10 +75,12 @@
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-core</artifactId>
+			<version>${flyway.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-database-postgresql</artifactId>
+			<version>${flyway.version}</version>
 		</dependency>
 
 		<!-- ===== JWT (JJWT 0.12) ===== -->
