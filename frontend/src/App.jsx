@@ -234,7 +234,7 @@ function DashboardContent() {
       const hasCache = (jobResultsCache[defaultJob.id] || []).length > 0;
       if (!hasCache) {
         const queryStr = defaultJob.description || `${defaultJob.title} ${(defaultJob.skills || []).join(' ')} ${defaultJob.location || ''}`.trim();
-        handleSearch(queryStr, { location: defaultJob.location, tech: defaultJob.skills }, defaultJob.id);
+        handleSearch(queryStr, { location: defaultJob.location, tech: defaultJob.skills, maxResults: defaultJob.maxResults || 10 }, defaultJob.id);
       }
     }
   }, []);
@@ -795,7 +795,8 @@ function DashboardContent() {
                       const fallbackFilters = {
                         location: activeJob?.location || 'All Locations',
                         minExp: activeJob?.experienceMin || 0,
-                        tech: activeJob?.skills || []
+                        tech: activeJob?.skills || [],
+                        maxResults: activeJob?.maxResults || 10
                       };
                       handleSearch(fallbackQuery, fallbackFilters, activeJob?.id);
                     }

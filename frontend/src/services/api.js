@@ -300,7 +300,7 @@ function parseExperienceYears(val, headline = '', summary = '') {
 }
 
 async function searchTalentPoolApi(searchQuery, filters = {}) {
-  const limit = Number(filters.maxResults || filters.limit) || 10;
+  const limit = (Number(filters.maxResults) > 0 ? Number(filters.maxResults) : null) || (Number(filters.limit) > 0 ? Number(filters.limit) : null) || 10;
   try {
     const response = await agentClient.post('/api/pool/search', {
       query: searchQuery,
