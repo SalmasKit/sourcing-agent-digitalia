@@ -26,6 +26,7 @@ _MOCK_APOLLO_RESPONSE: dict[str, Any] = {
         "organization": {"name": "OCP Group"},
         "departments": ["Engineering", "Information Technology"],
         "functions": ["software_development"],
+        "skills": ["Python", "Java", "Spring Boot", "FastAPI", "PostgreSQL"],  # Actual skills field from Apollo
         "employment_history": [
             {
                 "title": "Senior Software Engineer",
@@ -74,6 +75,195 @@ def _make_mock_response(status_code: int, payload: dict) -> MagicMock:
 
 class TestEnrichCandidate:
     """Unit tests for enrich_candidate() with mocked HTTP and DB."""
+
+    @pytest.mark.asyncio
+    async def test_enrich_candidate_french_accented_text_preserved(self):
+        """French accented characters (é, è, à, ç) must be preserved through enrichment pipeline."""
+        mock_response = {
+            "person": {
+                "first_name": "Jean",
+                "last_name": "Dupont",
+                "name": "Jean Dupont",
+                "headline": "Ingénieur Études Développement",
+                "title": "Ingénieur Études Développement",
+                "organization": {"name": "Société Marocaine"},
+                "departments": ["Ingénierie", "Études", "Développement"],
+                "functions": ["développement_logiciel"],
+                "employment_history": [
+                    {
+                        "title": "Ingénieur Études Développement",
+                        "organization_name": "Société Marocaine",
+                        "start_date": "2020-01",
+                        "end_date": None,
+                        "current": True,
+                        "description": "Développement d'applications web en français.",
+                    },
+                ],
+            }
+        }
+        mock_resp = _make_mock_response(200, mock_response)
+
+        with (
+            patch("src.mcp_server.tools.enrich_profile.settings") as mock_settings,
+            patch("src.mcp_server.tools.enrich_profile.QuotaManager.check_and_increment", new_callable=AsyncMock, return_value=True),
+            patch("httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_settings.has_enrichment = True
+            mock_settings.apollo_api_key = "test-apollo-key"
+            mock_settings.enrichment_monthly_quota = 1000
+            mock_settings.database_url = "postgresql+asyncpg://user:pass@localhost/db"
+
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(return_value=mock_resp)
+            mock_client_cls.return_value = mock_client
+
+            from src.mcp_server.tools.enrich_profile import enrich_candidate
+            result = await enrich_candidate("https://www.linkedin.com/in/jean-dupont")
+
+        assert result is not None
+        # Verify accented characters are preserved
+        assert "É" in result.headline or "é" in result.headline, "Accented É should be preserved in headline"
+        # Check skills don't have garbled text like "Ing Nieur"
+        for skill in result.skills:
+            assert "Nieur" not in skill, f"Garbled text 'Nieur' found in skill: {skill}"
+            assert "Tudes" not in skill, f"Garbled text 'Tudes' found in skill: {skill}"
+            assert "Veloppement" not in skill, f"Garbled text 'Veloppement' found in skill: {skill}"
+
+    @pytest.mark.asyncio
+    async def test_llm_skill_extraction_english(self):
+        """Test LLM skill extraction with English text."""
+        from src.mcp_server.tools.search_profiles import _extract_skills_via_llm
+        
+        profile = {
+            "headline": "Senior Software Engineer",
+            "summary": "Experienced developer specializing in Python, Java, and cloud architecture.",
+            "experiences": [
+                {
+                    "role": "Software Engineer",
+                    "company": "Tech Corp",
+                    "description": "Developed microservices using Spring Boot and PostgreSQL."
+                }
+            ]
+        }
+        
+        with patch("src.mcp_server.tools.search_profiles._get_llm") as mock_get_llm:
+            mock_llm = AsyncMock()
+            mock_response = MagicMock()
+            mock_response.content = '{"extracted_skills": [{"skill": "Python", "confidence": "high", "evidence": "Python, Java"}, {"skill": "Spring Boot", "confidence": "high", "evidence": "Spring Boot"}]}'
+            mock_llm.ainvoke = AsyncMock(return_value=mock_response)
+            mock_get_llm.return_value = mock_llm
+            
+            result = await _extract_skills_via_llm(profile)
+            
+        assert len(result) == 2
+        assert result[0]["skill"] == "Python"
+        assert result[0]["confidence"] == "high"
+        assert result[0]["source"] == "llm_extracted"
+        assert result[1]["skill"] == "Spring Boot"
+
+    @pytest.mark.asyncio
+    async def test_llm_skill_extraction_french(self):
+        """Test LLM skill extraction with French text and accents."""
+        from src.mcp_server.tools.search_profiles import _extract_skills_via_llm
+        
+        profile = {
+            "headline": "Ingénieur Études Développement",
+            "summary": "Développement d'applications web en Java et Python.",
+            "experiences": [
+                {
+                    "role": "Développeur",
+                    "company": "Société Marocaine",
+                    "description": "Développement avec Spring Boot et PostgreSQL."
+                }
+            ]
+        }
+        
+        with patch("src.mcp_server.tools.search_profiles._get_llm") as mock_get_llm:
+            mock_llm = AsyncMock()
+            mock_response = MagicMock()
+            mock_response.content = '{"extracted_skills": [{"skill": "Java", "confidence": "high", "evidence": "Java et Python"}, {"skill": "Spring Boot", "confidence": "high", "evidence": "Spring Boot"}]}'
+            mock_llm.ainvoke = AsyncMock(return_value=mock_response)
+            mock_get_llm.return_value = mock_llm
+            
+            result = await _extract_skills_via_llm(profile)
+            
+        assert len(result) == 2
+        assert result[0]["skill"] == "Java"
+        assert result[0]["source"] == "llm_extracted"
+
+    @pytest.mark.asyncio
+    async def test_llm_skill_extraction_no_text(self):
+        """Test LLM skill extraction returns empty list when no text signals available."""
+        from src.mcp_server.tools.search_profiles import _extract_skills_via_llm
+        
+        profile = {"headline": "", "summary": "", "experiences": []}
+        
+        with patch("src.mcp_server.tools.search_profiles._get_llm") as mock_get_llm:
+            mock_get_llm.return_value = None
+            
+            result = await _extract_skills_via_llm(profile)
+            
+        assert result == []
+
+    def test_apollo_department_underscore_converted_to_space(self):
+        """Regression test: Apollo snake_case departments should have underscores replaced with spaces."""
+        from src.mcp_server.tools.enrich_profile import _parse_apollo_person
+        
+        person = {
+            "name": "Test User",
+            "departments": ["master_engineering_technical", "software_development"],
+            "functions": []
+        }
+        result = _parse_apollo_person(person)
+        
+        # Should have spaces, not underscores
+        assert "Master Engineering Technical" in result.skills
+        assert "Software Development" in result.skills
+        # No underscores should remain in any skill
+        for skill in result.skills:
+            assert "_" not in skill, f"Underscore found in skill: {skill}"
+
+    def test_extract_skills_fallback_preserves_french_accents(self):
+        """Regression test: _extract_skills fallback should preserve French accents (é, è, à, ç)."""
+        from src.mcp_server.tools.search_profiles import _extract_skills
+        
+        # Test with French title containing accents
+        result = _extract_skills("Ingénieur Études Développement", "", {"required_skills": []})
+        
+        # Should preserve whole accented words, not split them
+        assert any("Ingénieur" in s or "ingénieur" in s.lower() for s in result), \
+            "Should preserve 'Ingénieur' as a whole word"
+        assert any("Études" in s or "études" in s.lower() for s in result), \
+            "Should preserve 'Études' as a whole word"
+        assert any("Développement" in s or "développement" in s.lower() for s in result), \
+            "Should preserve 'Développement' as a whole word"
+        
+        # Should NOT have garbled fragments
+        for skill in result:
+            assert "Nieur" not in skill, f"Garbled fragment 'Nieur' found in: {skill}"
+            assert "Tudes" not in skill, f"Garbled fragment 'Tudes' found in: {skill}"
+            assert "Veloppement" not in skill, f"Garbled fragment 'Veloppement' found in: {skill}"
+
+    def test_format_period_date_preserves_french_months(self):
+        """Regression test: format_period_date should parse French months with accents (août, décembre)."""
+        from src.mcp_server.tools.enrich_profile import format_period_date
+        
+        # Test French month with accent (août)
+        result_août = format_period_date("août 2021")
+        assert result_août is not None, "Should parse 'août 2021'"
+        assert "2021" in result_août, "Should preserve year"
+        
+        # Test another French month with accent (décembre)
+        result_dec = format_period_date("décembre 2020")
+        assert result_dec is not None, "Should parse 'décembre 2020'"
+        assert "2020" in result_dec, "Should preserve year"
+        
+        # Test standard English month still works
+        result_jan = format_period_date("January 2019")
+        assert result_jan is not None, "Should parse 'January 2019'"
+        assert "2019" in result_jan, "Should preserve year"
 
     @pytest.mark.asyncio
     async def test_enrich_candidate_success(self):

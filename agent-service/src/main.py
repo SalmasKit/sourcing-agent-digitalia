@@ -114,6 +114,31 @@ def _assert_jwt_secret_configured() -> None:
     logger.warning("=" * 65)
 
 
+def _assert_metrics_scraper_configured() -> None:
+    """
+    Startup invariant: METRICS_SCRAPER_USERNAME/PASSWORD must be set in production.
+
+    Prevents fail-open where empty credentials would allow unauthorized access to /metrics.
+    Mirrors the Spring Boot MetricsSecurityConfig.validateScraperCredentials() pattern.
+    """
+    settings = get_settings()
+    if settings.metrics_scraper_username and settings.metrics_scraper_password:
+        return  # all good
+
+    if settings.app_env == "production":
+        logger.critical(
+            "[SECURITY] FATAL: METRICS_SCRAPER_USERNAME/PASSWORD not configured. "
+            "Refusing to start in production — refusing to expose /metrics with trivially guessable credentials."
+        )
+        raise RuntimeError(
+            "METRICS_SCRAPER_USERNAME and METRICS_SCRAPER_PASSWORD must be set in production. "
+            "The agent-service cannot start without them."
+        )
+
+    # Non-production: warn visibly but allow boot so developers can run without metrics auth.
+    logger.warning("[SECURITY] Metrics scraper credentials not configured — /metrics is unprotected in dev.")
+
+
 async def _check_and_log_api_keys():
     """Probe all configured API services and print a live quota status banner in the terminal."""
     import httpx
@@ -166,6 +191,9 @@ async def _check_and_log_api_keys():
 async def lifespan(app: FastAPI):
     # Fail closed on missing JWT secret before accepting any traffic.
     _assert_jwt_secret_configured()
+
+    # Fail closed on missing metrics scraper credentials.
+    _assert_metrics_scraper_configured()
 
     from src.mcp_server.tools.candidate_pool import assert_pgvector_available
     await assert_pgvector_available()

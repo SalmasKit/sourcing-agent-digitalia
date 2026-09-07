@@ -67,6 +67,95 @@ def _get_llm():
     )
 
 
+async def _extract_skills_via_llm(profile: dict) -> list[dict]:
+    """
+    Extract skills from candidate text signals using LLM with evidence tracking.
+    
+    Returns list of dicts: [{"skill": str, "confidence": "high"|"low", "evidence": str, "source": "llm_extracted"}]
+    Only extracts skills explicitly evidenced in the text - no hallucination.
+    """
+    if _groq_breaker.is_rate_limited():
+        logger.debug("[_extract_skills_via_llm] Groq rate-limited (circuit breaker) — skipping.")
+        return []
+    
+    llm = _get_llm()
+    if not llm:
+        return []
+    
+    # Concatenate all text signals
+    text_signals = []
+    if profile.get("headline"):
+        text_signals.append(f"Headline: {profile['headline']}")
+    if profile.get("summary"):
+        text_signals.append(f"Summary: {profile['summary']}")
+    
+    # Add experience descriptions
+    experiences = profile.get("experiences", [])
+    if experiences:
+        for idx, exp in enumerate(experiences, 1):
+            if isinstance(exp, dict):
+                role = exp.get("role", exp.get("title", ""))
+                company = exp.get("company", "")
+                desc = exp.get("description", "")
+                if role or desc:
+                    text_signals.append(f"Experience {idx}: {role} at {company} - {desc}")
+    
+    if not text_signals:
+        return []
+    
+    combined_text = "\n\n".join(text_signals)
+    
+    prompt_system = """You are an expert technical recruiter and skills analyst.
+Your task is to extract ONLY explicitly evidenced technical and professional skills from the provided candidate text.
+
+STRICT RULES:
+1. Extract ONLY skills that are EXPLICITLY mentioned or clearly demonstrated in the text.
+2. DO NOT invent, hallucinate, or infer skills not supported by the text.
+3. For each skill, provide:
+   - skill: The exact skill name (e.g., "Python", "Project Management", "SEO")
+   - confidence: "high" if explicitly stated (e.g., "Skills: Python, Java"), "low" if implied through work (e.g., "developed web applications" → "Web Development")
+   - evidence: A brief quote from the text that supports this skill (max 50 chars)
+4. Return 5-12 skills maximum. Prioritize technical/hard skills over soft skills.
+5. Handle both English and French text correctly (preserve accents: é, è, à, ç).
+
+Return ONLY a valid JSON object matching this schema:
+{
+  "extracted_skills": [
+    {
+      "skill": "string",
+      "confidence": "high" | "low",
+      "evidence": "string"
+    }
+  ]
+}"""
+
+    prompt_user = f"""Candidate Profile Text:\n\n{combined_text}"""
+
+    try:
+        response = await llm.ainvoke([
+            SystemMessage(content=prompt_system),
+            HumanMessage(content=prompt_user)
+        ])
+        raw_text = str(response.content)
+        data = _parse_json_from_llm(raw_text)
+        
+        if data and isinstance(data, dict):
+            extracted = data.get("extracted_skills", [])
+            if isinstance(extracted, list):
+                # Add source tag to each skill
+                for skill_entry in extracted:
+                    if isinstance(skill_entry, dict):
+                        skill_entry["source"] = "llm_extracted"
+                return extracted
+    except Exception as exc:
+        if _groq_breaker.check_and_trigger_from_exception(exc):
+            pass
+        else:
+            logger.warning(f"LLM skill extraction failed: {exc}")
+    
+    return []
+
+
 async def _ai_enrich_profile(profile: dict) -> dict:
     """Use Groq AI to build comprehensive structured experiences, educations, skills, and summary."""
     if _groq_breaker.is_rate_limited():
@@ -437,7 +526,8 @@ def _extract_skills(title: str, snippet: str, criteria: dict) -> list[str]:
             extracted.add(tech)
 
     if not extracted:
-        words = [w.capitalize() for w in re.findall(r"[A-Za-z]{3,}", title)
+        # Use Unicode-aware word match to preserve French accents (é, è, à, ç)
+        words = [w.capitalize() for w in re.findall(r"[^\W\d_]{3,}", title, re.UNICODE)
                  if w.lower() not in ("and", "for", "with", "the", "lead", "senior", "junior", "manager", "head", "chez")]
         extracted.update(words[:4])
 

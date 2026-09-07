@@ -222,6 +222,17 @@ async def enrich_node(state: SourcingState) -> SourcingState:
                     profile["email_is_verified"] = enrich_result.email_is_verified
 
                 profile["enrichment_source"] = "apollo"
+                
+                # Run LLM skill extraction as a separate, evidence-based layer
+                if settings.groq_api_key:
+                    try:
+                        from src.mcp_server.tools.search_profiles import _extract_skills_via_llm
+                        llm_skills = await _extract_skills_via_llm(profile)
+                        if llm_skills:
+                            profile["llm_extracted_skills"] = llm_skills
+                    except Exception as exc:
+                        logger.warning(f"[Node 2.5] LLM skill extraction failed: {exc}")
+                
                 return profile
 
 
@@ -231,6 +242,16 @@ async def enrich_node(state: SourcingState) -> SourcingState:
                 try:
                     enriched = await _ai_enrich_profile(profile)
                     enriched["enrichment_source"] = "groq_fallback"
+                    
+                    # Run LLM skill extraction for Groq fallback as well
+                    try:
+                        from src.mcp_server.tools.search_profiles import _extract_skills_via_llm
+                        llm_skills = await _extract_skills_via_llm(enriched)
+                        if llm_skills:
+                            enriched["llm_extracted_skills"] = llm_skills
+                    except Exception as exc:
+                        logger.warning(f"[Node 2.5] LLM skill extraction failed in Groq fallback: {exc}")
+                    
                     return enriched
                 except Exception as exc:
                     logger.warning(f"[Node 2.5] Groq fallback failed for profile: {exc}")

@@ -283,8 +283,8 @@ def format_period_date(raw: Any) -> str | None:
             return f"{calendar.month_abbr[m_idx]} {m.group(2)}"
         return f"{m.group(1)}/{m.group(2)}"
 
-    # Textual dates like 'Jan 2021' or 'March 2021'
-    if m := re.search(r"([A-Za-z]{3,9})\.?\s+(\d{4})", s):
+    # Textual dates like 'Jan 2021', 'March 2021', or French 'août 2021'
+    if m := re.search(r"([^\W\d_]{3,9})\.?\s+(\d{4})", s, re.UNICODE):
         return f"{m.group(1)[:3].title()} {m.group(2)}"
 
     return s[:15] if len(s) >= 4 else None
@@ -503,9 +503,20 @@ def _parse_apollo_person(person: dict, snippet_hint: str = "") -> EnrichedProfil
 
     # 3. Extract skills
     skills_set: list[str] = []
-    for dept in (person.get("departments") or []) + (person.get("functions") or []):
-        if isinstance(dept, str) and dept.strip() and dept.strip() not in skills_set:
-            skills_set.append(dept.strip().title())
+    
+    # First, try to get actual skills from Apollo's skills field (if available)
+    apollo_skills = person.get("skills")
+    if isinstance(apollo_skills, list):
+        for skill in apollo_skills:
+            if isinstance(skill, str) and skill.strip() and skill.strip() not in skills_set:
+                skills_set.append(skill.strip())
+    
+    # Fallback to departments/functions if no skills field or empty
+    if not skills_set:
+        for dept in (person.get("departments") or []) + (person.get("functions") or []):
+            if isinstance(dept, str) and dept.strip() and dept.strip() not in skills_set:
+                # Replace underscores with spaces before title() to avoid "Master_Engineering_Technical"
+                skills_set.append(dept.strip().replace("_", " ").title())
 
     # 4. Extract verified email if present
     raw_email = (person.get("email") or person.get("corporate_email") or "").strip()
