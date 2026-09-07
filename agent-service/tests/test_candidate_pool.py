@@ -38,7 +38,6 @@ class TestStoreCandidateEmbedding:
         # Should return without error
         await store_candidate_embedding(candidate)
 
-    @pytest.mark.skip(reason="Complex async context manager mocking - covered by integration tests")
     @pytest.mark.asyncio
     async def test_store_candidate_with_id(self):
         """Test storing candidate with valid id."""
@@ -62,7 +61,6 @@ class TestStoreCandidateEmbedding:
             # Verify SQL was executed
             assert mock_conn.execute.called
 
-    @pytest.mark.skip(reason="Complex async context manager mocking - covered by integration tests")
     @pytest.mark.asyncio
     async def test_store_candidate_no_model(self):
         """Test storing candidate when embedding model is unavailable."""
@@ -132,7 +130,6 @@ class TestRerankPool:
         result = await rerank_pool("   ")
         assert result == []
 
-    @pytest.mark.skip(reason="Complex async context manager mocking - covered by integration tests")
     @pytest.mark.asyncio
     async def test_rerank_no_model_fallback(self):
         """Test fallback to text matching when model is unavailable."""
@@ -161,7 +158,6 @@ class TestRerankPool:
                 assert len(result) == 1
                 assert result[0]["pool_similarity"] == 75
 
-    @pytest.mark.skip(reason="Complex async context manager mocking - covered by integration tests")
     @pytest.mark.asyncio
     async def test_rerank_with_embeddings(self):
         """Test semantic search with embeddings."""
@@ -204,7 +200,6 @@ class TestRerankPool:
             # Should return empty list on error
             assert result == []
 
-    @pytest.mark.skip(reason="Complex async context manager mocking - covered by integration tests")
     @pytest.mark.asyncio
     async def test_rerank_limit_parameter(self):
         """Test that limit parameter is respected."""
@@ -234,14 +229,13 @@ class TestRerankPool:
                 # Verify limit was passed to query
                 assert mock_conn.fetch.called
                 call_args = mock_conn.fetch.call_args
-                # call_args[0] is (query_vec_str, limit)
-                assert call_args[0][1] == 3  # limit parameter
+                # call_args[0] is (sql_string, query_vec_str, limit)
+                assert call_args[0][2] == 3  # limit parameter
 
 
 class TestAssertPgvectorAvailable:
     """Tests for assert_pgvector_available function."""
 
-    @pytest.mark.skip(reason="Complex async context manager mocking - covered by integration tests")
     @pytest.mark.asyncio
     async def test_assert_pgvector_success(self):
         """Test successful pgvector availability check."""
@@ -264,7 +258,6 @@ class TestAssertPgvectorAvailable:
             # Should not raise
             await assert_pgvector_available()
 
-    @pytest.mark.skip(reason="Complex async context manager mocking - covered by integration tests")
     @pytest.mark.asyncio
     async def test_assert_pgvector_failure_production(self):
         """Test pgvector failure in production raises error."""
@@ -288,7 +281,6 @@ class TestAssertPgvectorAvailable:
                 with pytest.raises(RuntimeError):
                     await assert_pgvector_available()
 
-    @pytest.mark.skip(reason="Complex async context manager mocking - covered by integration tests")
     @pytest.mark.asyncio
     async def test_assert_pgvector_failure_development(self):
         """Test pgvector failure in development logs warning but doesn't raise."""
