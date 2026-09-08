@@ -21,6 +21,74 @@ from src.metrics import serpapi_failures
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Matches a LinkedIn profile slug wherever it appears in a URL/text field.
+LINKEDIN_SLUG_RE = re.compile(r"linkedin\.com/in/([a-zA-Z0-9\-_%]+)", re.IGNORECASE)
+
+
+def _resolve_linkedin_url(result: dict) -> str:
+    """
+    Extract a clean, direct linkedin.com/in/... URL from a SerpAPI organic result.
+
+    SerpAPI's 'link' field can come back as a Google goto/consent redirect wrapper
+    (e.g. 'https://.../goto/?url=CAESaw...') instead of the resolved destination —
+    seen especially for gl=ma / gl=fr searches. That opaque token is NOT decodable
+    client-side. Fall back to 'redirect_link' and 'displayed_link', which usually
+    still expose the plain domain+path even when 'link' is wrapped.
+
+    Returns "" if no field yields a real linkedin.com/in/<slug> URL — callers must
+    skip the result in that case rather than storing a broken URL, since a broken
+    URL silently disables downstream Apollo enrichment.
+    """
+    # First check the standard URL fields
+    for field in ("link", "redirect_link", "displayed_link"):
+        val = result.get(field, "") or ""
+        m = LINKEDIN_SLUG_RE.search(val)
+        if m:
+            slug = m.group(1).rstrip("/")
+            slug = re.sub(r"/(?:en|fr|ar|es|de)$", "", slug, flags=re.IGNORECASE)
+            return f"https://www.linkedin.com/in/{slug}"
+
+    # Fallback: check if title or snippet contains a LinkedIn URL
+    for field in ("title", "snippet"):
+        val = result.get(field, "") or ""
+        m = LINKEDIN_SLUG_RE.search(val)
+        if m:
+            slug = m.group(1).rstrip("/")
+            slug = re.sub(r"/(?:en|fr|ar|es|de)$", "", slug, flags=re.IGNORECASE)
+            return f"https://www.linkedin.com/in/{slug}"
+
+    return ""
+
+
+async def _resolve_linkedin_url_via_redirect(client: httpx.AsyncClient, result: dict) -> str:
+    """
+    Last-resort resolver: follow Google's goto/redirect wrapper via HTTP to reach
+    the real destination. Only called when _resolve_linkedin_url (field-based,
+    free) finds nothing. Costs one network round-trip per unresolved result.
+    """
+    raw_link = result.get("link", "") or ""
+    if not raw_link:
+        return ""
+
+    # Relative goto links (e.g. "/goto?url=...") need the google.com origin prefixed.
+    target = raw_link if raw_link.startswith("http") else f"https://www.google.com{raw_link}"
+
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        resp = await client.get(target, headers=headers, follow_redirects=True, timeout=8.0)
+        final_url = str(resp.url)
+        m = LINKEDIN_SLUG_RE.search(final_url)
+        if m:
+            slug = m.group(1).rstrip("/")
+            slug = re.sub(r"/(?:en|fr|ar|es|de)$", "", slug, flags=re.IGNORECASE)
+            return f"https://www.linkedin.com/in/{slug}"
+    except Exception as exc:
+        logger.debug(f"[_resolve_linkedin_url_via_redirect] failed for {target[:80]}: {exc}")
+
+    return ""
+
 
 def _parse_json_from_llm(raw: str) -> Any:
     """Robustly extract JSON from an LLM response, handling markdown fences, think blocks, and nested JSON."""
@@ -67,28 +135,28 @@ def _get_llm():
     )
 
 
-async def _extract_skills_via_llm(profile: dict) -> list[dict]:
+async def _extract_skills_via_llm(profile: dict, criteria: dict = None) -> list[dict]:
     """
     Extract skills from candidate text signals using LLM with evidence tracking.
-    
+
     Returns list of dicts: [{"skill": str, "confidence": "high"|"low", "evidence": str, "source": "llm_extracted"}]
     Only extracts skills explicitly evidenced in the text - no hallucination.
     """
     if _groq_breaker.is_rate_limited():
         logger.debug("[_extract_skills_via_llm] Groq rate-limited (circuit breaker) — skipping.")
         return []
-    
+
     llm = _get_llm()
     if not llm:
         return []
-    
+
     # Concatenate all text signals
     text_signals = []
     if profile.get("headline"):
         text_signals.append(f"Headline: {profile['headline']}")
     if profile.get("summary"):
         text_signals.append(f"Summary: {profile['summary']}")
-    
+
     # Add experience descriptions
     experiences = profile.get("experiences", [])
     if experiences:
@@ -99,35 +167,45 @@ async def _extract_skills_via_llm(profile: dict) -> list[dict]:
                 desc = exp.get("description", "")
                 if role or desc:
                     text_signals.append(f"Experience {idx}: {role} at {company} - {desc}")
-    
+
     if not text_signals:
         return []
-    
+
     combined_text = "\n\n".join(text_signals)
-    
-    prompt_system = """You are an expert technical recruiter and skills analyst.
+
+    # Build skill list from criteria if provided
+    target_skills = []
+    if criteria:
+        target_skills = criteria.get("required_skills", []) + criteria.get("nice_to_have_skills", [])
+
+    skill_filter = ""
+    if target_skills:
+        skill_filter = f"\n\nTARGET SKILLS TO LOOK FOR: {', '.join(target_skills)}\nOnly extract skills from this list if they appear in the text."
+
+    prompt_system = f"""You are an expert technical recruiter and skills analyst.
 Your task is to extract ONLY explicitly evidenced technical and professional skills from the provided candidate text.
 
 STRICT RULES:
 1. Extract ONLY skills that are EXPLICITLY mentioned or clearly demonstrated in the text.
 2. DO NOT invent, hallucinate, or infer skills not supported by the text.
-3. For each skill, provide:
+3. DO NOT extract methodologies, processes, or soft skills (e.g., "agile", "CI/CD", "clean code", "collaboration") - these are NOT skills.
+4. For each skill, provide:
    - skill: The exact skill name (e.g., "Python", "Project Management", "SEO")
    - confidence: "high" if explicitly stated (e.g., "Skills: Python, Java"), "low" if implied through work (e.g., "developed web applications" → "Web Development")
    - evidence: A brief quote from the text that supports this skill (max 50 chars)
-4. Return 5-12 skills maximum. Prioritize technical/hard skills over soft skills.
-5. Handle both English and French text correctly (preserve accents: é, è, à, ç).
+5. Return skills maximum. Prioritize technical/hard skills over soft skills.
+6. Handle both English and French text correctly (preserve accents: é, è, à, ç).{skill_filter}
 
 Return ONLY a valid JSON object matching this schema:
-{
+{{
   "extracted_skills": [
-    {
+    {{
       "skill": "string",
       "confidence": "high" | "low",
       "evidence": "string"
-    }
+    }}
   ]
-}"""
+}}"""
 
     prompt_user = f"""Candidate Profile Text:\n\n{combined_text}"""
 
@@ -138,7 +216,7 @@ Return ONLY a valid JSON object matching this schema:
         ])
         raw_text = str(response.content)
         data = _parse_json_from_llm(raw_text)
-        
+
         if data and isinstance(data, dict):
             extracted = data.get("extracted_skills", [])
             if isinstance(extracted, list):
@@ -152,7 +230,7 @@ Return ONLY a valid JSON object matching this schema:
             pass
         else:
             logger.warning(f"LLM skill extraction failed: {exc}")
-    
+
     return []
 
 
@@ -245,12 +323,10 @@ LinkedIn Extensions: {extensions_text}"""
             else:
                 logger.warning(f"AI enrichment failed for {full_name}: {exc}")
 
-
     if data and isinstance(data, dict):
         if comp := data.get("current_company"):
             if comp and "Listed on" not in comp and "See LinkedIn" not in comp and len(comp) < 80:
                 profile["current_company"] = comp
-
 
         if langs := data.get("languages"):
             if isinstance(langs, list) and len(langs) > 0:
@@ -317,7 +393,10 @@ def _build_search_query(criteria: dict) -> tuple[str, str, str]:
 
     seniority = ""
     if raw_seniority and raw_seniority not in ("Any", "N/A", "Unknown"):
-        sen_clean = raw_seniority.split("(")[0].split("/")[0].strip()
+        # Safe split with fallback
+        temp = raw_seniority.split("(")[0] if "(" in raw_seniority else raw_seniority
+        temp = temp.split("/")[0] if "/" in temp else temp
+        sen_clean = temp.strip()
         if sen_clean in ("Junior", "Mid-Level", "Senior", "Lead", "Architect", "Director", "Manager", "Head"):
             seniority = sen_clean
 
@@ -362,7 +441,8 @@ def _build_search_query(criteria: dict) -> tuple[str, str, str]:
 
     if not title_clause and clean_title:
         # Strip long sentences or punctuation if present
-        short_title = re.split(r"[\.\(\,\;]|\s+based\s+|\s+in\s+", clean_title, flags=re.IGNORECASE)[0].strip()
+        split_result = re.split(r"[\.\(\,\;]|\s+based\s+|\s+in\s+", clean_title, flags=re.IGNORECASE)
+        short_title = split_result[0].strip() if split_result else clean_title.strip()
         title_words = [w for w in short_title.split() if w.lower() not in ("a", "an", "the", "for", "in", "at", "to", "senior", "junior", "lead", "mid", "manager", "head")]
         if title_words:
             core_phrase = " ".join(title_words[:3])
@@ -406,7 +486,7 @@ async def _serpapi_search(criteria: dict, limit: int = 10) -> list[dict]:
                     "num": min(limit * 2, 20),
                     "start": start_offset,
                     "hl": "en",
-                    "gl": gl_code,
+                    "gl": "us",  # Use US to avoid regional redirect wrappers
                 },
             )
             if response.status_code != 200:
@@ -425,22 +505,31 @@ async def _serpapi_search(criteria: dict, limit: int = 10) -> list[dict]:
                 serpapi_failures.labels(error_type="api_error").inc()
                 raise RuntimeError(f"SerpAPI error: {err_msg}")
 
-
             raw_results = data.get("organic_results", [])
-            logger.info(f"🔑 [API Monitor] 🟢 SerpAPI: 200 OK — Successfully retrieved {len(raw_results)} profiles from Google index.")
+            logger.info(f"🔑 [API Monitor] 🟢 SerpAPI: 200 OK — Successfully retrieved {len(raw_results)} profiles from Google.")
             if not raw_results:
                 break
 
             for result in raw_results:
                 if len(profiles) >= limit:
                     break
-                link = result.get("link", "")
-                if not link or link in seen_urls:
+
+                # Resolve the real linkedin.com/in/... URL using the dedicated resolver
+                link = _resolve_linkedin_url(result)
+                # If field-based resolution fails, try HTTP redirect following as last resort
+                if not link:
+                    async with httpx.AsyncClient(timeout=8.0) as redirect_client:
+                        link = await _resolve_linkedin_url_via_redirect(redirect_client, result)
+                if not link:
+                    logger.warning(f"Skipping result with no resolvable LinkedIn URL")
+                    continue
+                if link in seen_urls:
                     continue
                 seen_urls.add(link)
 
                 parsed = _parse_serpapi_result(len(profiles), result, criteria, location)
                 if parsed:
+                    parsed["linkedin_url"] = link
                     profiles.append(parsed)
 
             start_offset += 20
@@ -517,13 +606,28 @@ def _extract_skills(title: str, snippet: str, criteria: dict) -> list[str]:
     combined = f"{title} {snippet}".lower()
     extracted = set()
 
-    for kw in criteria.get("required_skills", []):
+    # Only extract skills that are in the user's criteria (required or nice-to-have)
+    required_skills = criteria.get("required_skills", [])
+    nice_to_have_skills = criteria.get("nice_to_have_skills", [])
+    all_requested_skills = set([s.lower() for s in required_skills + nice_to_have_skills])
+
+    for kw in required_skills:
         if kw.lower() in combined:
             extracted.add(kw)
 
+    for kw in nice_to_have_skills:
+        if kw.lower() in combined:
+            extracted.add(kw)
+
+    # Only add skills from catalog if they closely match requested skills
     for tech in SKILL_CATALOG:
-        if re.search(r"\b" + re.escape(tech.lower()) + r"\b", combined):
-            extracted.add(tech)
+        tech_lower = tech.lower()
+        # Check if this catalog skill matches any requested skill
+        for requested_skill in all_requested_skills:
+            if requested_skill in tech_lower or tech_lower in requested_skill:
+                if re.search(r"\b" + re.escape(tech_lower) + r"\b", combined):
+                    extracted.add(tech)
+                    break
 
     if not extracted:
         # Use Unicode-aware word match to preserve French accents (é, è, à, ç)
@@ -531,7 +635,7 @@ def _extract_skills(title: str, snippet: str, criteria: dict) -> list[str]:
                  if w.lower() not in ("and", "for", "with", "the", "lead", "senior", "junior", "manager", "head", "chez")]
         extracted.update(words[:4])
 
-    req_lower = [k.lower() for k in criteria.get("required_skills", [])]
+    req_lower = [k.lower() for k in required_skills]
     return sorted(list(extracted), key=lambda s: (s.lower() not in req_lower, s))
 
 
@@ -539,6 +643,12 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
     title = result.get("title", "")
     snippet = result.get("snippet", "")
     url = result.get("link", "")
+
+    # Try to extract email from snippet
+    email = ""
+    email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", snippet)
+    if email_match:
+        email = email_match.group(0)
 
     # Extract rich snippet extensions — LinkedIn puts: [location, role, company, school, ...]
     extensions = []
@@ -570,8 +680,14 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
     if not cand_location:
         cand_location = requested_location or "Casablanca, Morocco"
 
-    name = title.split(" - ")[0].split(" | ")[0].strip() if title else f"Profile {idx + 1}"
-    role = title.split(" - ")[1].strip() if " - " in title else title
+    # Safe chained splits for name extraction
+    if title:
+        temp = title.split(" - ")[0] if " - " in title else title
+        temp = temp.split(" | ")[0] if " | " in temp else temp
+        name = temp.strip() or f"Profile {idx + 1}"
+    else:
+        name = f"Profile {idx + 1}"
+    role = title.split(" - ")[1].strip() if " - " in title and len(title.split(" - ")) > 1 else title
 
     candidate_skills = _extract_skills(role, full_text, criteria)
     exp_years = _estimate_experience_years(role, full_text)
@@ -595,7 +711,13 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
         if sep in role:
             parts = role.split(sep, 1)
             clean_role = parts[0].strip()
-            company = parts[1].split(" - ")[0].split(" | ")[0].split(" · ")[0].strip()[:60]
+            if len(parts) > 1 and parts[1].strip():
+                # Safe chained splits - each split always returns at least [0]
+                temp = parts[1].split(" - ")[0]
+                temp = temp.split(" | ")[0]
+                temp = temp.split(" · ")[0]
+                company_parts = temp.strip()
+                company = company_parts[:60] if company_parts else ""
             break
 
     if not company and " - " in role:
@@ -612,7 +734,13 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
                 company = ext
                 break
 
-    clean_role = clean_role.split(" | ")[0].split(" · ")[0].strip() or "Professional"
+    # Safe chained splits for clean_role
+    if clean_role:
+        temp = clean_role.split(" | ")[0] if " | " in clean_role else clean_role
+        temp = temp.split(" · ")[0] if " · " in temp else temp
+        clean_role = temp.strip() or "Professional"
+    else:
+        clean_role = "Professional"
 
     # Smart tenure extraction from snippet & extensions for the current active role
     exp_period = "Present"
@@ -620,7 +748,6 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
         exp_period = f"{m_tenure.group(1)} - Present"
     elif m_range := re.search(r"\b(20\d\d|19\d\d)\s*[-–—]\s*(Present|Actuel|Current|Aujourd'hui)\b", full_text, re.IGNORECASE):
         exp_period = f"{m_range.group(1)} - Present"
-
 
     # Experiences extraction — initialized with the verified current role
     experiences = [
@@ -678,7 +805,6 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
     }
 
 
-
 def _estimate_salary(exp_years: int, seniority: str) -> str:
     sen = (seniority or "").lower()
     if exp_years >= 8 or any(k in sen for k in ["lead", "principal", "architect", "director"]):
@@ -688,5 +814,3 @@ def _estimate_salary(exp_years: int, seniority: str) -> str:
     if exp_years >= 3 or "mid" in sen:
         return "[Est.] Mid Level"
     return "[Est.] Junior Level"
-
-
