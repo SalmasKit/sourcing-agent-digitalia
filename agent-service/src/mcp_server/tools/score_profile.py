@@ -176,11 +176,15 @@ def _compute_skill_score(
 
 
 async def score_profile(
-    profile: dict[str, Any],
-    criteria: dict[str, Any],
+    profile: dict,
+    criteria: dict,
     use_llm_rationale: bool = True,
-) -> dict[str, Any]:
-    """Score a single profile against criteria using LLM semantic reasoning and embeddings."""
+) -> dict:
+    """Score a single candidate profile against job criteria."""
+    logger.info(f"[score_profile] Scoring profile: {profile.get('full_name')}, skills: {profile.get('skills')}, experience_years: {profile.get('experience_years')}")
+    start_time = time.time()
+    status = "success"
+
     job_text = _build_job_context(criteria)
     profile_text = _build_profile_context(profile)
 
@@ -213,6 +217,8 @@ async def score_profile(
         if _baseline_skill_check(s, full_corpus, profile_skills)
     ]
     missing_skills = [s for s in required_skills if s not in matched_skills]
+
+    logger.info(f"[score_profile] Required skills: {required_skills}, Profile skills: {profile_skills}, Matched: {matched_skills}, Missing: {missing_skills}")
 
     skill_score, nice_to_have_matched = _compute_skill_score(
         required_skills, matched_skills, nice_to_have_skills, full_corpus, profile_skills
@@ -353,6 +359,7 @@ async def score_profile(
         "embedding_score": embedding_score,
         "matched_skills": matched_skills,
         "missing_skills": missing_skills,
+        "min_experience_years": criteria.get("min_experience_years", 0),
         "match_rationale": llm_data.get("match_rationale", [
             f"Skills: {len(matched_skills)}/{len(required_skills)} required skills matched",
             f"Experience: {candidate_exp} years ({'+' if candidate_exp >= min_exp else '-'} vs required {min_exp})",

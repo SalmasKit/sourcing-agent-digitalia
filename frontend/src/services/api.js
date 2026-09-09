@@ -90,7 +90,8 @@ agentClient.interceptors.request.use(jwtRequestInterceptor, (e) => Promise.rejec
 agentClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    // Only clear session on 401 (unauthenticated) — 403 means authenticated but forbidden
+    if (error.response?.status === 401) {
       storage.clearSession();
       window.dispatchEvent(new CustomEvent('auth:session-expired'));
     }
@@ -112,16 +113,17 @@ const processPendingQueue = (error, token = null) => {
   pendingQueue = [];
 };
 
-// Response interceptor — auto-refresh on 401 / 403
+// Response interceptor — auto-refresh on 401 only (403 means authenticated but forbidden)
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
     const status = error.response?.status;
 
-    // Attempt refresh or session expiry on 401 / 403 for non-auth endpoints
+    // Attempt refresh or session expiry on 401 only for non-auth endpoints
+    // 403 means the user is authenticated but lacks specific permissions — don't auto-refresh
     if (
-      (status === 401 || status === 403) &&
+      status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
       !originalRequest.url?.includes('/auth/')
@@ -339,6 +341,12 @@ async function searchTalentPoolApi(searchQuery, filters = {}) {
         headline: p.headline,
         location: p.location,
         experienceYears: exp,
+        experience_years: exp,
+        min_experience_years: p.min_experience_years ?? p.raw_data?.min_experience_years ?? 0,
+        matched_skills: p.matched_skills ?? p.raw_data?.matched_skills ?? [],
+        missing_skills: p.missing_skills ?? p.raw_data?.missing_skills ?? [],
+        required_skills: p.required_skills ?? p.raw_data?.required_skills ?? [],
+        location_score: p.score_breakdown?.location ?? p.location_score ?? p.raw_data?.location_score ?? 0,
         email: candEmail,
         matchScore: p.pool_similarity || p.match_score || 0,
         summary: p.summary || p.headline,
@@ -395,11 +403,14 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
   //    request carries a valid JWT Bearer token via agentClient's interceptor.
   try {
     let limit = Number(filters.maxResults || filters.limit);
-    const countMatch = fullPrompt.match(/\b(?:top|find|source|get|first)?\s*(\d{1,2})\s*(?:candidates?|profils?|profiles?|développeurs?|developpeurs?|engineers?|candidats?)\b/i);
-    if (countMatch) {
-      const extracted = parseInt(countMatch[1], 10);
-      if (extracted >= 1 && extracted <= 50) {
-        limit = extracted;
+    // Only fall back to regex extraction when maxResults was NOT explicitly provided
+    if (!limit || isNaN(limit)) {
+      const countMatch = fullPrompt.match(/\b(?:top|find|source|get|first)?\s*(\d{1,2})\s*(?:candidates?|profils?|profiles?|développeurs?|developpeurs?|engineers?|candidats?)\b/i);
+      if (countMatch) {
+        const extracted = parseInt(countMatch[1], 10);
+        if (extracted >= 1 && extracted <= 50) {
+          limit = extracted;
+        }
       }
     }
     if (!limit || isNaN(limit)) {
@@ -449,12 +460,28 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
           headline: p.headline,
           location: p.location,
           experienceYears: exp,
+          experience_years: exp,
+          min_experience_years: p.min_experience_years ?? p.raw_data?.min_experience_years ?? 0,
+          matched_skills: p.matched_skills ?? p.raw_data?.matched_skills ?? [],
+          missing_skills: p.missing_skills ?? p.raw_data?.missing_skills ?? [],
+          required_skills: p.required_skills ?? p.raw_data?.required_skills ?? [],
+          location_score: p.score_breakdown?.location ?? p.location_score ?? p.raw_data?.location_score ?? 0,
           email: candEmail,
+          email_status: p.email_status,
+          extrapolated_email_confidence: p.extrapolated_email_confidence,
+          match_confidence: p.match_confidence,
+          photo_url: p.photo_url,
+          linkedin: p.linkedin_url || p.source_url,
+          github_url: p.github_url,
+          organization_name: p.organization_name,
+          organization_domain: p.organization_domain,
+          organization_departments: p.organization_departments,
+          organization_functions: p.organization_functions,
+          organization_seniority: p.organization_seniority,
           matchScore: p.match_score || p.score || 80,
           summary: p.summary || p.about || p.bio || p.headline,
           skills: Array.isArray(p.skills) ? p.skills : (p.skills?.skills || []),
-          linkedin: p.linkedin_url || p.source_url,
-          avatarUrl: p.avatar_url || defaultAvatar,
+          avatarUrl: p.avatar_url || p.photo_url || defaultAvatar,
           verifiedMatchReasons: p.match_rationale || [],
           availability: p.availability || 'Open for Outreach (Contact Candidate)',
           salaryExpectation: p.salary_expectation || p.salaryExpectation || (exp >= 5 ? '[Est. Market Benchmark] 25,000 - 34,000 MAD / mo' : '[Est. Market Benchmark] 16,000 - 24,000 MAD / mo'),

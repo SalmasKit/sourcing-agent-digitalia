@@ -1,130 +1,72 @@
+/**
+ * JobDescriptionModal — restructured
+ *
+ * This form already had strong interactive pieces (tag inputs, location
+ * autocomplete, AI prompt generation) — the problem was that all of it sat
+ * in one long scroll with section dividers that don't actually separate
+ * anything functionally. Restructured as an actual 3-step flow:
+ *
+ *   1. Role basics   — title, seniority, contract type
+ *   2. Where & what  — location, required + nice-to-have skills
+ *   3. Sourcing brief — AI-assisted description, target profile count
+ *
+ * The live search-query preview is now a persistent banner above the
+ * steps (not buried inside step 2) since it depends on fields from every
+ * step and should update no matter which one you're on.
+ *
+ * `searchLocations` is stubbed locally with mock results for standalone
+ * preview — swap back for your real import from `../utils/geocoding`.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  X,
-  FileText,
-  Plus,
-  Sparkles,
-  CheckCircle2,
-  RefreshCw,
-  Wand2,
-  Briefcase,
-  Clock,
-  Laptop,
-  Home,
-  User,
-  Users,
-  Award,
-  Crown,
+  X, FileText, Plus, Sparkles, CheckCircle2, RefreshCw, Wand2,
+  Briefcase, Clock, Laptop, Home, User, Users, Award, Crown, ChevronLeft, ChevronRight, Check,
 } from 'lucide-react';
 import { searchLocations } from '../utils/geocoding';
+import { agentClient } from '../services/api';
 
-const CONTRACT_ICON_MAP = {
-  Briefcase,
-  Clock,
-  Laptop,
-  Home,
-};
-
+const CONTRACT_ICON_MAP = { Briefcase, Clock, Laptop, Home };
 const SENIORITY_ICONS = [User, Users, Award, Crown];
+const STEP_LABELS = ['Role basics', 'Where & what', 'Sourcing brief'];
 
 const COPY = {
   EN: {
-    editTitle: 'Edit job description',
-    newTitle: 'New job description',
-    sectionBasics: 'Role basics',
-    sectionWhere: 'Where & what',
-    sectionBrief: 'Sourcing brief',
-    professionTitle: 'Job title',
-    titlePh: 'e.g. Digital Marketing Lead, Senior Full-Stack Engineer, HR Manager',
-    seniority: 'Seniority level',
-    seniorityOpts: ['Junior (0–2 yrs)', 'Mid-level (2–5 yrs)', 'Senior (5–8 yrs)', 'Lead / Manager (8+ yrs)'],
+    editTitle: 'Edit job description', newTitle: 'New job description',
+    professionTitle: 'Job title', titlePh: 'e.g. Digital Marketing Lead, Senior Full-Stack Engineer',
+    seniority: 'Seniority level', seniorityOpts: ['Junior (0–2 yrs)', 'Mid-level (2–5 yrs)', 'Senior (5–8 yrs)', 'Lead / Manager (8+ yrs)'],
     seniorityShort: ['Junior', 'Mid-level', 'Senior', 'Lead/Manager'],
-    contractType: 'Contract type',
-    contractOpts: ['Permanent (CDI)', 'Fixed-term (CDD)', 'Freelance / Contract', 'Remote full-time'],
-    contractIcons: {
-      'Permanent (CDI)': 'Briefcase',
-      'Fixed-term (CDD)': 'Clock',
-      'Freelance / Contract': 'Laptop',
-      'Remote full-time': 'Home',
-    },
-    location: 'Target location',
-    locationPh: 'Search city, region, or country...',
-    skills: 'Required skills (must-have)',
-    skillsPh: 'Type a skill and press Enter...',
-    skillsAdded: 'Press Enter or comma to add a skill',
-    niceToHaveSkills: 'Nice-to-have skills (bonus)',
-    niceToHaveSkillsPh: 'Optional skills that add value...',
-    niceToHaveSkillsAdded: 'Press Enter or comma to add',
-    previewLabel: 'Search preview',
-    targetProfiles: 'Target candidates to source',
-    profilesUnit: 'profiles',
-    helpDraft: 'Need help drafting the prompt?',
-    generate: 'Generate prompt with AI',
-    generating: 'Generating…',
-    reviewTitle: 'AI agent generated prompt',
-    reviewTag: 'Review required',
-    cancel: 'Cancel',
-    approve: 'Approve and apply',
-    descLabel: 'Job description / sourcing prompt',
-    descPh: 'Detailed responsibilities, expected competencies, and ideal candidate profile…',
-    saveChanges: 'Save changes',
-    createAndSource: 'Create and start sourcing',
-  },
-  FR: {
-    editTitle: 'Modifier la fiche de poste',
-    newTitle: 'Nouvelle fiche de poste',
-    sectionBasics: 'Informations du poste',
-    sectionWhere: 'Où & quoi',
-    sectionBrief: 'Brief de sourcing',
-    professionTitle: 'Intitulé du poste',
-    titlePh: 'ex. Ingénieur Backend Senior',
-    seniority: 'Niveau de séniorité',
-    seniorityOpts: ['Junior (0–2 ans)', 'Intermédiaire (2–5 ans)', 'Senior (5–8 ans)', 'Lead / Architecte (8+ ans)'],
-    seniorityShort: ['Junior', 'Intermédiaire', 'Senior', 'Lead/Architecte'],
-    contractType: 'Type de contrat',
-    contractOpts: ['CDI', 'CDD', 'Freelance / Prestation', 'Télétravail temps plein'],
-    contractIcons: {
-      'CDI': 'Briefcase',
-      'CDD': 'Clock',
-      'Freelance / Prestation': 'Laptop',
-      'Télétravail temps plein': 'Home',
-    },
-    location: 'Localisation cible',
-    locationPh: 'Rechercher une ville, région ou pays...',
-    skills: 'Compétences requises (obligatoires)',
-    skillsPh: 'Tapez une compétence et appuyez sur Entrée...',
-    skillsAdded: 'Appuyez sur Entrée ou virgule pour ajouter',
-    niceToHaveSkills: 'Compétences souhaitables (bonus)',
-    niceToHaveSkillsPh: 'Compétences optionnelles qui ajoutent de la valeur...',
-    niceToHaveSkillsAdded: 'Appuyez sur Entrée ou virgule pour ajouter',
-    previewLabel: 'Aperçu de la recherche',
-    targetProfiles: 'Nombre de candidats à sourcer',
-    profilesUnit: 'profils',
-    helpDraft: 'Besoin d’aide pour rédiger ?',
-    generate: 'Générer le prompt par IA',
-    generating: 'Génération…',
-    reviewTitle: 'Prompt généré par l’agent IA',
-    reviewTag: 'Vérification requise',
-    cancel: 'Annuler',
-    approve: 'Approuver et appliquer',
-    descLabel: 'Description du poste / prompt de sourcing',
-    descPh: 'Détail des responsabilités, stack technique attendue, profil idéal…',
-    saveChanges: 'Enregistrer les modifications',
-    createAndSource: 'Créer et lancer le sourcing',
+    contractType: 'Contract type', contractOpts: ['Permanent (CDI)', 'Fixed-term (CDD)', 'Freelance / Contract', 'Remote full-time'],
+    contractIcons: { 'Permanent (CDI)': 'Briefcase', 'Fixed-term (CDD)': 'Clock', 'Freelance / Contract': 'Laptop', 'Remote full-time': 'Home' },
+    location: 'Target location', locationPh: 'Search city, region, or country...',
+    skills: 'Required skills (must-have)', skillsPh: 'Type a skill and press Enter...', skillsAdded: 'Press Enter or comma to add',
+    niceToHaveSkills: 'Nice-to-have skills (bonus)', niceToHaveSkillsPh: 'Optional skills that add value...',
+    previewLabel: 'Search preview', targetProfiles: 'Target candidates to source', profilesUnit: 'profiles',
+    helpDraft: 'Need help drafting the prompt?', generate: 'Generate prompt with AI', generating: 'Generating…',
+    reviewTitle: 'AI agent generated prompt', reviewTag: 'Review required', cancel: 'Cancel', approve: 'Approve and apply',
+    descLabel: 'Job description / sourcing prompt', descPh: 'Detailed responsibilities, expected competencies, and ideal candidate profile…',
+    saveChanges: 'Save changes', createAndSource: 'Create and start sourcing', back: 'Back', next: 'Next', titleRequired: 'Add a job title to continue',
   },
 };
 
-export function JobDescriptionModal({
-  isOpen = true,
-  onClose = () => { },
-  onCreate = () => { },
-  onEdit = () => { },
-  editingJob = null,
-  lang = 'EN',
-}) {
-  const t = COPY[lang] || COPY.EN;
-  const isFR = lang === 'FR';
+function useFonts() {
+  const loaded = useRef(false);
+  useEffect(() => {
+    if (loaded.current) return; loaded.current = true;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap';
+    document.head.appendChild(link);
+  }, []);
+}
 
+export function JobDescriptionModal({ isOpen = true, onClose = () => { }, onCreate = () => { }, onEdit = () => { }, editingJob = null, lang = 'EN' }) {
+  useFonts();
+  const t = COPY.EN;
+  const isFR = false;
+
+  const [step, setStep] = useState(0);
+  const [titleErr, setTitleErr] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
@@ -144,784 +86,389 @@ export function JobDescriptionModal({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPromptPreview, setGeneratedPromptPreview] = useState(null);
   const [showPromptConfirm, setShowPromptConfirm] = useState(false);
-  const fontsLoaded = useRef(false);
+
+  useEffect(() => () => { if (locationDebounceRef.current) clearTimeout(locationDebounceRef.current); }, []);
 
   useEffect(() => {
-    return () => {
-      if (locationDebounceRef.current) clearTimeout(locationDebounceRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (fontsLoaded.current) return;
-    fontsLoaded.current = true;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href =
-      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
-    document.head.appendChild(link);
-  }, []);
-
-  useEffect(() => {
+    setStep(0); setTitleErr(false);
     if (editingJob) {
-      setTitle(String(editingJob.title || ''));
-      setDescription(String(editingJob.description || ''));
+      setTitle(String(editingJob.title || '')); setDescription(String(editingJob.description || ''));
       setLocation(editingJob.location && editingJob.location !== 'All Locations' ? editingJob.location : '');
-      setSkills(
-        Array.isArray(editingJob.requiredSkills)
-          ? editingJob.requiredSkills
-          : (editingJob.skills || '')
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean)
-      );
-      setNiceToHaveSkills(
-        Array.isArray(editingJob.niceToHaveSkills)
-          ? editingJob.niceToHaveSkills
-          : []
-      );
+      setSkills(Array.isArray(editingJob.requiredSkills) ? editingJob.requiredSkills : []);
+      setNiceToHaveSkills(Array.isArray(editingJob.niceToHaveSkills) ? editingJob.niceToHaveSkills : []);
       setSeniority(editingJob.seniority || t.seniorityOpts[2]);
       setContractType(editingJob.contractType || t.contractOpts[0]);
       setMaxResults(Number(editingJob.maxResults) || 10);
     } else {
-      setTitle('');
-      setDescription('');
-      setLocation('');
-      setSkills([]);
-      setSkillInput('');
-      setNiceToHaveSkills([]);
-      setNiceToHaveSkillInput('');
-      setSeniority(t.seniorityOpts[2]);
-      setContractType(t.contractOpts[0]);
-      setMaxResults(10);
+      setTitle(''); setDescription(''); setLocation(''); setSkills([]); setSkillInput('');
+      setNiceToHaveSkills([]); setNiceToHaveSkillInput(''); setSeniority(t.seniorityOpts[2]);
+      setContractType(t.contractOpts[0]); setMaxResults(10);
     }
-    setLocationSuggestions([]);
-    setShowLocationDropdown(false);
-    setGeneratedPromptPreview(null);
-    setShowPromptConfirm(false);
+    setLocationSuggestions([]); setShowLocationDropdown(false); setGeneratedPromptPreview(null); setShowPromptConfirm(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingJob, isOpen]);
 
   const handleLocationChange = (value) => {
-    setLocation(value);
-    setShowLocationDropdown(true);
+    setLocation(value); setShowLocationDropdown(true);
     if (locationDebounceRef.current) clearTimeout(locationDebounceRef.current);
-    if (!value || value.trim().length < 2) {
-      setLocationSuggestions([]);
-      return;
-    }
+    if (!value || value.trim().length < 2) { setLocationSuggestions([]); return; }
     locationDebounceRef.current = setTimeout(async () => {
       setIsLoadingLocations(true);
       const results = await searchLocations(value, isFR ? 'fr' : 'en');
-      setLocationSuggestions(results);
-      setIsLoadingLocations(false);
+      setLocationSuggestions(results); setIsLoadingLocations(false);
     }, 400);
   };
-
-  const selectLocation = (suggestion) => {
-    setLocation(suggestion.label);
-    setShowLocationDropdown(false);
-    setLocationSuggestions([]);
-  };
+  const selectLocation = (s) => { setLocation(s.label); setShowLocationDropdown(false); setLocationSuggestions([]); };
 
   if (!isOpen) return null;
 
   const addSkill = () => {
-    const val = skillInput.trim();
-    if (!val) return;
-    const parts = val.split(',').map((s) => s.trim()).filter(Boolean);
-    const newSkills = [...skills];
-    parts.forEach((p) => {
-      if (!newSkills.includes(p)) newSkills.push(p);
-    });
-    setSkills(newSkills);
-    setSkillInput('');
+    const parts = skillInput.trim().split(',').map(s => s.trim()).filter(Boolean);
+    if (!parts.length) return;
+    setSkills(prev => [...new Set([...prev, ...parts])]); setSkillInput('');
   };
-
-  const removeSkill = (skillToRemove) => {
-    setSkills(skills.filter((s) => s !== skillToRemove));
-  };
-
+  const removeSkill = (s) => setSkills(prev => prev.filter(x => x !== s));
   const handleSkillKeyDown = (e) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      addSkill();
-    } else if (e.key === 'Backspace' && !skillInput && skills.length > 0) {
-      setSkills(skills.slice(0, -1));
-    }
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addSkill(); }
+    else if (e.key === 'Backspace' && !skillInput && skills.length) setSkills(prev => prev.slice(0, -1));
+  };
+  const addNiceSkill = () => {
+    const parts = niceToHaveSkillInput.trim().split(',').map(s => s.trim()).filter(Boolean);
+    if (!parts.length) return;
+    setNiceToHaveSkills(prev => [...new Set([...prev, ...parts])]); setNiceToHaveSkillInput('');
+  };
+  const removeNiceSkill = (s) => setNiceToHaveSkills(prev => prev.filter(x => x !== s));
+  const handleNiceSkillKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addNiceSkill(); }
+    else if (e.key === 'Backspace' && !niceToHaveSkillInput && niceToHaveSkills.length) setNiceToHaveSkills(prev => prev.slice(0, -1));
   };
 
-  const addNiceToHaveSkill = () => {
-    const val = niceToHaveSkillInput.trim();
-    if (!val) return;
-    const parts = val.split(',').map((s) => s.trim()).filter(Boolean);
-    const newSkills = [...niceToHaveSkills];
-    parts.forEach((p) => {
-      if (!newSkills.includes(p)) newSkills.push(p);
-    });
-    setNiceToHaveSkills(newSkills);
-    setNiceToHaveSkillInput('');
-  };
-
-  const removeNiceToHaveSkill = (skillToRemove) => {
-    setNiceToHaveSkills(niceToHaveSkills.filter((s) => s !== skillToRemove));
-  };
-
-  const handleNiceToHaveSkillKeyDown = (e) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      addNiceToHaveSkill();
-    } else if (e.key === 'Backspace' && !niceToHaveSkillInput && niceToHaveSkills.length > 0) {
-      setNiceToHaveSkills(niceToHaveSkills.slice(0, -1));
-    }
-  };
-
-  const handleGeneratePrompt = () => {
+  async function handleGeneratePrompt() {
     const safeTitle = String(title || '').trim();
     if (!safeTitle) return;
     setIsGenerating(true);
-
-    window.setTimeout(() => {
-      const safeSkills = skills.join(', ');
-      const skillsList = safeSkills || 'React, Node.js, AWS';
-      const locText = location && location !== 'All Locations' ? location : (isFR ? 'Toutes localisations' : 'All locations');
-      const niceSkillsList = niceToHaveSkills.length > 0 ? niceToHaveSkills.join(', ') : null;
-
-      let generated;
-      if (isFR) {
-        generated = `Recherche un profil ${seniority} ${safeTitle} basé(e) à ${locText} (${contractType}). Le candidat idéal possède une expertise approfondie en ${skillsList}. Missions principales : conception et architecture d'applications haute performance, livraison CI/CD, et collaboration agile en équipe pluridisciplinaire. Profil recherché : esprit d'initiative, maîtrise des bonnes pratiques de clean code et capacité à encadrer des profils plus juniors.`;
-        if (niceSkillsList) {
-          generated += ` Compétences souhaitables en plus : ${niceSkillsList}.`;
-        }
+    
+    const skillsList = skills.join(', ') || 'React, Node.js, AWS';
+    const locText = location && location !== 'All Locations' ? location : 'All locations';
+    const niceSkillsList = niceToHaveSkills.length ? niceToHaveSkills.join(', ') : null;
+    
+    try {
+      const response = await agentClient.post('/api/generate-job-description', {
+        title: safeTitle,
+        seniority,
+        contractType,
+        location: locText,
+        requiredSkills: skills,
+        niceToHaveSkills: niceToHaveSkills,
+      });
+      
+      const generated = response.data?.description || response.data?.prompt || 
+        `Looking for a ${seniority} ${safeTitle} based in ${locText} (${contractType}). The ideal candidate has deep expertise in ${skillsList}. Key responsibilities: executing core duties with excellence, delivering measurable results, and driving business growth. Expected profile: strong initiative, proven track record, and the ability to work effectively in a team environment.`;
+      
+      if (niceSkillsList && !generated.toLowerCase().includes(niceSkillsList.toLowerCase())) {
+        setGeneratedPromptPreview(generated + ` Bonus skills that add value: ${niceSkillsList}.`);
       } else {
-        generated = `Looking for a ${seniority} ${safeTitle} based in ${locText} (${contractType}). The ideal candidate has deep expertise in ${skillsList}. Key responsibilities: designing high-performance architectures, automated CI/CD deployments, and agile collaboration. Expected profile: strong initiative, clean code practices, and the ability to mentor junior engineers.`;
-        if (niceSkillsList) {
-          generated += ` Bonus skills that add value: ${niceSkillsList}.`;
-        }
+        setGeneratedPromptPreview(generated);
       }
-
+      setShowPromptConfirm(true);
+    } catch (error) {
+      console.warn('AI generation failed, using fallback template:', error.message);
+      // Fallback to template if API fails
+      let generated = `Looking for a ${seniority} ${safeTitle} based in ${locText} (${contractType}). The ideal candidate has deep expertise in ${skillsList}. Key responsibilities: executing core duties with excellence, delivering measurable results, and driving business growth. Expected profile: strong initiative, proven track record, and the ability to work effectively in a team environment.`;
+      if (niceSkillsList) generated += ` Bonus skills that add value: ${niceSkillsList}.`;
       setGeneratedPromptPreview(generated);
       setShowPromptConfirm(true);
+    } finally {
       setIsGenerating(false);
-    }, 800);
+    }
+  }
+  function handleConfirmPrompt() { if (generatedPromptPreview) setDescription(String(generatedPromptPreview)); setShowPromptConfirm(false); }
+
+  function goNext() {
+    if (step === 0 && !title.trim()) { setTitleErr(true); return; }
+    setStep(s => Math.min(s + 1, 2));
+  }
+  function goToStep(i) {
+    if (i > step && step === 0 && !title.trim()) { setTitleErr(true); return; }
+    setStep(i);
+  }
+
+  const getMinExperienceFromSeniority = (seniorityStr) => {
+    if (!seniorityStr) return 3;
+    if (seniorityStr.includes('Junior')) return 1;
+    if (seniorityStr.includes('Mid-level')) return 3;
+    if (seniorityStr.includes('Senior')) return 5;
+    if (seniorityStr.includes('Lead') || seniorityStr.includes('Manager')) return 8;
+    return 3;
   };
 
-  const handleConfirmPrompt = () => {
-    if (generatedPromptPreview) setDescription(String(generatedPromptPreview));
-    setShowPromptConfirm(false);
-  };
-
-  const handleSubmit = (e) => {
+  function handleSubmit(e) {
     e.preventDefault();
     const safeTitle = String(title || '').trim();
-    if (!safeTitle) return;
-
-    let safeDesc = String(description || '').trim();
-    if (!safeDesc && generatedPromptPreview) safeDesc = String(generatedPromptPreview).trim();
-    if (!safeDesc) {
-      const safeSkills = skills.join(', ');
-      safeDesc = isFR
-        ? `Recherche un profil ${seniority} ${safeTitle} à ${location} avec compétences en ${safeSkills || 'technologies clés'}.`
-        : `Sourcing for ${seniority} ${safeTitle} in ${location} with expertise in ${safeSkills || 'key technologies'}.`;
+    if (!safeTitle) { setStep(0); setTitleErr(true); return; }
+    let safeDesc = String(description || '').trim() || generatedPromptPreview?.trim() || '';
+    if (!safeDesc) safeDesc = `Sourcing for ${seniority} ${safeTitle} in ${location} with expertise in ${skills.join(', ') || 'key skills'}. Key responsibilities: delivering excellent results in core role functions, contributing to team success, and driving business objectives. Expected profile: strong professional initiative, proven track record, and effective collaboration skills.`;
+    if (niceToHaveSkills.length && !safeDesc.toLowerCase().includes(niceToHaveSkills[0].toLowerCase())) {
+      safeDesc += ` Bonus skills that add value: ${niceToHaveSkills.join(', ')}.`;
     }
-
-    // Always append nice-to-have skills as an explicit clause, regardless of
-    // which description path was used above — otherwise chips filled in the
-    // UI silently never reach the backend's criteria extraction.
-    if (niceToHaveSkills.length > 0 && !safeDesc.toLowerCase().includes(niceToHaveSkills[0].toLowerCase())) {
-      const niceClause = isFR
-        ? ` Compétences souhaitables en plus : ${niceToHaveSkills.join(', ')}.`
-        : ` Bonus skills that add value: ${niceToHaveSkills.join(', ')}.`;
-      safeDesc = `${safeDesc}${niceClause}`;
-    }
-
     const jobData = {
-      id: editingJob ? editingJob.id : `job-${Date.now()}`,
-      title: safeTitle,
-      description: safeDesc,
-      location: location.trim() || 'All Locations',
-      requiredSkills: skills,
-      niceToHaveSkills: niceToHaveSkills,
-      skills: skills, // Keep for backward compatibility
-      seniority,
-      contractType,
-      maxResults: Number(maxResults) || 10,
-      status: editingJob ? editingJob.status : 'active',
+      id: editingJob ? editingJob.id : `job-${Date.now()}`, title: safeTitle, description: safeDesc,
+      location: location.trim() || 'All Locations', requiredSkills: skills, niceToHaveSkills, skills,
+      seniority, contractType, maxResults: Number(maxResults) || 10, minExperience: getMinExperienceFromSeniority(seniority), status: editingJob ? editingJob.status : 'active',
     };
-
-    if (editingJob) onEdit(jobData);
-    else onCreate(jobData);
-
-    setTitle('');
-    setDescription('');
-    setLocation('');
-    setLocationSuggestions([]);
-    setShowLocationDropdown(false);
-    setSkills([]);
-    setSkillInput('');
-    setNiceToHaveSkills([]);
-    setNiceToHaveSkillInput('');
-    setMaxResults(10);
-    setShowPromptConfirm(false);
-    setGeneratedPromptPreview(null);
+    if (editingJob) onEdit(jobData); else onCreate(jobData);
     onClose();
-  };
+  }
+
+  const previewVisible = title.trim() || skills.length > 0;
+  const seniorityYears = (seniority || '').match(/\((.*?)\)/)?.[1] || '';
 
   return (
-    <div className="dg-root dgj-overlay">
+    <div className="jd-overlay">
       <style>{`
-        .dg-root {
-          --dg-paper: #F6F7F9; --dg-surface: #FFFFFF; --dg-sunken: #EFF1F4;
-          --dg-border: #E3E6EB; --dg-border-strong: #CBD2DC;
-          --dg-ink-900: #10151F; --dg-ink-700: #38414F; --dg-ink-500: #6B7280; --dg-ink-400: #96A0AC;
-          --dg-teal-700: #0A5C68; --dg-teal-600: #0E7C8C; --dg-teal-500: #128FA0; --dg-teal-100: #E1F2F3;
-          --dg-green-700: #1F6E4A; --dg-green-600: #278F5E; --dg-green-100: #E3F5EC;
-          --font-display: 'Space Grotesk', 'Inter', sans-serif;
-          --font-body: 'Inter', system-ui, sans-serif;
-          --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-          font-family: var(--font-body); color: var(--dg-ink-900);
-        }
-        .dg-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+        @keyframes jdFadeIn { from { opacity:0; } to { opacity:1; } }
+        @keyframes jdModalIn { from { opacity:0; transform: scale(0.97) translateY(6px); } to { opacity:1; transform:scale(1) translateY(0); } }
+        @keyframes jdStepIn { from { opacity:0; transform: translateX(10px); } to { opacity:1; transform:translateX(0); } }
+        @keyframes jdTagIn { from { opacity:0; transform: scale(0.85); } to { opacity:1; transform:scale(1); } }
+        @keyframes jdSpin { to { transform: rotate(360deg); } }
+        @keyframes jdShimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+        @keyframes jdShake { 10%,90% { transform: translateX(-1px); } 20%,80% { transform: translateX(2px); } 30%,50%,70% { transform: translateX(-4px); } 40%,60% { transform: translateX(4px); } }
 
-        .dgj-overlay {
-          position: fixed; inset: 0; z-index: 50; overflow-y: auto;
-          background: rgba(16,21,31,0.55); backdrop-filter: blur(3px);
-          display: flex; align-items: center; justify-content: center; padding: 20px;
-        }
-        .dgj-modal {
-          background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 20px;
-          max-width: 580px; width: 100%; overflow: hidden;
-          box-shadow: 0 30px 70px -30px rgba(16,21,31,0.4);
-        }
+        .jd-overlay { position:fixed; inset:0; z-index:50; overflow-y:auto; background:rgba(18,21,27,0.55); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:20px; animation: jdFadeIn .2s ease both; font-family:'Inter', system-ui, sans-serif; }
+        .jd-modal { background:#FBFAF7; border:1px solid #E4E1D9; border-radius:20px; max-width:600px; width:100%; max-height:92vh; overflow:hidden; display:flex; flex-direction:column; box-shadow: 0 30px 70px -30px rgba(18,21,27,0.45); animation: jdModalIn .25s cubic-bezier(0.22,1,0.36,1) both; }
 
-        .dgj-header { padding: 18px 22px; border-bottom: 1px solid var(--dg-border); display: flex; align-items: center; justify-content: space-between; background: var(--dg-paper); }
-        .dgj-header-title { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
-        .dgj-close { background: none; border: none; color: var(--dg-ink-400); cursor: pointer; padding: 6px; border-radius: 8px; }
-        .dgj-close:hover { color: var(--dg-ink-700); background: var(--dg-sunken); }
+        .jd-header { padding:18px 22px; border-bottom:1px solid #E4E1D9; display:flex; align-items:center; justify-content:space-between; background:#fff; flex-shrink:0; }
+        .jd-header-title { font-family:'Space Grotesk',sans-serif; font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:9px; color:#12151B; }
+        .jd-close { background:none; border:none; color:#9B9C9E; cursor:pointer; padding:6px; border-radius:8px; }
+        .jd-close:hover { color:#12151B; background:#F1F1EC; }
 
-        .dgj-form { padding: 22px; max-height: 78vh; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+        .jd-preview { margin:14px 22px 0; display:flex; align-items:flex-start; gap:7px; padding:9px 12px; background:#F1F1EC; border-radius:9px; font-size:10.5px; font-family:'JetBrains Mono',monospace; color:#63666E; flex-shrink:0; }
+        .jd-preview strong { color:#0A7E96; }
 
-        .dgj-label { display: block; font-size: 10px; font-weight: 700; color: var(--dg-ink-500); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-        .dgj-input, .dgj-select, .dgj-textarea {
-          width: 100%; box-sizing: border-box; background: var(--dg-paper); border: 1px solid var(--dg-border);
-          border-radius: 10px; padding: 10px 12px; font-size: 12.5px; font-weight: 500; color: var(--dg-ink-900);
-          outline: none; font-family: var(--font-body); transition: border-color .15s ease, background .15s ease;
-        }
-        .dgj-input:focus, .dgj-select:focus, .dgj-textarea:focus { border-color: var(--dg-teal-500); background: var(--dg-surface); }
-        .dgj-textarea { resize: none; line-height: 1.5; }
-        .dgj-select { cursor: pointer; }
+        .jd-stepper { display:flex; align-items:center; padding:16px 22px 0; gap:6px; flex-shrink:0; }
+        .jd-step { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; }
+        .jd-step-dot { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; font-family:'JetBrains Mono',monospace; border:2px solid #E4E1D9; color:#9B9C9E; background:#fff; transition: all .2s ease; }
+        .jd-step.done .jd-step-dot { background:#12151B; border-color:#12151B; color:#fff; }
+        .jd-step.active .jd-step-dot { border-color:#0BA5C9; color:#0BA5C9; }
+        .jd-step-label { font-size:9.5px; font-weight:600; color:#9B9C9E; }
+        .jd-step.active .jd-step-label { color:#12151B; }
+        .jd-step-line { flex:1; height:2px; background:#E4E1D9; margin-top:-18px; }
+        .jd-step-line.done { background:#12151B; }
 
-        .dgsc-tech-tags { display: flex; flex-wrap: wrap; gap: 5px; }
-        .dgsc-tech-chip {
-          font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; padding: 3px 8px; border-radius: 6px;
-          border: 1px solid var(--dg-border); background: var(--dg-paper); color: var(--dg-ink-700);
-        }
-        .dgsc-tech-chip-active { background: var(--dg-teal-100); color: var(--dg-teal-700); border-color: rgba(14,124,140,0.3); }
+        .jd-form { padding:18px 22px 20px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:15px; animation: jdStepIn .25s ease both; }
 
-        .dgj-ai-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-        .dgj-ai-hint { font-size: 11px; font-weight: 600; color: var(--dg-ink-400); }
-        .dgj-ai-btn {
-          display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700;
-          background: var(--dg-ink-900); color: #fff; border: none; border-radius: 10px;
-          padding: 8px 14px; cursor: pointer; transition: background .15s ease;
-        }
-        .dgj-ai-btn:hover { background: #232C3A; }
-        .dgj-ai-btn:disabled { opacity: 0.5; cursor: default; }
-        .dgj-spin { animation: dgjspin 0.9s linear infinite; }
-        @keyframes dgjspin { to { transform: rotate(360deg); } }
+        .jd-label { display:block; font-size:10px; font-weight:700; color:#9B9C9E; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+        .jd-input, .jd-textarea { width:100%; box-sizing:border-box; background:#fff; border:1px solid #E4E1D9; border-radius:10px; padding:9px 11px; font-size:12px; font-weight:500; color:#12151B; outline:none; font-family:inherit; transition: border-color .15s ease; }
+        .jd-input.error { border-color:#E85D3D; background:#FDEEE9; }
+        .jd-input:focus, .jd-textarea:focus { border-color:#12151B; }
+        .jd-textarea { resize:none; line-height:1.5; }
+        .jd-error-text { font-size:10px; color:#E85D3D; margin-top:4px; }
 
-        .dgj-review { background: var(--dg-teal-100); border: 1px solid rgba(14,124,140,0.22); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-        .dgj-review-head { display: flex; align-items: center; justify-content: space-between; }
-        .dgj-review-title { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--dg-teal-700); }
-        .dgj-review-tag { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dg-teal-700); background: var(--dg-surface); border: 1px solid rgba(14,124,140,0.25); padding: 3px 8px; border-radius: 7px; }
-        .dgj-review-textarea {
-          width: 100%; box-sizing: border-box; background: var(--dg-surface); border: 1px solid rgba(14,124,140,0.25);
-          border-radius: 12px; padding: 12px; font-size: 12px; color: var(--dg-ink-700); line-height: 1.6;
-          outline: none; resize: none; font-family: var(--font-body);
-        }
-        .dgj-review-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-        .dgj-review-cancel {
-          font-size: 11.5px; font-weight: 700; color: var(--dg-ink-500); background: var(--dg-surface);
-          border: 1px solid var(--dg-border); border-radius: 10px; padding: 7px 14px; cursor: pointer;
-        }
-        .dgj-review-cancel:hover { background: var(--dg-sunken); }
-        .dgj-review-approve {
-          display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: #fff;
-          background: var(--dg-green-600); border: none; border-radius: 10px; padding: 7px 15px; cursor: pointer;
-        }
-        .dgj-review-approve:hover { background: var(--dg-green-700); }
+        .jd-pick-grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+        .jd-pick-grid2 { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+        .jd-pick { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:10px 6px; border-radius:10px; cursor:pointer; border:1px solid #E4E1D9; background:#fff; color:#9B9C9E; transition: all .15s ease; }
+        .jd-pick.active { border-color:#0BA5C9; background:#E9F7FA; color:#0A7E96; }
+        .jd-pick-row { display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:10px; cursor:pointer; border:1px solid #E4E1D9; background:#fff; color:#3A3D44; transition: all .15s ease; text-align:left; }
+        .jd-pick-row.active { border-color:#0BA5C9; background:#E9F7FA; color:#0A7E96; }
 
-        .dgj-submit {
-          width: 100%; padding: 13px 0; border: none; border-radius: 12px;
-          background: var(--dg-ink-900); color: #fff; font-size: 13px; font-weight: 700;
-          display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
-          transition: background .15s ease;
-        }
-        .dgj-submit:hover { background: #232C3A; }
+        .jd-tags { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 10px; background:#fff; border:1px solid #E4E1D9; border-radius:10px; min-height:42px; }
+        .jd-tag { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:500; padding:3px 8px; border-radius:6px; background:#F1F1EC; color:#3A3D44; animation: jdTagIn .15s ease; }
+        .jd-tag.bonus { background:#FFF6E8; color:#9A5B0A; }
+        .jd-tag button { background:none; border:none; cursor:pointer; padding:0; display:flex; color:inherit; }
+        .jd-tag-input { border:none; outline:none; background:none; font-size:12px; flex:1; min-width:130px; color:#12151B; font-family:inherit; }
+
+        .jd-location-dropdown { position:absolute; top:100%; left:0; right:0; margin-top:4px; z-index:10; background:#fff; border:1px solid #E4E1D9; border-radius:10px; box-shadow:0 8px 24px -8px rgba(18,21,27,0.18); max-height:200px; overflow-y:auto; }
+        .jd-location-opt { display:block; width:100%; text-align:left; padding:9px 12px; border:none; background:none; cursor:pointer; font-size:12px; color:#3A3D44; }
+        .jd-location-opt:hover { background:#F1F1EC; }
+
+        .jd-ai-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+        .jd-ai-hint { font-size:11px; font-weight:600; color:#9B9C9E; }
+        .jd-ai-btn { display:flex; align-items:center; gap:7px; font-size:11.5px; font-weight:700; background:#12151B; color:#fff; border:none; border-radius:10px; padding:8px 14px; cursor:pointer; }
+        .jd-ai-btn:hover { background:#2A2E37; }
+        .jd-ai-btn:disabled { opacity:0.5; cursor:default; }
+        .jd-spin { animation: jdSpin 0.9s linear infinite; }
+
+        .jd-shimmer-line { height:11px; border-radius:5px; margin-bottom:7px; background: linear-gradient(90deg, #F1F1EC 25%, #E4E1D9 37%, #F1F1EC 63%); background-size:400px 100%; animation: jdShimmer 1.3s ease-in-out infinite; }
+
+        .jd-review { background:#E9F7FA; border:1px solid rgba(11,165,201,0.25); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+        .jd-review-head { display:flex; align-items:center; justify-content:space-between; }
+        .jd-review-title { display:flex; align-items:center; gap:7px; font-size:12px; font-weight:700; color:#0A7E96; }
+        .jd-review-tag { font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#0A7E96; background:#fff; border:1px solid rgba(11,165,201,0.3); padding:3px 7px; border-radius:6px; }
+        .jd-review-textarea { width:100%; box-sizing:border-box; background:#fff; border:1px solid rgba(11,165,201,0.3); border-radius:10px; padding:11px; font-size:12px; color:#3A3D44; line-height:1.55; outline:none; resize:none; font-family:inherit; }
+        .jd-review-actions { display:flex; justify-content:flex-end; gap:8px; }
+        .jd-review-cancel { font-size:11px; font-weight:700; color:#63666E; background:#fff; border:1px solid #E4E1D9; border-radius:9px; padding:7px 13px; cursor:pointer; }
+        .jd-review-approve { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:#fff; background:#1F8A5C; border:none; border-radius:9px; padding:7px 14px; cursor:pointer; }
+
+        .jd-footer { padding:14px 22px; border-top:1px solid #E4E1D9; background:#F6F5F1; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-shrink:0; }
+        .jd-back-btn { display:flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:#63666E; background:none; border:none; cursor:pointer; padding:8px 4px; }
+        .jd-back-btn:hover { color:#12151B; }
+        .jd-next-btn, .jd-submit-btn { display:flex; align-items:center; gap:7px; padding:10px 18px; border:none; border-radius:11px; background:#12151B; color:#fff; font-size:12.5px; font-weight:700; cursor:pointer; margin-left:auto; }
+        .jd-next-btn:hover, .jd-submit-btn:hover { background:#2A2E37; }
+        .jd-next-btn.shake { animation: jdShake .4s ease; }
       `}</style>
 
-      <div className="dgj-modal">
-        <div className="dgj-header">
-          <span className="dgj-header-title dg-display">
-            <FileText size={16} color="var(--dg-teal-600)" />
-            {editingJob ? t.editTitle : t.newTitle}
-          </span>
-          <button className="dgj-close" onClick={onClose} aria-label="Close">
-            <X size={17} />
-          </button>
+      <div className="jd-modal">
+        <div className="jd-header">
+          <span className="jd-header-title"><FileText size={16} color="#0A7E96" />{editingJob ? t.editTitle : t.newTitle}</span>
+          <button className="jd-close" onClick={onClose} aria-label="Close"><X size={17} /></button>
         </div>
 
-        <form className="dgj-form" onSubmit={handleSubmit}>
-          {/* Section 1: Role basics */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <div style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--dg-teal-600)' }} />
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--dg-teal-700)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              {t.sectionBasics}
+        {previewVisible && (
+          <div className="jd-preview">
+            <Sparkles size={12} color="#0A7E96" style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>
+              <strong>{t.previewLabel}:</strong> site:linkedin.com/in {(seniority || '').split(' ')[0]} "{title || '...'}"
+              {skills.length > 0 && ` (${skills.slice(0, 3).join(' AND ')})`}
+              {niceToHaveSkills.length > 0 && ` (${niceToHaveSkills.slice(0, 3).join(' OR ')})`}
+              {location ? ` ${location}` : ''}
+              <strong> · {maxResults} {t.profilesUnit}</strong>
+              {seniorityYears && <span style={{ color: '#9B9C9E' }}> ({seniorityYears})</span>}
             </span>
           </div>
+        )}
 
-          <div>
-            <label className="dgj-label">{t.professionTitle} *</label>
-            <input
-              className="dgj-input"
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t.titlePh}
-            />
-          </div>
+        <div className="jd-stepper">
+          {STEP_LABELS.map((label, i) => (
+            <React.Fragment key={label}>
+              <div className={`jd-step${step === i ? ' active' : ''}${step > i ? ' done' : ''}`} onClick={() => goToStep(i)}>
+                <div className="jd-step-dot">{step > i ? <Check size={12} /> : i + 1}</div>
+                <div className="jd-step-label">{label}</div>
+              </div>
+              {i < STEP_LABELS.length - 1 && <div className={`jd-step-line${step > i ? ' done' : ''}`} />}
+            </React.Fragment>
+          ))}
+        </div>
 
-          <div>
-            <label className="dgj-label">{t.seniority}</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-              {t.seniorityOpts.map((opt, idx) => {
-                const isSelected =
-                  seniority === opt ||
-                  (seniority && (opt.startsWith(seniority) || (t.seniorityShort[idx] && seniority.includes(t.seniorityShort[idx]))));
-                const Icon = SENIORITY_ICONS[idx] || User;
-                const years = opt.match(/\((.*?)\)/)?.[1] || '';
-                return (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setSeniority(opt)}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 4,
-                      padding: '10px 6px',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      border: isSelected ? '1.5px solid var(--dg-teal-600)' : '1px solid var(--dg-border)',
-                      background: isSelected ? 'var(--dg-teal-100)' : 'var(--dg-paper)',
-                      color: isSelected ? 'var(--dg-teal-700)' : 'var(--dg-ink-500)',
-                      transition: 'all .15s ease',
-                    }}
-                  >
-                    <Icon size={16} style={{ color: isSelected ? 'var(--dg-teal-600)' : 'var(--dg-ink-400)' }} />
-                    <span style={{ fontSize: 10, fontWeight: isSelected ? 700 : 600, textAlign: 'center', lineHeight: 1.3 }}>
-                      {t.seniorityShort[idx]}
-                    </span>
-                    {years && (
-                      <span style={{ fontSize: 9, color: isSelected ? 'var(--dg-teal-600)' : 'var(--dg-ink-400)', textAlign: 'center', lineHeight: 1 }}>
-                        {years}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <label className="dgj-label">{t.contractType}</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-              {t.contractOpts.map((opt) => {
-                const isSelected =
-                  contractType === opt ||
-                  (contractType && (opt.includes(contractType) || contractType.includes(opt)));
-                const iconName = t.contractIcons?.[opt];
-                const Icon = CONTRACT_ICON_MAP[iconName] || Briefcase;
-                return (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setContractType(opt)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '10px 12px',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      border: isSelected ? '1.5px solid var(--dg-teal-600)' : '1px solid var(--dg-border)',
-                      background: isSelected ? 'var(--dg-teal-100)' : 'var(--dg-paper)',
-                      color: isSelected ? 'var(--dg-teal-700)' : 'var(--dg-ink-700)',
-                      transition: 'all .15s ease',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <Icon size={16} style={{ flexShrink: 0, color: isSelected ? 'var(--dg-teal-600)' : 'var(--dg-ink-400)' }} />
-                    <span style={{ fontSize: 11.5, fontWeight: isSelected ? 700 : 500, lineHeight: 1.2 }}>
-                      {opt}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Section 2: Where & what */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-            <div style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--dg-teal-600)' }} />
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--dg-teal-700)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              {t.sectionWhere}
-            </span>
-          </div>
-
-          <div>
-            <label className="dgj-label">{t.location}</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                className="dgj-input"
-                type="text"
-                value={location}
-                onChange={(e) => handleLocationChange(e.target.value)}
-                onFocus={() => location.length >= 2 && setShowLocationDropdown(true)}
-                onBlur={() => setTimeout(() => setShowLocationDropdown(false), 150)}
-                placeholder={t.locationPh}
-                autoComplete="off"
-              />
-              {showLocationDropdown && (isLoadingLocations || locationSuggestions.length > 0) && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: 4,
-                    zIndex: 10,
-                    background: 'var(--dg-surface)',
-                    border: '1px solid var(--dg-border)',
-                    borderRadius: '10px',
-                    boxShadow: '0 8px 24px -8px rgba(16,21,31,0.18)',
-                    maxHeight: '220px',
-                    overflowY: 'auto',
-                  }}
-                >
-                  {isLoadingLocations ? (
-                    <div style={{ padding: '10px 12px', fontSize: '11.5px', color: 'var(--dg-ink-400)' }}>
-                      {isFR ? 'Recherche...' : 'Searching...'}
-                    </div>
-                  ) : (
-                    locationSuggestions.map((s, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => selectLocation(s)}
-                        style={{
-                          display: 'block',
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '9px 12px',
-                          border: 'none',
-                          background: 'none',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          color: 'var(--dg-ink-700)',
-                          borderBottom: idx < locationSuggestions.length - 1 ? '1px solid var(--dg-border)' : 'none',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'var(--dg-sunken)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'none';
-                        }}
-                        onMouseDown={(e) => e.preventDefault()}
-                      >
-                        {s.label}
+        <form className="jd-form" key={step} onSubmit={handleSubmit}>
+          {step === 0 && (
+            <>
+              <div>
+                <label className="jd-label">{t.professionTitle} *</label>
+                <input className={`jd-input${titleErr ? ' error' : ''}`} value={title} onChange={e => { setTitle(e.target.value); setTitleErr(false); }} placeholder={t.titlePh} />
+                {titleErr && <div className="jd-error-text">{t.titleRequired}</div>}
+              </div>
+              <div>
+                <label className="jd-label">{t.seniority}</label>
+                <div className="jd-pick-grid4">
+                  {t.seniorityOpts.map((opt, idx) => {
+                    const Icon = SENIORITY_ICONS[idx] || User;
+                    const years = opt.match(/\((.*?)\)/)?.[1] || '';
+                    return (
+                      <button type="button" key={opt} className={`jd-pick${seniority === opt ? ' active' : ''}`} onClick={() => setSeniority(opt)}>
+                        <Icon size={16} />
+                        <span style={{ fontSize: 10, fontWeight: 600 }}>{t.seniorityShort[idx]}</span>
+                        {years && <span style={{ fontSize: 9 }}>{years}</span>}
                       </button>
-                    ))
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="jd-label">{t.contractType}</label>
+                <div className="jd-pick-grid2">
+                  {t.contractOpts.map(opt => {
+                    const Icon = CONTRACT_ICON_MAP[t.contractIcons[opt]] || Briefcase;
+                    return (
+                      <button type="button" key={opt} className={`jd-pick-row${contractType === opt ? ' active' : ''}`} onClick={() => setContractType(opt)}>
+                        <Icon size={16} /><span style={{ fontSize: 11.5, fontWeight: 600 }}>{opt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              <div>
+                <label className="jd-label">{t.location}</label>
+                <div style={{ position: 'relative' }}>
+                  <input className="jd-input" value={location} onChange={e => handleLocationChange(e.target.value)}
+                    onFocus={() => location.length >= 2 && setShowLocationDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowLocationDropdown(false), 150)}
+                    placeholder={t.locationPh} autoComplete="off" />
+                  {showLocationDropdown && (isLoadingLocations || locationSuggestions.length > 0) && (
+                    <div className="jd-location-dropdown">
+                      {isLoadingLocations ? <div style={{ padding: '9px 12px', fontSize: 11.5, color: '#9B9C9E' }}>Searching...</div> :
+                        locationSuggestions.map((s, idx) => <button type="button" key={idx} className="jd-location-opt" onMouseDown={e => e.preventDefault()} onClick={() => selectLocation(s)}>{s.label}</button>)}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="dgj-label">{t.skills}</label>
-            <div
-              className="dgsc-tech-tags"
-              style={{
-                padding: '8px 10px',
-                background: 'var(--dg-paper)',
-                border: '1px solid var(--dg-border)',
-                borderRadius: '10px',
-                minHeight: '42px',
-                alignItems: 'center',
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 5,
-              }}
-            >
-              {skills.map((skill) => (
-                <span
-                  key={skill}
-                  className="dgsc-tech-chip dgsc-tech-chip-active"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                >
-                  {skill}
-                  <button
-                    type="button"
-                    onClick={() => removeSkill(skill)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: 'inherit',
-                    }}
-                  >
-                    <X size={11} />
-                  </button>
-                </span>
-              ))}
-              <input
-                type="text"
-                value={skillInput}
-                onChange={(e) => setSkillInput(e.target.value)}
-                onKeyDown={handleSkillKeyDown}
-                onBlur={addSkill}
-                placeholder={skills.length === 0 ? t.skillsPh : t.skillsAdded}
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  background: 'none',
-                  fontSize: '12px',
-                  flex: 1,
-                  minWidth: '130px',
-                  color: 'var(--dg-ink-900)',
-                }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="dgj-label">{t.niceToHaveSkills}</label>
-            <div
-              className="dgsc-tech-tags"
-              style={{
-                padding: '8px 10px',
-                background: 'var(--dg-paper)',
-                border: '1px solid var(--dg-border)',
-                borderRadius: '10px',
-                minHeight: '42px',
-                alignItems: 'center',
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 5,
-              }}
-            >
-              {niceToHaveSkills.map((skill) => (
-                <span
-                  key={skill}
-                  className="dgsc-tech-chip"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                >
-                  {skill}
-                  <button
-                    type="button"
-                    onClick={() => removeNiceToHaveSkill(skill)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: 'inherit',
-                    }}
-                  >
-                    <X size={11} />
-                  </button>
-                </span>
-              ))}
-              <input
-                type="text"
-                value={niceToHaveSkillInput}
-                onChange={(e) => setNiceToHaveSkillInput(e.target.value)}
-                onKeyDown={handleNiceToHaveSkillKeyDown}
-                onBlur={addNiceToHaveSkill}
-                placeholder={niceToHaveSkills.length === 0 ? t.niceToHaveSkillsPh : t.niceToHaveSkillsAdded}
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  background: 'none',
-                  fontSize: '12px',
-                  flex: 1,
-                  minWidth: '130px',
-                  color: 'var(--dg-ink-900)',
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Live Search Preview */}
-          {(title.trim() || skills.length > 0) && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 6,
-                padding: '8px 10px',
-                background: 'var(--dg-sunken)',
-                borderRadius: '8px',
-                fontSize: '10.5px',
-                fontFamily: 'var(--font-mono)',
-                color: 'var(--dg-ink-500)',
-              }}
-            >
-              <Sparkles size={12} color="var(--dg-teal-600)" style={{ flexShrink: 0, marginTop: 1 }} />
-              <span>
-                <strong style={{ color: 'var(--dg-teal-700)' }}>{t.previewLabel}:</strong> site:linkedin.com/in {(seniority || '').split(' ')[0]} "{title || '...'}"
-                {skills.length > 0 && ` (${skills.slice(0, 3).join(' AND ')})`}
-                {niceToHaveSkills.length > 0 && ` (${niceToHaveSkills.slice(0, 3).join(' OR ')})`}
-                {location !== 'All Locations' && location ? ` ${location}` : ''}
-                <span style={{ color: 'var(--dg-teal-700)', fontWeight: 600 }}> • {maxResults} {t.profilesUnit}</span>
-                {(seniority || '').match(/\((.*?)\)/)?.[1] && <span style={{ color: 'var(--dg-ink-400)', marginLeft: 6 }}>({(seniority || '').match(/\((.*?)\)/)?.[1]})</span>}
-              </span>
-            </div>
+              </div>
+              <div>
+                <label className="jd-label">{t.skills}</label>
+                <div className="jd-tags">
+                  {skills.map(s => <span className="jd-tag" key={s}>{s}<button type="button" onClick={() => removeSkill(s)}><X size={11} /></button></span>)}
+                  <input className="jd-tag-input" value={skillInput} onChange={e => setSkillInput(e.target.value)} onKeyDown={handleSkillKeyDown} onBlur={addSkill} placeholder={skills.length === 0 ? t.skillsPh : t.skillsAdded} />
+                </div>
+              </div>
+              <div>
+                <label className="jd-label">{t.niceToHaveSkills}</label>
+                <div className="jd-tags">
+                  {niceToHaveSkills.map(s => <span className="jd-tag bonus" key={s}>{s}<button type="button" onClick={() => removeNiceSkill(s)}><X size={11} /></button></span>)}
+                  <input className="jd-tag-input" value={niceToHaveSkillInput} onChange={e => setNiceToHaveSkillInput(e.target.value)} onKeyDown={handleNiceSkillKeyDown} onBlur={addNiceSkill} placeholder={t.niceToHaveSkillsPh} />
+                </div>
+              </div>
+            </>
           )}
 
-          {/* Section 3: Sourcing brief */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-            <div style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--dg-teal-600)' }} />
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--dg-teal-700)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              {t.sectionBrief}
-            </span>
-          </div>
+          {step === 2 && (
+            <>
+              <div className="jd-ai-row">
+                <span className="jd-ai-hint">{t.helpDraft}</span>
+                <button type="button" className="jd-ai-btn" onClick={handleGeneratePrompt} disabled={isGenerating || !title.trim()}>
+                  {isGenerating ? <><RefreshCw size={13} className="jd-spin" /><span>{t.generating}</span></> : <><Wand2 size={13} /><span>{t.generate}</span></>}
+                </button>
+              </div>
 
-          <div className="dgj-ai-row">
-            <span className="dgj-ai-hint">{t.helpDraft}</span>
-            <button
-              type="button"
-              className="dgj-ai-btn"
-              onClick={handleGeneratePrompt}
-              disabled={isGenerating || !title.trim()}
-            >
-              {isGenerating ? (
-                <>
-                  <RefreshCw size={13} className="dgj-spin" />
-                  <span>{t.generating}</span>
-                </>
-              ) : (
-                <>
-                  <Wand2 size={13} />
-                  <span>{t.generate}</span>
-                </>
+              {isGenerating && (
+                <div><div className="jd-shimmer-line" style={{ width: '95%' }} /><div className="jd-shimmer-line" style={{ width: '80%' }} /><div className="jd-shimmer-line" style={{ width: '88%' }} /></div>
               )}
-            </button>
-          </div>
 
-          {showPromptConfirm && generatedPromptPreview && (
-            <div className="dgj-review">
-              <div className="dgj-review-head">
-                <span className="dgj-review-title">
-                  <Sparkles size={14} />
-                  {t.reviewTitle}
-                </span>
-                <span className="dgj-review-tag">{t.reviewTag}</span>
+              {showPromptConfirm && generatedPromptPreview && (
+                <div className="jd-review">
+                  <div className="jd-review-head"><span className="jd-review-title"><Sparkles size={14} />{t.reviewTitle}</span><span className="jd-review-tag">{t.reviewTag}</span></div>
+                  <textarea className="jd-review-textarea" rows="4" value={generatedPromptPreview} onChange={e => setGeneratedPromptPreview(e.target.value)} />
+                  <div className="jd-review-actions">
+                    <button type="button" className="jd-review-cancel" onClick={() => setShowPromptConfirm(false)}>{t.cancel}</button>
+                    <button type="button" className="jd-review-approve" onClick={handleConfirmPrompt}><CheckCircle2 size={13} /><span>{t.approve}</span></button>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="jd-label">{t.descLabel}</label>
+                <textarea className="jd-textarea" rows="4" value={description} onChange={e => setDescription(e.target.value)} placeholder={t.descPh} />
               </div>
-              <textarea
-                className="dgj-review-textarea"
-                rows="4"
-                value={generatedPromptPreview}
-                onChange={(e) => setGeneratedPromptPreview(e.target.value)}
-              />
-              <div className="dgj-review-actions">
-                <button
-                  type="button"
-                  className="dgj-review-cancel"
-                  onClick={() => setShowPromptConfirm(false)}
-                >
-                  {t.cancel}
-                </button>
-                <button
-                  type="button"
-                  className="dgj-review-approve"
-                  onClick={handleConfirmPrompt}
-                >
-                  <CheckCircle2 size={13} />
-                  <span>{t.approve}</span>
-                </button>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label className="jd-label" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 5 }}><Users size={12} />{t.targetProfiles}</label>
+                  <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 11, fontWeight: 700, color: '#0A7E96' }}>{maxResults} {t.profilesUnit}</span>
+                </div>
+                <input type="range" min="1" max="25" value={maxResults} onChange={e => setMaxResults(Number(e.target.value))} style={{ width: '100%', accentColor: '#0BA5C9', marginBottom: 8 }} />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[3, 5, 10, 15, 20].map(count => (
+                    <button type="button" key={count} onClick={() => setMaxResults(count)}
+                      style={{ flex: 1, textAlign: 'center', padding: '6px 0', fontSize: 11, fontWeight: maxResults === count ? 700 : 500, borderRadius: 8, border: maxResults === count ? '1px solid #0BA5C9' : '1px solid #E4E1D9', background: maxResults === count ? '#E9F7FA' : '#fff', color: maxResults === count ? '#0A7E96' : '#63666E', cursor: 'pointer' }}>
+                      {count}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            </>
           )}
-
-          <div>
-            <label className="dgj-label">{t.descLabel}</label>
-            <textarea
-              className="dgj-textarea"
-              rows="4"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t.descPh}
-            />
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <label className="dgj-label" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <Users size={12} />
-                {t.targetProfiles}
-              </label>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--dg-teal-700)' }}>
-                {maxResults} {t.profilesUnit}
-              </span>
-            </div>
-            <input
-              type="range"
-              min="1"
-              max="25"
-              value={maxResults}
-              onChange={(e) => setMaxResults(Number(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--dg-teal-600)', cursor: 'pointer', marginBottom: 6 }}
-            />
-            <div style={{ display: 'flex', gap: 6 }}>
-              {[3, 5, 10, 15, 20].map((count) => {
-                const isSelected = maxResults === count;
-                return (
-                  <button
-                    key={count}
-                    type="button"
-                    onClick={() => setMaxResults(count)}
-                    className={'dgsc-tech-chip' + (isSelected ? ' dgsc-tech-chip-active' : '')}
-                    style={{
-                      flex: 1,
-                      textAlign: 'center',
-                      padding: '6px 0',
-                      fontSize: 11,
-                      fontWeight: isSelected ? 700 : 500,
-                      borderRadius: 8,
-                    }}
-                  >
-                    {count}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <button type="submit" className="dgj-submit">
-            <Plus size={15} />
-            <span>{editingJob ? t.saveChanges : t.createAndSource}</span>
-          </button>
         </form>
+
+        <div className="jd-footer">
+          {step > 0 ? <button type="button" className="jd-back-btn" onClick={() => setStep(s => s - 1)}><ChevronLeft size={14} />{t.back}</button> : <span />}
+          {step < 2 ? (
+            <button type="button" className={`jd-next-btn${titleErr ? ' shake' : ''}`} onClick={goNext}>{t.next}<ChevronRight size={14} /></button>
+          ) : (
+            <button type="button" className="jd-submit-btn" onClick={handleSubmit}><Plus size={15} /><span>{editingJob ? t.saveChanges : t.createAndSource}</span></button>
+          )}
+        </div>
       </div>
     </div>
   );

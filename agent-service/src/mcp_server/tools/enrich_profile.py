@@ -156,6 +156,28 @@ class EnrichedProfile(BaseModel):
 
     email_is_verified: bool = False
 
+    email_status: str | None = None
+
+    extrapolated_email_confidence: int | None = None
+
+    match_confidence: str | None = None
+
+    photo_url: str | None = None
+
+    linkedin_url: str | None = None
+
+    github_url: str | None = None
+
+    organization_name: str | None = None
+
+    organization_domain: str | None = None
+
+    organization_departments: list[str] = []
+
+    organization_functions: list[str] = []
+
+    organization_seniority: str | None = None
+
     education: list[EducationEntry] = []
 
     experience: list[ExperienceEntry] = []
@@ -1074,6 +1096,27 @@ def _parse_apollo_person(person: dict, snippet_hint: str = "") -> EnrichedProfil
 
 
 
+    # Extract organization details
+    org_domain = ""
+    org_departments = []
+    org_functions = []
+    org_seniority = ""
+    
+    if isinstance(person.get("organization"), dict):
+        org = person["organization"]
+        org_domain = (org.get("domain") or "").strip()
+        org_departments = org.get("departments") or []
+        org_functions = org.get("functions") or []
+        org_seniority = (org.get("seniority") or "").strip()
+
+    # Log what Apollo fields we're getting
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"[Apollo] Social URLs - twitter: {bool(person.get('twitter_url'))}, github: {bool(person.get('github_url'))}, facebook: {bool(person.get('facebook_url'))}, photo: {bool(person.get('photo_url'))}")
+    logger.info(f"[Apollo] Organization - name: {org_name}, domain: {org_domain}, seniority: {org_seniority}")
+
+
+
     return EnrichedProfile(
 
         full_name=full_name,
@@ -1085,6 +1128,32 @@ def _parse_apollo_person(person: dict, snippet_hint: str = "") -> EnrichedProfil
         email=valid_email,
 
         email_is_verified=bool(valid_email),
+
+        email_status=person.get("email_status"),
+
+        extrapolated_email_confidence=person.get("extrapolated_email_confidence"),
+
+        match_confidence=person.get("match_confidence"),
+
+        photo_url=person.get("photo_url"),
+
+        linkedin_url=person.get("linkedin_url"),
+
+        twitter_url=person.get("twitter_url"),
+
+        github_url=person.get("github_url"),
+
+        facebook_url=person.get("facebook_url"),
+
+        organization_name=org_name or None,
+
+        organization_domain=org_domain or None,
+
+        organization_departments=org_departments if isinstance(org_departments, list) else [],
+
+        organization_functions=org_functions if isinstance(org_functions, list) else [],
+
+        organization_seniority=org_seniority or None,
 
         education=[],
 

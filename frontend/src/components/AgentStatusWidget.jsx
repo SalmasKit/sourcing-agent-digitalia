@@ -1,135 +1,344 @@
-import React, { useEffect, useRef } from 'react';
-import { useLanguage } from '../context/LanguageContext';
-import { Cpu, CheckCircle2, Loader2, Sparkles, Database, Award } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Check,
+  Circle,
+  Search,
+  Sparkles,
+  UserSearch,
+} from "lucide-react";
 
-export function AgentStatusWidget({ currentStep = 2, totalCandidatesFound = 0 }) {
-  const { t } = useLanguage();
-  const fontsLoaded = useRef(false);
+const STEPS = [
+  {
+    id: 0,
+    title: "Understanding role",
+    description: "Reading requirements and priorities",
+    icon: Sparkles,
+  },
+  {
+    id: 1,
+    title: "Finding candidates",
+    description: "Searching relevant professional profiles",
+    icon: Search,
+  },
+  {
+    id: 2,
+    title: "Enriching profiles",
+    description: "Reviewing skills and experience signals",
+    icon: UserSearch,
+  },
+  {
+    id: 3,
+    title: "Ranking matches",
+    description: "Ordering candidates by role relevance",
+    icon: Sparkles,
+  },
+];
+
+const AgentStatusWidget = ({
+  currentStep = 0,
+  totalCandidatesFound = 0,
+}) => {
+  /*
+   * Smoothly animate the visual progress rather than showing
+   * raw fake command logs.
+   */
+  const safeStep = Math.min(
+    Math.max(Number(currentStep) || 0, 0),
+    STEPS.length - 1
+  );
+
+  const [visualStep, setVisualStep] =
+    useState(safeStep);
 
   useEffect(() => {
-    if (fontsLoaded.current) return;
-    fontsLoaded.current = true;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href =
-      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
-    document.head.appendChild(link);
-  }, []);
+    setVisualStep(safeStep);
+  }, [safeStep]);
 
-  const steps = [
-    { id: 1, label: t('step1Label'), desc: t('step1Desc'), icon: Sparkles },
-    { id: 2, label: t('step2Label'), desc: t('step2Desc'), icon: Database },
-    { id: 3, label: t('step3Label'), desc: t('step3Desc'), icon: Cpu },
-    { id: 4, label: t('step4Label'), desc: t('step4Desc'), icon: Award },
-  ];
+  const progress = useMemo(() => {
+    return ((visualStep + 1) / STEPS.length) * 100;
+  }, [visualStep]);
+
+  const current = STEPS[visualStep];
+  const CurrentIcon = current.icon;
 
   return (
-    <div className="dg-root dgas-root">
-      <style>{`
-        .dg-root {
-          --dg-paper: #F6F7F9; --dg-surface: #FFFFFF; --dg-sunken: #EFF1F4;
-          --dg-border: #E3E6EB; --dg-border-strong: #CBD2DC;
-          --dg-ink-900: #10151F; --dg-ink-700: #38414F; --dg-ink-500: #6B7280; --dg-ink-400: #96A0AC;
-          --dg-teal-700: #0A5C68; --dg-teal-600: #0E7C8C; --dg-teal-100: #E1F2F3;
-          --dg-green-700: #1F6E4A; --dg-green-600: #278F5E; --dg-green-100: #E3F5EC;
-          --font-display: 'Space Grotesk', 'Inter', sans-serif;
-          --font-body: 'Inter', system-ui, sans-serif;
-          --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-          font-family: var(--font-body); color: var(--dg-ink-900);
-        }
-        .dg-display { font-family: var(--font-display); letter-spacing: -0.01em; }
-        .dg-mono { font-family: var(--font-mono); }
+    <div className="agent-progress">
+      <style>{styles}</style>
 
-        .dgas-root {
-          background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 18px;
-          padding: 20px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 16px;
-        }
+      <div className="agent-progress-top">
+        <div className="agent-current">
+          <div className="agent-current-icon">
+            <CurrentIcon size={15} />
+          </div>
 
-        .dgas-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-        .dgas-top-left { display: flex; align-items: center; gap: 12px; }
-        .dgas-icon {
-          width: 38px; height: 38px; border-radius: 11px; background: var(--dg-teal-100); color: var(--dg-teal-700);
-          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        }
-        .dgas-title { font-size: 15px; font-weight: 700; color: var(--dg-ink-900); display: flex; align-items: center; gap: 8px; }
-        .dgas-active-pill {
-          font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: var(--dg-green-700);
-          background: var(--dg-green-100); border: 1px solid rgba(31,110,74,0.25); padding: 2px 7px; border-radius: 6px;
-        }
-        .dgas-sub { font-size: 11.5px; color: var(--dg-ink-500); margin-top: 2px; }
-
-        .dgas-count-box { text-align: right; }
-        .dgas-count-label { font-size: 10px; font-weight: 700; color: var(--dg-ink-400); text-transform: uppercase; letter-spacing: 0.05em; }
-        .dgas-count-val { font-size: 16px; font-weight: 700; color: var(--dg-teal-700); }
-
-        .dgas-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        .dgas-step {
-          background: var(--dg-paper); border: 1px solid var(--dg-border); border-radius: 12px;
-          padding: 12px; display: flex; flex-direction: column; gap: 6px; transition: border-color .15s ease, background .15s ease;
-        }
-        .dgas-step-current { background: var(--dg-teal-100); border-color: rgba(14,124,140,0.3); }
-        .dgas-step-done { background: var(--dg-surface); border-color: var(--dg-border); }
-
-        .dgas-step-head { display: flex; align-items: center; justify-content: space-between; }
-        .dgas-step-num { font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--dg-ink-400); }
-        .dgas-step-title { font-size: 12px; font-weight: 700; color: var(--dg-ink-900); }
-        .dgas-step-desc { font-size: 10.5px; color: var(--dg-ink-500); line-height: 1.3; }
-
-        @media (max-width: 768px) {
-          .dgas-steps { grid-template-columns: repeat(2, 1fr); }
-        }
-      `}</style>
-
-      <div className="dgas-top">
-        <div className="dgas-top-left">
-          <div className="dgas-icon"><Cpu size={18} /></div>
           <div>
-            <div className="dgas-title dg-display">
-              <span>{t('pipelineTitle')}</span>
-              <span className="dgas-active-pill">{t('activeProcess')}</span>
+            <div className="agent-current-title">
+              <span className="agent-live-dot" />
+
+              <strong>{current.title}</strong>
+
+              <span className="agent-step-number">
+                Step {visualStep + 1} of{" "}
+                {STEPS.length}
+              </span>
             </div>
-            <div className="dgas-sub">{t('pipelineDesc')}</div>
+
+            <p>{current.description}</p>
           </div>
         </div>
 
-        <div className="dgas-count-box">
-          <div className="dgas-count-label">{t('totalEvaluated')}</div>
-          <div className="dgas-count-val dg-display">{totalCandidatesFound} Candidates</div>
-        </div>
+        {totalCandidatesFound > 0 && (
+          <div className="agent-found">
+            <strong>{totalCandidatesFound}</strong>
+
+            <span>
+              candidate
+              {totalCandidatesFound === 1
+                ? ""
+                : "s"}{" "}
+              found
+            </span>
+          </div>
+        )}
       </div>
 
-      <div className="dgas-steps">
-        {steps.map((step) => {
-          const IconComponent = step.icon;
-          const isDone = step.id < currentStep;
-          const isCurrent = step.id === currentStep;
+      <div className="agent-track">
+        <div
+          className="agent-track-progress"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      <div className="agent-steps">
+        {STEPS.map((step, index) => {
+          const completed = index < visualStep;
+          const active = index === visualStep;
+          const StepIcon = step.icon;
 
           return (
             <div
               key={step.id}
-              className={'dgas-step' + (isCurrent ? ' dgas-step-current' : isDone ? ' dgas-step-done' : '')}
+              className={[
+                "agent-step",
+                completed
+                  ? "agent-step-complete"
+                  : "",
+                active ? "agent-step-active" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
             >
-              <div className="dgas-step-head">
-                <span className="dgas-step-num">STEP 0{step.id}</span>
-                {isDone ? (
-                  <CheckCircle2 size={14} color="var(--dg-green-600)" />
-                ) : isCurrent ? (
-                  <Loader2 size={14} color="var(--dg-teal-600)" style={{ animation: 'spin 1s linear infinite' }} />
+              <div className="agent-step-marker">
+                {completed ? (
+                  <Check size={10} />
+                ) : active ? (
+                  <StepIcon size={10} />
                 ) : (
-                  <IconComponent size={14} color="var(--dg-ink-400)" />
+                  <Circle size={7} />
                 )}
               </div>
 
-              <div className="dgas-step-title dg-display">{step.label}</div>
-              <div className="dgas-step-desc">{step.desc}</div>
+              <span>{step.title}</span>
             </div>
           );
         })}
       </div>
-
     </div>
   );
+};
+
+const styles = `
+.agent-progress {
+  --cyan: #0BA5C9;
+  --cyan-dark: #087F9B;
+  --cyan-soft: #EBF9FC;
+  --border: #E5E2DB;
+  --ink: #171A20;
+  --muted: #757980;
+
+  padding: 13px 15px 11px;
+  margin-bottom: 13px;
+  border: 1px solid #DCE8E9;
+  border-radius: 10px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(11,165,201,.035),
+      rgba(255,255,255,0) 45%
+    ),
+    #FCFCFA;
+  font-family: Inter, sans-serif;
 }
 
-export default AgentStatusWidget;
+.agent-progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
 
+.agent-current {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-current-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 31px;
+  height: 31px;
+  flex: 0 0 auto;
+  border: 1px solid #D1EAF0;
+  border-radius: 8px;
+  background: var(--cyan-soft);
+  color: var(--cyan-dark);
+}
+
+.agent-current-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-current-title strong {
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.agent-step-number {
+  color: #909398;
+  font-size: 8px;
+}
+
+.agent-current p {
+  margin: 3px 0 0 13px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.agent-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 0 4px rgba(11,165,201,.10);
+  animation: agentPulse 1.4s ease-in-out infinite;
+}
+
+.agent-found {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.agent-found strong {
+  color: var(--cyan-dark);
+  font-family: "Space Grotesk", Inter, sans-serif;
+  font-size: 14px;
+}
+
+.agent-found span {
+  color: #86898E;
+  font-size: 8px;
+}
+
+.agent-track {
+  overflow: hidden;
+  height: 3px;
+  margin-top: 11px;
+  border-radius: 999px;
+  background: #EDECE8;
+}
+
+.agent-track-progress {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--cyan);
+  transition:
+    width .45s cubic-bezier(.4,0,.2,1);
+}
+
+.agent-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 9px;
+}
+
+.agent-step {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: #A0A2A6;
+}
+
+.agent-step-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 1px solid #DDDBD6;
+  border-radius: 50%;
+  background: white;
+  color: #ACADB0;
+}
+
+.agent-step span {
+  overflow: hidden;
+  font-size: 7.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-step-active {
+  color: var(--cyan-dark);
+}
+
+.agent-step-active .agent-step-marker {
+  border-color: #BDE2E9;
+  background: var(--cyan-soft);
+  color: var(--cyan-dark);
+}
+
+.agent-step-complete {
+  color: #62666C;
+}
+
+.agent-step-complete .agent-step-marker {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  color: white;
+}
+
+@keyframes agentPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .38;
+  }
+}
+
+@media (max-width: 700px) {
+  .agent-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .agent-found {
+    display: none;
+  }
+}
+`;
+
+export default AgentStatusWidget;

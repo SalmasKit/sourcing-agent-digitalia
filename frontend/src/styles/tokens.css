@@ -1,0 +1,54 @@
+/* ==========================================================
+   tokens.css — Global design-system CSS custom properties.
+
+   Split into two layers:
+     1. Digitalia component design system (dg-* tokens used
+        inside component <style> blocks).
+     2. Score tier tokens consumed by CandidateCard, the
+        carousel score arc, and AgentStatusWidget.
+   ========================================================== */
+
+:root {
+  /* ── Digitalia design system ───────────────────────────── */
+  --dg-paper:         #F6F7F9;
+  --dg-surface:       #FFFFFF;
+  --dg-sunken:        #EFF1F4;
+  --dg-border:        #E3E6EB;
+  --dg-border-strong: #CBD2DC;
+
+  --dg-ink-900: #10151F;
+  --dg-ink-700: #38414F;
+  --dg-ink-500: #6B7280;
+  --dg-ink-400: #96A0AC;
+
+  --dg-teal-700: #0A5C68;
+  --dg-teal-600: #0E7C8C;
+  --dg-teal-100: #E1F2F3;
+
+  --dg-bronze-700: #8A4B0C;
+  --dg-bronze-600: #B4650F;
+  --dg-bronze-100: #FBEEDD;
+
+  --dg-green-700: #1F6E4A;
+  --dg-green-600: #278F5E;
+  --dg-green-100: #E3F5EC;
+
+  --dg-danger:    #B3261E;
+  --dg-danger-bg: #FBEAE9;
+
+  /* ── Score tier tokens ─────────────────────────────────── */
+  /* Hot  ≥ 90 — vivid emerald, the one loud colour in the UI */
+  --score-hot:      #10B981;
+  --score-hot-bg:   #D1FAE5;
+  --score-hot-glow: rgba(16, 185, 129, 0.45);
+
+  /* Good ≥ 80 — teal (brand) */
+  --score-good:      #0E7C8C;
+  --score-good-bg:   #E1F2F3;
+  --score-good-glow: rgba(14, 124, 140, 0.35);
+
+  /* Avg  < 80 — amber */
+  --score-avg:      #D97706;
+  --score-avg-bg:   #FEF3C7;
+  --score-avg-glow: rgba(217, 119, 6, 0.30);
+}

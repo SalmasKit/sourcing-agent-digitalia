@@ -223,8 +223,8 @@ export default function AuthPage() {
   const handleSandbox = async (sandboxRole) => {
     setError('');
     setLoading(true);
-    const demoEmail = sandboxRole === 'RECRUITER' ? 'salma.barrak@digitalia.io' : 'sarah.connor@digitalia.io';
-    const demoName  = sandboxRole === 'RECRUITER' ? 'Salma Barrak' : 'Sarah Connor';
+    const demoEmail = sandboxRole === 'RECRUITER' ? 'recruiter@digitalia.io' : 'hr@digitalia.io';
+    const demoName  = sandboxRole === 'RECRUITER' ? 'Recruiter User' : 'HR Admin';
     try {
       await login(demoEmail, 'SecurePassword123!');
     } catch {

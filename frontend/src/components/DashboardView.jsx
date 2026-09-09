@@ -1,106 +1,320 @@
-import React, { useMemo, useEffect, useRef } from 'react';
+/**
+ * DashboardView — workspace redesign
+ *
+ * Design direction:
+ *  - One coherent dashboard instead of a collection of equal cards.
+ *  - Cyan is the only accent, matching the candidate UI.
+ *  - Large editorial hero with a dominant match-quality metric.
+ *  - Pipeline becomes an interactive journey.
+ *  - Candidates become a horizontal ranked queue.
+ *  - Jobs/searches become a compact activity workspace.
+ *  - AI performance is integrated into the dashboard rather than another card.
+ *
+ * Interactions:
+ *  - Pipeline stages filter the dashboard.
+ *  - "Clear" removes the stage filter.
+ *  - Candidate rows/cards are clickable.
+ *  - Job rows are selectable.
+ *  - Search history can be rerun.
+ *  - Score distribution segments are clickable.
+ */
+
+import React, {
+  useMemo,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
 import {
-  Users, FileText, TrendingUp, Target, CheckCircle2, BarChart3,
-  Award, ArrowUpRight, Search, BookmarkCheck, Star, Sparkles
+  Users,
+  FileText,
+  TrendingUp,
+  BookmarkCheck,
+  Search,
+  Sparkles,
+  RotateCw,
+  ArrowUpRight,
+  ChevronRight,
+  SlidersHorizontal,
+  Activity,
+  Target,
+  BriefcaseBusiness,
+  Check,
+  X,
 } from 'lucide-react';
 
-import { useLanguage } from '../context/LanguageContext';
-import { getAvatarUrl as getAvatarUrlUtil } from '../utils/avatar';
-
-function getAvatarUrl(name, avatarUrl) {
-  return getAvatarUrlUtil(name, avatarUrl);
+function useLanguage() {
+  return { lang: 'EN' };
 }
 
-/* ------------------------------------------------------------------
-   Copy
-   ------------------------------------------------------------------ */
+function getAvatarUrl(name) {
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+    name || 'Candidate'
+  )}&backgroundColor=12151B&textColor=ffffff&fontWeight=600&fontSize=38`;
+}
+
 const COPY = {
   EN: {
-    welcome: (n) => `Welcome back, ${n}`,
-    workspaceNote: 'Metrics scoped to your workspace',
-    dashboardTag: 'Dedicated analytics',
-    dashboardSub: 'Isolated to your account',
-    activeJDs: 'Active job descriptions', totalOf: (n) => `${n} total`,
-    sourced: 'Sourced candidates', inPool: 'in talent pool',
-    shortlisted: 'Shortlisted', ofPool: 'of pool',
-    avgScore: 'Avg AI match score', matchAccuracy: 'matching accuracy',
-    pipeline: 'Recruitment pipeline', allRoles: 'All roles',
-    shortlistRate: 'Shortlist rate', interviewRate: 'Interview rate', hireRate: 'Hire rate',
-    scoreDist: 'AI score distribution',
-    topCandidate: 'Top candidate', matchScoreLbl: 'Match score', exp: 'yrs exp.',
+    eyebrow: 'RECRUITING OVERVIEW',
+    welcome: (n) => `Good to see you, ${n}`,
+    workspaceNote: 'Your hiring workspace',
+    matchQuality: 'Average match',
+    activeJDs: 'Active roles',
+    sourced: 'Candidates',
+    shortlisted: 'Shortlisted',
+
+    pipeline: 'Pipeline',
+    allStages: 'All stages',
+    clearFilter: 'Clear',
+    candidates: 'candidates',
+
+    leaderboard: 'Highest matches',
     noCandidates: 'No candidates sourced yet',
-    jdTitle: 'Job descriptions', noJDs: 'No job descriptions yet', saved: 'saved', more: 'more',
-    recentSearches: 'Recent searches', noSearches: 'No searches yet', results: 'results',
-    agentPerf: 'AI agent performance', agentSub: 'Real-time sourcing agent metrics',
-    totalSearches: 'Total searches', avgMatch: 'Avg match score', inPipeline: 'In pipeline', profilesSourced: 'Profiles sourced',
-    stages: { new: 'New', contacted: 'Contacted', interview: 'Interview', offer: 'Offer', hired: 'Hired' },
+    viewAll: 'View all',
+
+    scoreDist: 'Match distribution',
+    scoreHint: 'Click a range to focus',
+
+    activity: 'Workspace activity',
+    jobsTab: 'Roles',
+    searchesTab: 'Searches',
+
+    noJDs: 'No job descriptions yet',
+    noSearches: 'No searches yet',
+
+    saved: 'shortlisted',
+    results: 'results',
+
+    rerun: 'Rerun search',
+
+    agent: 'AI sourcing',
+    searches: 'searches',
+    avgMatch: 'avg match',
+    inPipeline: 'in pipeline',
+    profiles: 'profiles',
+
+    selected: 'Selected',
+    stage: 'Stage',
+
+    stages: {
+      new: 'New',
+      contacted: 'Contacted',
+      interview: 'Interview',
+      offer: 'Offer',
+      hired: 'Hired',
+    },
+
+    ranges: {
+      high: '90–100',
+      strong: '80–89',
+      potential: '70–79',
+      low: '<70',
+    },
   },
+
   FR: {
-    welcome: (n) => `Bienvenue, ${n}`,
-    workspaceNote: 'Statistiques propres à votre espace',
-    dashboardTag: 'Tableau de bord dédié',
-    dashboardSub: 'Isolé à votre compte',
-    activeJDs: 'Fiches de poste actives', totalOf: (n) => `${n} au total`,
-    sourced: 'Candidats sourcés', inPool: 'dans le vivier',
-    shortlisted: 'En shortlist', ofPool: 'du vivier',
-    avgScore: 'Score moyen IA', matchAccuracy: 'précision de matching',
-    pipeline: 'Pipeline de recrutement', allRoles: 'Tous les postes',
-    shortlistRate: 'Taux shortlist', interviewRate: 'En entretien', hireRate: "Taux d'embauche",
-    scoreDist: 'Distribution des scores',
-    topCandidate: 'Meilleur profil', matchScoreLbl: 'Score de correspondance', exp: 'ans exp.',
+    eyebrow: 'VUE DU RECRUTEMENT',
+    welcome: (n) => `Ravi de vous revoir, ${n}`,
+    workspaceNote: 'Votre espace de recrutement',
+    matchQuality: 'Score moyen',
+    activeJDs: 'Postes actifs',
+    sourced: 'Candidats',
+    shortlisted: 'Shortlist',
+
+    pipeline: 'Pipeline',
+    allStages: 'Toutes les étapes',
+    clearFilter: 'Effacer',
+    candidates: 'candidats',
+
+    leaderboard: 'Meilleures correspondances',
     noCandidates: 'Aucun candidat sourcé',
-    jdTitle: 'Fiches de poste', noJDs: 'Aucune fiche de poste créée', saved: 'sauvés', more: 'autres',
-    recentSearches: 'Recherches récentes', noSearches: 'Aucune recherche effectuée', results: 'résultats',
-    agentPerf: "Performance de l'agent IA", agentSub: "Métriques de l'agent en temps réel",
-    totalSearches: 'Recherches totales', avgMatch: 'Score moyen', inPipeline: 'Dans le pipeline', profilesSourced: 'Profils sourcés',
-    stages: { new: 'Nouveau', contacted: 'Contacté', interview: 'Entretien', offer: 'Offre', hired: 'Recruté' },
+    viewAll: 'Voir tout',
+
+    scoreDist: 'Distribution des scores',
+    scoreHint: 'Cliquez sur une plage pour filtrer',
+
+    activity: 'Activité',
+    jobsTab: 'Postes',
+    searchesTab: 'Recherches',
+
+    noJDs: 'Aucune fiche de poste',
+    noSearches: 'Aucune recherche',
+
+    saved: 'shortlistés',
+    results: 'résultats',
+
+    rerun: 'Relancer',
+
+    agent: 'Sourcing IA',
+    searches: 'recherches',
+    avgMatch: 'score moyen',
+    inPipeline: 'pipeline',
+    profiles: 'profils',
+
+    selected: 'Sélectionné',
+    stage: 'Étape',
+
+    stages: {
+      new: 'Nouveau',
+      contacted: 'Contacté',
+      interview: 'Entretien',
+      offer: 'Offre',
+      hired: 'Recruté',
+    },
+
+    ranges: {
+      high: '90–100',
+      strong: '80–89',
+      potential: '70–79',
+      low: '<70',
+    },
   },
 };
 
-/* ------------------------------------------------------------------
-   Small chart primitives
-   ------------------------------------------------------------------ */
-function DonutRing({ percentage, size = 92 }) {
-  const r = 30;
-  const circumference = 2 * Math.PI * r;
-  const offset = circumference - (percentage / 100) * circumference;
-  return (
-    <svg width={size} height={size} viewBox="0 0 70 70">
-      <circle cx="35" cy="35" r={r} fill="none" stroke="var(--dg-sunken)" strokeWidth="7" />
-      <circle
-        cx="35" cy="35" r={r} fill="none" stroke="var(--dg-teal-600)" strokeWidth="7"
-        strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
-        transform="rotate(-90 35 35)" style={{ transition: 'stroke-dashoffset 1s ease-in-out' }}
-      />
-      <text x="35" y="39" textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--dg-ink-900)" fontFamily="var(--font-display)">
-        {percentage}%
-      </text>
-    </svg>
-  );
+/* -------------------------------------------------------
+   Count-up
+------------------------------------------------------- */
+
+function useCountUp(target, duration = 700) {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    let frame;
+    let start = null;
+
+    const step = (timestamp) => {
+      if (!start) start = timestamp;
+
+      const progress = Math.min(
+        (timestamp - start) / duration,
+        1
+      );
+
+      setValue(Math.round(progress * target));
+
+      if (progress < 1) {
+        frame = requestAnimationFrame(step);
+      }
+    };
+
+    frame = requestAnimationFrame(step);
+
+    return () => cancelAnimationFrame(frame);
+  }, [target, duration]);
+
+  return value;
 }
 
-function KpiCard({ icon: Icon, label, value, sub, trend, tone = 'teal' }) {
+/* -------------------------------------------------------
+   Match Ring
+------------------------------------------------------- */
+
+function MatchRing({ percentage, size = 138 }) {
+  const [drawn, setDrawn] = useState(0);
+
+  const radius = 53;
+  const circumference = 2 * Math.PI * radius;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDrawn(percentage);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [percentage]);
+
   return (
-    <div className="dgd-kpi">
-      <div className="dgd-kpi-top">
-        <div className={`dgd-kpi-icon dgd-tone-${tone}`}><Icon size={16} /></div>
-        {trend != null && (
-          <span className={'dgd-trend ' + (trend >= 0 ? 'dgd-trend-up' : 'dgd-trend-down')}>
-            <ArrowUpRight size={11} style={{ transform: trend < 0 ? 'rotate(90deg)' : 'none' }} />
-            {Math.abs(trend)}%
-          </span>
-        )}
-      </div>
-      <div className="dgd-kpi-value dg-display">{value}</div>
-      <div className="dgd-kpi-label">{label}</div>
-      {sub && <div className="dgd-kpi-sub">{sub}</div>}
+    <div className="db3-ring">
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 132 132"
+      >
+        <circle
+          cx="66"
+          cy="66"
+          r={radius}
+          fill="none"
+          stroke="rgba(255,255,255,0.10)"
+          strokeWidth="9"
+        />
+
+        <circle
+          cx="66"
+          cy="66"
+          r={radius}
+          fill="none"
+          stroke="#0BA5C9"
+          strokeWidth="9"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={
+            circumference -
+            (drawn / 100) * circumference
+          }
+          transform="rotate(-90 66 66)"
+          style={{
+            transition:
+              'stroke-dashoffset 1s cubic-bezier(.22,1,.36,1)',
+          }}
+        />
+
+        <text
+          x="66"
+          y="61"
+          textAnchor="middle"
+          fontSize="29"
+          fontWeight="700"
+          fill="#fff"
+          fontFamily="'Space Grotesk', sans-serif"
+        >
+          {percentage}%
+        </text>
+
+        <text
+          x="66"
+          y="78"
+          textAnchor="middle"
+          fontSize="8.5"
+          fontWeight="600"
+          fill="rgba(255,255,255,.48)"
+          fontFamily="'JetBrains Mono', monospace"
+        >
+          MATCH
+        </text>
+      </svg>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------
-   Main component
-   ------------------------------------------------------------------ */
+/* -------------------------------------------------------
+   Fonts
+------------------------------------------------------- */
+
+function useFonts() {
+  const loaded = useRef(false);
+
+  useEffect(() => {
+    if (loaded.current) return;
+
+    loaded.current = true;
+
+    const link = document.createElement('link');
+
+    link.rel = 'stylesheet';
+
+    link.href =
+      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap';
+
+    document.head.appendChild(link);
+  }, []);
+}
+
+/* -------------------------------------------------------
+   Main
+------------------------------------------------------- */
+
 export function DashboardView({
   user = null,
   jobDescriptions = [],
@@ -108,432 +322,2351 @@ export function DashboardView({
   savedRoleCandidates = {},
   candidatePipelineStage = {},
   searchHistory = [],
-  lang: langProp = null,
-}) {
-  const langContext = useLanguage();
-  const currentLang = langProp || langContext?.lang || 'EN';
-  const t = COPY[currentLang] || COPY.EN;
-  const fontsLoaded = useRef(false);
 
-  useEffect(() => {
-    if (fontsLoaded.current) return;
-    fontsLoaded.current = true;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href =
-      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
-    document.head.appendChild(link);
-  }, []);
+  lang: langProp = null,
+
+  onStageClick = null,
+  onSelectJob = null,
+  onRerunSearch = null,
+  onSelectCandidate = null,
+}) {
+  useFonts();
+
+  const langContext = useLanguage();
+
+  const t =
+    COPY[langProp || langContext?.lang || 'EN'] ||
+    COPY.EN;
+
+  const [focusedStage, setFocusedStage] =
+    useState(null);
+
+  const [selectedJobId, setSelectedJobId] =
+    useState(null);
+
+  const [selectedRange, setSelectedRange] =
+    useState(null);
+
+  const [activityTab, setActivityTab] =
+    useState(0);
+
+  /* -------------------------------------------------------
+     Stats
+  ------------------------------------------------------- */
 
   const stats = useMemo(() => {
     const totalJDs = jobDescriptions.length;
-    const activeJDs = jobDescriptions.filter((j) => j.status !== 'archived').length;
+
+    const activeJDs =
+      jobDescriptions.filter(
+        (job) => job.status !== 'archived'
+      ).length;
+
     const totalCandidates = candidates.length;
 
-    const allSavedIds = Object.values(savedRoleCandidates).flat();
-    const uniqueSavedCount = new Set(allSavedIds).size;
+    const uniqueSavedCount =
+      new Set(
+        Object.values(savedRoleCandidates).flat()
+      ).size;
 
-    const avgScore = totalCandidates > 0
-      ? Math.round(candidates.reduce((sum, c) => sum + (c.matchScore || 0), 0) / totalCandidates)
-      : 0;
+    const avgScore =
+      totalCandidates > 0
+        ? Math.round(
+            candidates.reduce(
+              (sum, candidate) =>
+                sum + (candidate.matchScore || 0),
+              0
+            ) / totalCandidates
+          )
+        : 0;
 
-    const shortlistRate = totalCandidates > 0
-      ? Math.round((uniqueSavedCount / totalCandidates) * 100)
-      : 0;
+    const ranked = [...candidates].sort(
+      (a, b) =>
+        (b.matchScore || 0) -
+        (a.matchScore || 0)
+    );
 
-    const topCandidate = [...candidates].sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))[0];
+    const stages = [
+      'new',
+      'contacted',
+      'interview',
+      'offer',
+      'hired',
+    ].reduce((acc, key) => {
+      acc[key] = candidates.filter(
+        (candidate) =>
+          candidatePipelineStage[candidate.id] === key
+      ).length;
 
-    const pipelineStages = {
-      new: candidates.filter((c) => candidatePipelineStage[c.id] === 'new').length,
-      contacted: candidates.filter((c) => candidatePipelineStage[c.id] === 'contacted').length,
-      interview: candidates.filter((c) => candidatePipelineStage[c.id] === 'interview').length,
-      offer: candidates.filter((c) => candidatePipelineStage[c.id] === 'offer').length,
-      hired: candidates.filter((c) => candidatePipelineStage[c.id] === 'hired').length,
-      rejected: candidates.filter((c) => candidatePipelineStage[c.id] === 'rejected').length,
-    };
-    const totalInPipeline = Object.values(pipelineStages).reduce((a, b) => a + b, 0);
+      return acc;
+    }, {});
+
+    const totalInPipeline =
+      Object.values(stages).reduce(
+        (a, b) => a + b,
+        0
+      );
 
     const scoreDist = [
-      { key: '90-100', label: '90-100', value: candidates.filter((c) => c.matchScore >= 90).length },
-      { key: '80-89', label: '80-89', value: candidates.filter((c) => c.matchScore >= 80 && c.matchScore < 90).length },
-      { key: '70-79', label: '70-79', value: candidates.filter((c) => c.matchScore >= 70 && c.matchScore < 80).length },
-      { key: '<70', label: '<70', value: candidates.filter((c) => c.matchScore < 70).length },
+      {
+        key: 'high',
+        label: t.ranges.high,
+        value: candidates.filter(
+          (c) => (c.matchScore || 0) >= 90
+        ).length,
+      },
+      {
+        key: 'strong',
+        label: t.ranges.strong,
+        value: candidates.filter(
+          (c) =>
+            (c.matchScore || 0) >= 80 &&
+            (c.matchScore || 0) < 90
+        ).length,
+      },
+      {
+        key: 'potential',
+        label: t.ranges.potential,
+        value: candidates.filter(
+          (c) =>
+            (c.matchScore || 0) >= 70 &&
+            (c.matchScore || 0) < 80
+        ).length,
+      },
+      {
+        key: 'low',
+        label: t.ranges.low,
+        value: candidates.filter(
+          (c) => (c.matchScore || 0) < 70
+        ).length,
+      },
     ];
 
     return {
-      totalJDs, activeJDs, totalCandidates, uniqueSavedCount,
-      avgScore, shortlistRate, topCandidate, pipelineStages, totalInPipeline, scoreDist,
+      totalJDs,
+      activeJDs,
+      totalCandidates,
+      uniqueSavedCount,
+      avgScore,
+      ranked,
+      stages,
+      totalInPipeline,
+      scoreDist,
     };
-  }, [jobDescriptions, candidates, savedRoleCandidates, candidatePipelineStage]);
+  }, [
+    jobDescriptions,
+    candidates,
+    savedRoleCandidates,
+    candidatePipelineStage,
+    t,
+  ]);
 
-  const pipelineData = [
-    { key: 'new', label: t.stages.new, value: stats.pipelineStages.new, tone: 'neutral' },
-    { key: 'contacted', label: t.stages.contacted, value: stats.pipelineStages.contacted, tone: 'teal-light' },
-    { key: 'interview', label: t.stages.interview, value: stats.pipelineStages.interview, tone: 'bronze-light' },
-    { key: 'offer', label: t.stages.offer, value: stats.pipelineStages.offer, tone: 'bronze' },
-    { key: 'hired', label: t.stages.hired, value: stats.pipelineStages.hired, tone: 'green' },
+  /* -------------------------------------------------------
+     Pipeline
+  ------------------------------------------------------- */
+
+  const funnel = [
+    {
+      key: 'new',
+      label: t.stages.new,
+      value: stats.stages.new,
+    },
+    {
+      key: 'contacted',
+      label: t.stages.contacted,
+      value: stats.stages.contacted,
+    },
+    {
+      key: 'interview',
+      label: t.stages.interview,
+      value: stats.stages.interview,
+    },
+    {
+      key: 'offer',
+      label: t.stages.offer,
+      value: stats.stages.offer,
+    },
+    {
+      key: 'hired',
+      label: t.stages.hired,
+      value: stats.stages.hired,
+    },
   ];
-  const maxPipeline = Math.max(...pipelineData.map((d) => d.value), 1);
-  const recentSearches = [...searchHistory].reverse().slice(0, 5);
-  const roleIsHR = user?.role === 'HR_ADMIN';
+
+  /* -------------------------------------------------------
+     Animated stats
+  ------------------------------------------------------- */
+
+  const activeJDsCount =
+    useCountUp(stats.activeJDs);
+
+  const sourcedCount =
+    useCountUp(stats.totalCandidates);
+
+  const shortlistedCount =
+    useCountUp(stats.uniqueSavedCount);
+
+  /* -------------------------------------------------------
+     Filtered candidates
+  ------------------------------------------------------- */
+
+  const filteredCandidates = useMemo(() => {
+    let result = stats.ranked;
+
+    if (focusedStage) {
+      result = result.filter(
+        (candidate) =>
+          candidatePipelineStage[candidate.id] ===
+          focusedStage
+      );
+    }
+
+    if (selectedRange) {
+      result = result.filter((candidate) => {
+        const score = candidate.matchScore || 0;
+
+        if (selectedRange === 'high') {
+          return score >= 90;
+        }
+
+        if (selectedRange === 'strong') {
+          return score >= 80 && score < 90;
+        }
+
+        if (selectedRange === 'potential') {
+          return score >= 70 && score < 80;
+        }
+
+        return score < 70;
+      });
+    }
+
+    return result;
+  }, [
+    stats.ranked,
+    focusedStage,
+    selectedRange,
+    candidatePipelineStage,
+  ]);
+
+  const recentSearches =
+    [...searchHistory].reverse().slice(0, 5);
+
+  /* -------------------------------------------------------
+     Handlers
+  ------------------------------------------------------- */
+
+  function handleStageClick(key) {
+    const next =
+      focusedStage === key ? null : key;
+
+    setFocusedStage(next);
+
+    onStageClick?.(next);
+  }
+
+  function handleSelectJob(id) {
+    setSelectedJobId((current) =>
+      current === id ? null : id
+    );
+
+    onSelectJob?.(id);
+  }
+
+  function handleRangeClick(key) {
+    setSelectedRange((current) =>
+      current === key ? null : key
+    );
+  }
+
+  function clearFilters() {
+    setFocusedStage(null);
+    setSelectedRange(null);
+
+    onStageClick?.(null);
+  }
+
+  const hasFilters =
+    focusedStage || selectedRange;
+
+  /* -------------------------------------------------------
+     Render
+  ------------------------------------------------------- */
 
   return (
-    <div className="dg-root dgd-root">
+    <div className="db3-root">
       <style>{`
-        .dg-root {
-          --dg-paper: #F6F7F9; --dg-surface: #FFFFFF; --dg-sunken: #EFF1F4;
-          --dg-border: #E3E6EB; --dg-border-strong: #CBD2DC;
-          --dg-ink-900: #10151F; --dg-ink-700: #38414F; --dg-ink-500: #6B7280; --dg-ink-400: #96A0AC;
-          --dg-teal-700: #0A5C68; --dg-teal-600: #0E7C8C; --dg-teal-300: #8CCDD3; --dg-teal-100: #E1F2F3;
-          --dg-bronze-700: #8A4B0C; --dg-bronze-600: #B4650F; --dg-bronze-500: #C97A1A; --dg-bronze-100: #FBEEDD;
-          --dg-green-700: #1F6E4A; --dg-green-600: #278F5E; --dg-green-100: #E3F5EC;
-          --dg-danger: #B3261E; --dg-danger-bg: #FBEAE9;
-          --font-display: 'Space Grotesk', 'Inter', sans-serif;
-          --font-body: 'Inter', system-ui, sans-serif;
-          --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-          font-family: var(--font-body); color: var(--dg-ink-900); background: var(--dg-paper);
+        @keyframes db3Fade {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
-        .dg-display { font-family: var(--font-display); letter-spacing: -0.01em; }
-        .dgd-root { padding: 28px; max-width: 1200px; margin: 0 auto; }
-        .dgd-section { display: flex; flex-direction: column; gap: 28px; }
 
-        .dgd-banner {
-          background: var(--dg-ink-900); border-radius: 20px; padding: 26px 28px; color: #fff;
-          display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+        @keyframes db3Line {
+          from {
+            transform: scaleX(0);
+          }
+          to {
+            transform: scaleX(1);
+          }
         }
-        .dgd-banner-left { display: flex; align-items: center; gap: 16px; }
-        .dgd-avatar {
-          width: 52px; height: 52px; border-radius: 14px; background: var(--dg-teal-600);
-          display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px;
+
+        .db3-root {
+          --ink: #12151B;
+          --muted: #777A82;
+          --soft: #9B9DA2;
+          --border: #E4E1D9;
+          --paper: #FBFAF7;
+          --surface: #FFFFFF;
+          --cyan: #0BA5C9;
+          --cyan-dark: #087D98;
+          --cyan-soft: #EAF8FB;
+
+          min-height: 100%;
+          box-sizing: border-box;
+
+          background: var(--paper);
+          color: var(--ink);
+
+          padding: 30px;
+          max-width: 1240px;
+          margin: 0 auto;
+
+          font-family:
+            'Inter',
+            system-ui,
+            sans-serif;
+        }
+
+        .db3-root *,
+        .db3-root *::before,
+        .db3-root *::after {
+          box-sizing: border-box;
+        }
+
+        .db3-main {
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+        }
+
+        /* -----------------------------------------------
+           HEADER
+        ----------------------------------------------- */
+
+        .db3-page-head {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 24px;
+          padding: 2px 2px 4px;
+        }
+
+        .db3-eyebrow {
+          font-family:
+            'JetBrains Mono',
+            monospace;
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: .12em;
+          color: var(--cyan-dark);
+          margin-bottom: 7px;
+        }
+
+        .db3-title {
+          margin: 0;
+          font-family:
+            'Space Grotesk',
+            sans-serif;
+          font-size: 25px;
+          line-height: 1.05;
+          letter-spacing: -.03em;
+          font-weight: 700;
+        }
+
+        .db3-page-note {
+          font-size: 11px;
+          color: var(--soft);
+          margin-top: 7px;
+        }
+
+        .db3-head-status {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 10px;
+          color: var(--muted);
+          white-space: nowrap;
+        }
+
+        .db3-live-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--cyan);
+          box-shadow: 0 0 0 4px var(--cyan-soft);
+        }
+
+        /* -----------------------------------------------
+           HERO
+        ----------------------------------------------- */
+
+        .db3-hero {
+          position: relative;
+          overflow: hidden;
+
+          background: var(--ink);
+          color: white;
+
+          border-radius: 20px;
+          padding: 25px 27px;
+
+          display: grid;
+          grid-template-columns: minmax(260px, 1.2fr) minmax(390px, 1fr);
+          gap: 28px;
+
+          min-height: 188px;
+
+          animation:
+            db3Fade .45s ease both;
+        }
+
+        .db3-hero::after {
+          content: '';
+          position: absolute;
+          right: -80px;
+          bottom: -110px;
+
+          width: 300px;
+          height: 300px;
+
+          border: 1px solid rgba(11,165,201,.15);
+          border-radius: 50%;
+
+          pointer-events: none;
+        }
+
+        .db3-hero-left {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          position: relative;
+          z-index: 1;
+        }
+
+        .db3-hero-welcome {
+          font-family:
+            'Space Grotesk',
+            sans-serif;
+          font-size: 17px;
+          font-weight: 700;
+          letter-spacing: -.015em;
+        }
+
+        .db3-role {
+          display: inline-flex;
+          align-items: center;
+
+          margin-left: 8px;
+          padding: 3px 7px;
+
+          border:
+            1px solid
+            rgba(11,165,201,.35);
+
+          border-radius: 999px;
+
+          color: #8FDCEE;
+
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          font-size: 8px;
+          font-weight: 600;
+          letter-spacing: .04em;
+        }
+
+        .db3-hero-description {
+          max-width: 400px;
+
+          font-size: 11px;
+          line-height: 1.65;
+
+          color: rgba(255,255,255,.48);
+
+          margin-top: 13px;
+        }
+
+        .db3-hero-mini {
+          display: flex;
+          gap: 22px;
+          margin-top: 20px;
+        }
+
+        .db3-mini {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+
+          font-size: 9.5px;
+          color: rgba(255,255,255,.48);
+        }
+
+        .db3-mini strong {
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          color: rgba(255,255,255,.86);
+          font-size: 10px;
+        }
+
+        .db3-hero-right {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 30px;
+
+          position: relative;
+          z-index: 1;
+        }
+
+        .db3-match {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+        }
+
+        .db3-match-copy {
+          min-width: 105px;
+        }
+
+        .db3-match-label {
+          font-size: 10px;
+          color: rgba(255,255,255,.46);
+          margin-bottom: 5px;
+        }
+
+        .db3-match-title {
+          font-family:
+            'Space Grotesk',
+            sans-serif;
+
+          font-size: 16px;
+          font-weight: 700;
+        }
+
+        .db3-match-sub {
+          font-size: 9px;
+          color: rgba(255,255,255,.38);
+          line-height: 1.5;
+          margin-top: 4px;
+        }
+
+        .db3-stat-stack {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(80px, 1fr));
+          min-width: 300px;
+        }
+
+        .db3-stat {
+          padding-left: 18px;
+          border-left:
+            1px solid
+            rgba(255,255,255,.10);
+        }
+
+        .db3-stat-icon {
+          width: 23px;
+          height: 23px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border-radius: 7px;
+          background: rgba(255,255,255,.07);
+
+          color: rgba(255,255,255,.65);
+
+          margin-bottom: 9px;
+        }
+
+        .db3-stat-value {
+          font-family:
+            'Space Grotesk',
+            sans-serif;
+
+          font-size: 22px;
+          line-height: 1;
+          font-weight: 700;
+        }
+
+        .db3-stat-label {
+          font-size: 9px;
+          color: rgba(255,255,255,.42);
+          margin-top: 5px;
+        }
+
+        /* -----------------------------------------------
+           WORKSPACE FILTER BAR
+        ----------------------------------------------- */
+
+        .db3-context-bar {
+          min-height: 48px;
+
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          gap: 14px;
+
+          padding:
+            8px
+            10px
+            8px
+            14px;
+
+          background: white;
+          border: 1px solid var(--border);
+          border-radius: 12px;
+
+          animation:
+            db3Fade .45s .05s ease both;
+        }
+
+        .db3-context-left {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          min-width: 0;
+        }
+
+        .db3-context-icon {
+          width: 25px;
+          height: 25px;
+
+          border-radius: 7px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          background: var(--cyan-soft);
+          color: var(--cyan-dark);
+
           flex-shrink: 0;
         }
-        .dgd-avatar-bronze { background: var(--dg-bronze-600); }
-        .dgd-welcome { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .dgd-welcome h2 { font-size: 19px; font-weight: 700; margin: 0; }
-        .dgd-role-badge {
-          font-family: var(--font-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.05em;
-          padding: 3px 9px; border-radius: 999px; border: 1px solid;
-        }
-        .dgd-role-badge-teal { color: #9FE0E8; background: rgba(14,124,140,0.25); border-color: rgba(14,124,140,0.45); }
-        .dgd-role-badge-bronze { color: #F0C88A; background: rgba(180,101,15,0.22); border-color: rgba(180,101,15,0.45); }
-        .dgd-banner-meta { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 4px; display: flex; align-items: center; gap: 8px; }
-        .dgd-banner-right {
-          display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 10px 16px;
-        }
-        .dgd-banner-right-title { font-size: 12.5px; font-weight: 700; }
-        .dgd-banner-right-sub { font-size: 10.5px; color: rgba(255,255,255,0.5); }
 
-        .dgd-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-        .dgd-kpi {
-          background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 16px;
-          padding: 18px; display: flex; flex-direction: column; gap: 10px;
-        }
-        .dgd-kpi-top { display: flex; align-items: center; justify-content: space-between; }
-        .dgd-kpi-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
-        .dgd-tone-teal { background: var(--dg-teal-100); color: var(--dg-teal-700); }
-        .dgd-tone-bronze { background: var(--dg-bronze-100); color: var(--dg-bronze-700); }
-        .dgd-tone-green { background: var(--dg-green-100); color: var(--dg-green-700); }
-        .dgd-tone-neutral { background: var(--dg-sunken); color: var(--dg-ink-500); }
-        .dgd-trend {
-          display: flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 700;
-          padding: 2px 7px; border-radius: 999px; border: 1px solid;
-        }
-        .dgd-trend-up { color: var(--dg-green-700); background: var(--dg-green-100); border-color: rgba(31,110,74,0.25); }
-        .dgd-trend-down { color: var(--dg-danger); background: var(--dg-danger-bg); border-color: rgba(179,38,30,0.25); }
-        .dgd-kpi-value { font-size: 24px; font-weight: 700; line-height: 1; }
-        .dgd-kpi-label { font-size: 11.5px; font-weight: 600; color: var(--dg-ink-700); }
-        .dgd-kpi-sub { font-size: 10.5px; color: var(--dg-ink-400); }
+        .db3-context-text {
+          font-size: 10.5px;
+          color: var(--muted);
 
-        .dgd-charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 18px; }
-        .dgd-card { background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 16px; padding: 22px; }
-        .dgd-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-        .dgd-card-title { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-        .dgd-card-tag {
-          font-family: var(--font-mono); font-size: 10px; color: var(--dg-ink-500);
-          background: var(--dg-sunken); border: 1px solid var(--dg-border); border-radius: 8px; padding: 3px 8px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        .dgd-bars { display: flex; align-items: flex-end; gap: 14px; height: 100px; }
-        .dgd-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .dgd-bar-val { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--dg-ink-700); }
-        .dgd-bar { width: 100%; border-radius: 6px 6px 3px 3px; transition: height .5s ease; }
-        .dgd-bar-label { font-size: 10px; font-weight: 600; color: var(--dg-ink-500); text-align: center; }
-        .dgd-bar-neutral { background: var(--dg-border-strong); }
-        .dgd-bar-teal-light { background: var(--dg-teal-300); }
-        .dgd-bar-bronze-light { background: var(--dg-bronze-500); opacity: 0.55; }
-        .dgd-bar-bronze { background: var(--dg-bronze-600); }
-        .dgd-bar-green { background: var(--dg-green-600); }
+        .db3-filter-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
 
-        .dgd-conv-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--dg-border); }
-        .dgd-conv { text-align: center; }
-        .dgd-conv-val { font-size: 17px; font-weight: 700; }
-        .dgd-conv-label { font-size: 10px; font-weight: 600; color: var(--dg-ink-500); margin-top: 2px; }
+          border: 1px solid var(--border);
+          background: var(--paper);
 
-        .dgd-dist-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-        .dgd-dist-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .dgd-dist-label { font-size: 10.5px; font-weight: 600; color: var(--dg-ink-500); width: 44px; }
-        .dgd-dist-track { flex: 1; background: var(--dg-sunken); border-radius: 999px; height: 6px; overflow: hidden; }
-        .dgd-dist-fill { height: 100%; border-radius: 999px; transition: width .6s ease; }
-        .dgd-dist-count { font-size: 10.5px; font-weight: 700; width: 18px; text-align: right; color: var(--dg-ink-700); }
+          border-radius: 999px;
 
-        .dgd-bottom-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
-        .dgd-spotlight { background: var(--dg-ink-900); color: #fff; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; min-height: 190px; }
-        .dgd-spotlight-tag { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; color: rgba(255,255,255,0.55); text-transform: uppercase; }
-        .dgd-spotlight-person { display: flex; align-items: center; gap: 12px; margin: 14px 0; }
-        .dgd-spotlight-img { width: 46px; height: 46px; border-radius: 12px; object-fit: cover; border: 1px solid rgba(255,255,255,0.2); }
-        .dgd-spotlight-name { font-size: 14px; font-weight: 700; }
-        .dgd-spotlight-headline { font-size: 10.5px; color: rgba(255,255,255,0.55); margin-top: 2px; }
-        .dgd-spotlight-foot { display: flex; align-items: center; justify-content: space-between; }
-        .dgd-spotlight-score { font-size: 28px; font-weight: 700; }
-        .dgd-spotlight-score-label { font-size: 10px; color: rgba(255,255,255,0.5); font-weight: 600; }
-        .dgd-spotlight-exp { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 8px 12px; text-align: center; }
-        .dgd-spotlight-empty { color: rgba(255,255,255,0.5); font-size: 12px; text-align: center; padding: 30px 0; }
+          padding: 5px 9px;
 
-        .dgd-list-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--dg-paper); border: 1px solid var(--dg-border); border-radius: 12px; margin-bottom: 8px; }
-        .dgd-list-title { font-size: 12px; font-weight: 700; color: var(--dg-ink-900); }
-        .dgd-list-sub { font-size: 10.5px; color: var(--dg-ink-400); margin-top: 1px; }
-        .dgd-list-badge { font-family: var(--font-mono); font-size: 10px; font-weight: 500; padding: 3px 8px; border-radius: 999px; border: 1px solid; flex-shrink: 0; }
-        .dgd-list-badge-on { color: var(--dg-green-700); background: var(--dg-green-100); border-color: rgba(31,110,74,0.25); }
-        .dgd-list-badge-off { color: var(--dg-ink-500); background: var(--dg-sunken); border-color: var(--dg-border); }
-        .dgd-list-more { font-size: 10.5px; color: var(--dg-ink-400); text-align: center; font-weight: 600; }
-        .dgd-empty { font-size: 12px; color: var(--dg-ink-400); text-align: center; padding: 26px 0; }
+          font-size: 9px;
+          font-weight: 600;
 
-        .dgd-search-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--dg-paper); border: 1px solid var(--dg-border); border-radius: 12px; margin-bottom: 8px; }
-        .dgd-search-icon { width: 24px; height: 24px; border-radius: 7px; background: var(--dg-teal-100); color: var(--dg-teal-700); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .dgd-search-query { font-size: 11.5px; font-weight: 600; color: var(--dg-ink-900); }
-        .dgd-search-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
-        .dgd-search-date { font-size: 10px; color: var(--dg-ink-400); font-weight: 500; }
-        .dgd-search-results { font-size: 10px; color: var(--dg-teal-700); font-weight: 700; }
+          color: var(--ink);
+        }
 
-        .dgd-perf { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
-        .dgd-perf-left { display: flex; align-items: center; gap: 12px; }
-        .dgd-perf-icon { width: 36px; height: 36px; border-radius: 11px; background: var(--dg-teal-100); color: var(--dg-teal-700); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .dgd-perf-title { font-size: 12.5px; font-weight: 700; }
-        .dgd-perf-sub { font-size: 10.5px; color: var(--dg-ink-400); }
-        .dgd-perf-stats { display: flex; flex-wrap: wrap; gap: 26px; }
-        .dgd-perf-stat { text-align: center; }
-        .dgd-perf-stat-val { display: flex; align-items: center; justify-content: center; gap: 5px; color: var(--dg-teal-700); font-weight: 700; font-size: 16px; }
-        .dgd-perf-stat-label { font-size: 9.5px; font-weight: 600; color: var(--dg-ink-400); margin-top: 2px; }
+        .db3-filter-pill button {
+          border: 0;
+          padding: 0;
+          margin: 0;
 
-        @media (max-width: 980px) {
-          .dgd-kpi-grid { grid-template-columns: repeat(2, 1fr); }
-          .dgd-charts-row { grid-template-columns: 1fr; }
-          .dgd-bottom-row { grid-template-columns: 1fr; }
+          background: none;
+          color: var(--soft);
+
+          cursor: pointer;
+
+          display: flex;
+        }
+
+        .db3-clear {
+          border: 0;
+          background: none;
+
+          color: var(--cyan-dark);
+
+          font-size: 9.5px;
+          font-weight: 600;
+
+          cursor: pointer;
+
+          padding: 5px 7px;
+        }
+
+        /* -----------------------------------------------
+           PIPELINE
+        ----------------------------------------------- */
+
+        .db3-section {
+          animation:
+            db3Fade .45s .1s ease both;
+        }
+
+        .db3-section-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 15px;
+
+          margin-bottom: 11px;
+        }
+
+        .db3-section-title {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+
+          font-family:
+            'Space Grotesk',
+            sans-serif;
+
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .db3-section-title svg {
+          color: var(--cyan-dark);
+        }
+
+        .db3-section-note {
+          font-size: 9px;
+          color: var(--soft);
+        }
+
+        .db3-pipeline {
+          display: grid;
+          grid-template-columns:
+            repeat(5, minmax(0, 1fr));
+
+          border-top:
+            1px solid var(--border);
+
+          border-bottom:
+            1px solid var(--border);
+
+          background: white;
+        }
+
+        .db3-stage {
+          position: relative;
+
+          min-height: 91px;
+
+          padding:
+            15px
+            18px;
+
+          border-right:
+            1px solid var(--border);
+
+          background: white;
+
+          cursor: pointer;
+
+          transition:
+            background .18s ease,
+            padding .18s ease;
+        }
+
+        .db3-stage:last-child {
+          border-right: 0;
+        }
+
+        .db3-stage:hover {
+          background: var(--paper);
+          padding-top: 13px;
+        }
+
+        .db3-stage.active {
+          background: var(--cyan-soft);
+        }
+
+        .db3-stage.dimmed {
+          opacity: .38;
+        }
+
+        .db3-stage-line {
+          position: absolute;
+          left: 18px;
+          right: 18px;
+          bottom: 0;
+
+          height: 2px;
+
+          background: var(--cyan);
+
+          transform-origin: left;
+          transform: scaleX(0);
+
+          transition: transform .25s ease;
+        }
+
+        .db3-stage.active .db3-stage-line {
+          transform: scaleX(1);
+        }
+
+        .db3-stage-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .db3-stage-index {
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          font-size: 8px;
+          color: var(--soft);
+        }
+
+        .db3-stage-arrow {
+          color: var(--soft);
+          opacity: 0;
+          transform: translateX(-3px);
+
+          transition:
+            opacity .18s ease,
+            transform .18s ease;
+        }
+
+        .db3-stage:hover .db3-stage-arrow,
+        .db3-stage.active .db3-stage-arrow {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .db3-stage-number {
+          font-family:
+            'Space Grotesk',
+            sans-serif;
+
+          font-size: 24px;
+          line-height: 1;
+
+          font-weight: 700;
+
+          margin-top: 12px;
+        }
+
+        .db3-stage-label {
+          font-size: 9.5px;
+          color: var(--muted);
+          margin-top: 5px;
+        }
+
+        /* -----------------------------------------------
+           MAIN GRID
+        ----------------------------------------------- */
+
+        .db3-content-grid {
+          display: grid;
+
+          grid-template-columns:
+            minmax(0, 1.55fr)
+            minmax(290px, .75fr);
+
+          gap: 22px;
+
+          align-items: start;
+        }
+
+        /* -----------------------------------------------
+           CANDIDATES
+        ----------------------------------------------- */
+
+        .db3-panel {
+          background: white;
+          border: 1px solid var(--border);
+
+          border-radius: 14px;
+
+          overflow: hidden;
+        }
+
+        .db3-panel-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          padding:
+            15px
+            17px
+            12px;
+
+          border-bottom:
+            1px solid var(--border);
+        }
+
+        .db3-panel-head-left {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+        }
+
+        .db3-panel-icon {
+          width: 25px;
+          height: 25px;
+
+          border-radius: 7px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          background: var(--cyan-soft);
+          color: var(--cyan-dark);
+        }
+
+        .db3-panel-title {
+          font-family:
+            'Space Grotesk',
+            sans-serif;
+
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .db3-panel-count {
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          font-size: 8px;
+          color: var(--soft);
+
+          margin-top: 2px;
+        }
+
+        .db3-view-all {
+          border: 0;
+          background: none;
+
+          color: var(--cyan-dark);
+
+          font-size: 9px;
+          font-weight: 600;
+
+          cursor: pointer;
+
+          display: flex;
+          align-items: center;
+          gap: 3px;
+        }
+
+        .db3-candidate-list {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .db3-candidate {
+          display: grid;
+
+          grid-template-columns:
+            25px
+            38px
+            minmax(120px, 1.2fr)
+            minmax(85px, .75fr)
+            auto;
+
+          align-items: center;
+
+          gap: 12px;
+
+          padding:
+            12px
+            17px;
+
+          border-bottom:
+            1px solid #EEECE7;
+
+          cursor: pointer;
+
+          transition:
+            background .15s ease,
+            padding .15s ease;
+        }
+
+        .db3-candidate:last-child {
+          border-bottom: 0;
+        }
+
+        .db3-candidate:hover {
+          background: var(--paper);
+          padding-left: 20px;
+        }
+
+        .db3-rank {
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          font-size: 8.5px;
+          color: var(--soft);
+        }
+
+        .db3-avatar {
+          width: 34px;
+          height: 34px;
+
+          border-radius: 50%;
+
+          display: block;
+        }
+
+        .db3-candidate-main {
+          min-width: 0;
+        }
+
+        .db3-candidate-name {
+          font-size: 10.5px;
+          font-weight: 700;
+
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .db3-candidate-headline {
+          font-size: 9px;
+          color: var(--soft);
+
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+
+          margin-top: 2px;
+        }
+
+        .db3-candidate-role {
+          font-size: 9px;
+          color: var(--muted);
+
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .db3-candidate-score {
+          min-width: 42px;
+
+          display: inline-flex;
+          justify-content: center;
+
+          padding: 4px 7px;
+
+          border-radius: 999px;
+
+          background: var(--cyan-soft);
+          color: var(--cyan-dark);
+
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          font-size: 8.5px;
+          font-weight: 600;
+        }
+
+        .db3-candidate-arrow {
+          color: #C2C2C0;
+
+          transition:
+            color .15s ease,
+            transform .15s ease;
+        }
+
+        .db3-candidate:hover .db3-candidate-arrow {
+          color: var(--cyan-dark);
+          transform: translateX(2px);
+        }
+
+        .db3-empty {
+          padding: 35px 20px;
+
+          text-align: center;
+
+          color: var(--soft);
+
+          font-size: 10.5px;
+        }
+
+        /* -----------------------------------------------
+           SCORE DISTRIBUTION
+        ----------------------------------------------- */
+
+        .db3-score-panel {
+          padding-bottom: 16px;
+        }
+
+        .db3-score-body {
+          padding: 15px 17px 0;
+        }
+
+        .db3-score-note {
+          font-size: 9px;
+          color: var(--soft);
+          margin-bottom: 13px;
+        }
+
+        .db3-score-bars {
+          display: flex;
+          flex-direction: column;
+          gap: 11px;
+        }
+
+        .db3-score-row {
+          display: grid;
+          grid-template-columns: 48px 1fr 28px;
+          align-items: center;
+          gap: 9px;
+
+          cursor: pointer;
+        }
+
+        .db3-score-label {
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          font-size: 8px;
+          color: var(--muted);
+        }
+
+        .db3-score-track {
+          height: 7px;
+
+          background: #F0EFEB;
+
+          border-radius: 999px;
+
+          overflow: hidden;
+        }
+
+        .db3-score-fill {
+          height: 100%;
+
+          background: var(--cyan);
+
+          border-radius: inherit;
+
+          transform-origin: left;
+
+          animation:
+            db3Line .7s
+            cubic-bezier(.22,1,.36,1)
+            both;
+        }
+
+        .db3-score-row.dimmed {
+          opacity: .3;
+        }
+
+        .db3-score-row.active {
+          opacity: 1;
+        }
+
+        .db3-score-value {
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          font-size: 8px;
+          color: var(--ink);
+          text-align: right;
+        }
+
+        /* -----------------------------------------------
+           ACTIVITY
+        ----------------------------------------------- */
+
+        .db3-activity {
+          margin-top: 22px;
+        }
+
+        .db3-activity-tabs {
+          display: flex;
+          align-items: center;
+
+          gap: 3px;
+
+          padding:
+            8px
+            10px;
+
+          border-bottom:
+            1px solid var(--border);
+        }
+
+        .db3-tab {
+          border: 0;
+          background: transparent;
+
+          color: var(--soft);
+
+          font-size: 9.5px;
+          font-weight: 600;
+
+          padding: 6px 9px;
+
+          border-radius: 7px;
+
+          cursor: pointer;
+        }
+
+        .db3-tab:hover {
+          color: var(--ink);
+        }
+
+        .db3-tab.active {
+          background: var(--paper);
+          border: 1px solid var(--border);
+          color: var(--ink);
+        }
+
+        .db3-role-row {
+          display: grid;
+
+          grid-template-columns:
+            minmax(0, 1fr)
+            auto
+            auto
+            18px;
+
+          align-items: center;
+
+          gap: 13px;
+
+          padding:
+            12px
+            17px;
+
+          border-bottom:
+            1px solid #EEECE7;
+
+          cursor: pointer;
+
+          transition:
+            background .15s ease;
+        }
+
+        .db3-role-row:last-child {
+          border-bottom: 0;
+        }
+
+        .db3-role-row:hover {
+          background: var(--paper);
+        }
+
+        .db3-role-main {
+          min-width: 0;
+        }
+
+        .db3-role-title {
+          font-size: 10.5px;
+          font-weight: 700;
+
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .db3-role-meta {
+          font-size: 8.5px;
+          color: var(--soft);
+
+          margin-top: 3px;
+
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .db3-role-count {
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          font-size: 8px;
+          color: var(--muted);
+
+          white-space: nowrap;
+        }
+
+        .db3-status {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+
+          font-size: 8px;
+          font-weight: 600;
+
+          color: var(--cyan-dark);
+
+          white-space: nowrap;
+        }
+
+        .db3-status-dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: var(--cyan);
+        }
+
+        .db3-row-arrow {
+          color: #C7C6C2;
+        }
+
+        .db3-search-row {
+          display: grid;
+
+          grid-template-columns:
+            25px
+            minmax(0, 1fr)
+            auto
+            25px;
+
+          align-items: center;
+
+          gap: 10px;
+
+          padding:
+            11px
+            17px;
+
+          border-bottom:
+            1px solid #EEECE7;
+        }
+
+        .db3-search-row:last-child {
+          border-bottom: 0;
+        }
+
+        .db3-search-icon {
+          width: 25px;
+          height: 25px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border-radius: 7px;
+
+          background: var(--cyan-soft);
+          color: var(--cyan-dark);
+        }
+
+        .db3-search-query {
+          font-size: 9.5px;
+          font-weight: 600;
+
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .db3-search-meta {
+          font-size: 8px;
+          color: var(--soft);
+          margin-top: 2px;
+        }
+
+        .db3-rerun {
+          width: 25px;
+          height: 25px;
+
+          border: 0;
+          background: transparent;
+
+          color: var(--soft);
+
+          border-radius: 7px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          cursor: pointer;
+        }
+
+        .db3-rerun:hover {
+          background: var(--paper);
+          color: var(--cyan-dark);
+        }
+
+        /* -----------------------------------------------
+           AI STRIP
+        ----------------------------------------------- */
+
+        .db3-ai {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          gap: 18px;
+
+          padding:
+            12px
+            15px;
+
+          background: white;
+
+          border:
+            1px solid var(--border);
+
+          border-radius: 12px;
+        }
+
+        .db3-ai-left {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+        }
+
+        .db3-ai-icon {
+          width: 27px;
+          height: 27px;
+
+          border-radius: 8px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          background: var(--cyan-soft);
+          color: var(--cyan-dark);
+        }
+
+        .db3-ai-title {
+          font-size: 9.5px;
+          font-weight: 700;
+        }
+
+        .db3-ai-sub {
+          font-size: 8px;
+          color: var(--soft);
+          margin-top: 2px;
+        }
+
+        .db3-ai-metrics {
+          display: flex;
+          align-items: center;
+
+          gap: 22px;
+        }
+
+        .db3-ai-metric {
+          display: flex;
+          align-items: baseline;
+          gap: 5px;
+
+          font-size: 8px;
+          color: var(--soft);
+        }
+
+        .db3-ai-metric strong {
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          color: var(--ink);
+          font-size: 9px;
+        }
+
+        /* -----------------------------------------------
+           RESPONSIVE
+        ----------------------------------------------- */
+
+        @media (max-width: 1050px) {
+          .db3-hero {
+            grid-template-columns: 1fr;
+          }
+
+          .db3-hero-right {
+            justify-content: flex-start;
+          }
+
+          .db3-content-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 760px) {
+          .db3-root {
+            padding: 18px;
+          }
+
+          .db3-page-head {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .db3-head-status {
+            display: none;
+          }
+
+          .db3-hero-right {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .db3-stat-stack {
+            width: 100%;
+            min-width: 0;
+          }
+
+          .db3-pipeline {
+            grid-template-columns: 1fr;
+          }
+
+          .db3-stage {
+            border-right: 0;
+            border-bottom: 1px solid var(--border);
+          }
+
+          .db3-stage:last-child {
+            border-bottom: 0;
+          }
+
+          .db3-candidate {
+            grid-template-columns:
+              25px
+              34px
+              minmax(0, 1fr)
+              auto;
+          }
+
+          .db3-candidate-role {
+            display: none;
+          }
+
+          .db3-candidate-arrow {
+            display: none;
+          }
+
+          .db3-ai {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .db3-ai-metrics {
+            flex-wrap: wrap;
+          }
         }
       `}</style>
 
-      <div className="dgd-section">
+      <div className="db3-main">
 
-        {/* Welcome banner */}
-        <div className="dgd-banner">
-          <div className="dgd-banner-left">
-            <div className={'dgd-avatar dg-display' + (roleIsHR ? ' dgd-avatar-bronze' : '')}>
-              {user?.fullName ? user.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2) : 'U'}
+        {/* ================================================
+            PAGE HEADER
+        ================================================= */}
+
+        <header className="db3-page-head">
+          <div>
+            <div className="db3-eyebrow">
+              {t.eyebrow}
             </div>
+
+            <h1 className="db3-title">
+              {t.welcome(
+                user?.fullName || 'User'
+              )}
+
+              <span className="db3-role">
+                {user?.role || 'RECRUITER'}
+              </span>
+            </h1>
+
+            <div className="db3-page-note">
+              {t.workspaceNote}
+            </div>
+          </div>
+
+          <div className="db3-head-status">
+            <span className="db3-live-dot" />
+            Workspace active
+          </div>
+        </header>
+
+
+        {/* ================================================
+            HERO
+        ================================================= */}
+
+        <section className="db3-hero">
+
+          <div className="db3-hero-left">
+
             <div>
-              <div className="dgd-welcome">
-                <h2 className="dg-display">{t.welcome(user?.fullName || 'User')}</h2>
-                <span className={'dgd-role-badge ' + (roleIsHR ? 'dgd-role-badge-bronze' : 'dgd-role-badge-teal')}>
-                  {user?.role || 'RECRUITER'}
+              <div className="db3-hero-welcome">
+                Hiring at a glance
+              </div>
+
+              <div className="db3-hero-description">
+                Your sourcing activity, candidate quality,
+                and recruitment pipeline in one place.
+              </div>
+            </div>
+
+            <div className="db3-hero-mini">
+
+              <div className="db3-mini">
+                <Activity size={11} />
+                <strong>
+                  {searchHistory.length || 0}
+                </strong>
+                {t.searches}
+              </div>
+
+              <div className="db3-mini">
+                <Target size={11} />
+                <strong>
+                  {stats.totalInPipeline}
+                </strong>
+                {t.inPipeline}
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div className="db3-hero-right">
+
+            <div className="db3-match">
+
+              <MatchRing
+                percentage={stats.avgScore}
+              />
+
+              <div className="db3-match-copy">
+                <div className="db3-match-label">
+                  {t.matchQuality}
+                </div>
+
+                <div className="db3-match-title">
+                  {stats.avgScore >= 80
+                    ? 'Strong pipeline'
+                    : stats.avgScore >= 60
+                    ? 'Healthy pipeline'
+                    : 'Build your pipeline'}
+                </div>
+
+                <div className="db3-match-sub">
+                  Based on sourced candidate
+                  match scores.
+                </div>
+              </div>
+
+            </div>
+
+
+            <div className="db3-stat-stack">
+
+              <div className="db3-stat">
+                <div className="db3-stat-icon">
+                  <FileText size={12} />
+                </div>
+
+                <div className="db3-stat-value">
+                  {activeJDsCount}
+                </div>
+
+                <div className="db3-stat-label">
+                  {t.activeJDs}
+                </div>
+              </div>
+
+
+              <div className="db3-stat">
+                <div className="db3-stat-icon">
+                  <Users size={12} />
+                </div>
+
+                <div className="db3-stat-value">
+                  {sourcedCount}
+                </div>
+
+                <div className="db3-stat-label">
+                  {t.sourced}
+                </div>
+              </div>
+
+
+              <div className="db3-stat">
+                <div className="db3-stat-icon">
+                  <BookmarkCheck size={12} />
+                </div>
+
+                <div className="db3-stat-value">
+                  {shortlistedCount}
+                </div>
+
+                <div className="db3-stat-label">
+                  {t.shortlisted}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        {/* ================================================
+            ACTIVE FILTER CONTEXT
+        ================================================= */}
+
+        {hasFilters && (
+          <div className="db3-context-bar">
+
+            <div className="db3-context-left">
+
+              <div className="db3-context-icon">
+                <SlidersHorizontal size={12} />
+              </div>
+
+              <div className="db3-context-text">
+                Showing candidates matching your
+                current focus
+              </div>
+
+              {focusedStage && (
+                <span className="db3-filter-pill">
+                  {t.stages[focusedStage]}
+
+                  <button
+                    onClick={() =>
+                      handleStageClick(
+                        focusedStage
+                      )
+                    }
+                    aria-label="Remove stage filter"
+                  >
+                    <X size={10} />
+                  </button>
                 </span>
-              </div>
-              <div className="dgd-banner-meta">
-                <span>{user?.email || 'user@digitalia.io'}</span>
-                <span>&bull;</span>
-                <span>{t.workspaceNote}</span>
-              </div>
+              )}
+
+              {selectedRange && (
+                <span className="db3-filter-pill">
+                  {
+                    stats.scoreDist.find(
+                      (item) =>
+                        item.key === selectedRange
+                    )?.label
+                  }
+
+                  <button
+                    onClick={() =>
+                      handleRangeClick(
+                        selectedRange
+                      )
+                    }
+                    aria-label="Remove score filter"
+                  >
+                    <X size={10} />
+                  </button>
+                </span>
+              )}
+
             </div>
+
+            <button
+              className="db3-clear"
+              onClick={clearFilters}
+            >
+              {t.clearFilter}
+            </button>
+
           </div>
-          <div className="dgd-banner-right">
-            <BarChart3 size={16} />
-            <div>
-              <div className="dgd-banner-right-title dg-display">{t.dashboardTag}</div>
-              <div className="dgd-banner-right-sub">{t.dashboardSub}</div>
-            </div>
-          </div>
-        </div>
+        )}
 
-        {/* KPI grid */}
-        <div className="dgd-kpi-grid">
-          <KpiCard icon={FileText} tone="teal" label={t.activeJDs} value={stats.activeJDs} sub={t.totalOf(stats.totalJDs)} />
-          <KpiCard icon={Users} tone="neutral" label={t.sourced} value={stats.totalCandidates} sub={t.inPool} />
-          <KpiCard icon={BookmarkCheck} tone="green" label={t.shortlisted} value={stats.uniqueSavedCount} sub={`${stats.shortlistRate}% ${t.ofPool}`} />
-          <KpiCard icon={Target} tone="bronze" label={t.avgScore} value={stats.avgScore > 0 ? `${stats.avgScore}%` : '—'} sub={t.matchAccuracy} />
-        </div>
 
-        {/* Charts row */}
-        <div className="dgd-charts-row">
-          <div className="dgd-card">
-            <div className="dgd-card-head">
-              <span className="dgd-card-title dg-display"><TrendingUp size={15} color="var(--dg-teal-600)" />{t.pipeline}</span>
-              <span className="dgd-card-tag">{t.allRoles}</span>
+        {/* ================================================
+            PIPELINE
+        ================================================= */}
+
+        <section className="db3-section">
+
+          <div className="db3-section-head">
+
+            <div className="db3-section-title">
+              <TrendingUp size={14} />
+              {t.pipeline}
             </div>
 
-            <div className="dgd-bars">
-              {pipelineData.map((stage) => {
-                const height = Math.max(14, (stage.value / maxPipeline) * 96);
-                return (
-                  <div className="dgd-bar-col" key={stage.key}>
-                    <span className="dgd-bar-val">{stage.value}</span>
-                    <div className={`dgd-bar dgd-bar-${stage.tone}`} style={{ height: `${height}px` }} />
-                    <span className="dgd-bar-label">{stage.label}</span>
-                  </div>
-                );
-              })}
+            <div className="db3-section-note">
+              {hasFilters
+                ? `${filteredCandidates.length} ${t.candidates}`
+                : t.allStages}
             </div>
 
-            <div className="dgd-conv-row">
-              <div className="dgd-conv">
-                <div className="dgd-conv-val dg-display" style={{ color: 'var(--dg-teal-700)' }}>{stats.shortlistRate}%</div>
-                <div className="dgd-conv-label">{t.shortlistRate}</div>
-              </div>
-              <div className="dgd-conv">
-                <div className="dgd-conv-val dg-display" style={{ color: 'var(--dg-bronze-700)' }}>
-                  {stats.totalInPipeline > 0 ? Math.round((stats.pipelineStages.interview / stats.totalInPipeline) * 100) : 0}%
-                </div>
-                <div className="dgd-conv-label">{t.interviewRate}</div>
-              </div>
-              <div className="dgd-conv">
-                <div className="dgd-conv-val dg-display" style={{ color: 'var(--dg-green-700)' }}>
-                  {stats.totalInPipeline > 0 ? Math.round((stats.pipelineStages.hired / stats.totalInPipeline) * 100) : 0}%
-                </div>
-                <div className="dgd-conv-label">{t.hireRate}</div>
-              </div>
-            </div>
           </div>
 
-          <div className="dgd-card">
-            <div className="dgd-card-head" style={{ marginBottom: 14 }}>
-              <span className="dgd-card-title dg-display"><Award size={15} color="var(--dg-teal-600)" />{t.scoreDist}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <DonutRing percentage={stats.avgScore} />
-            </div>
-            {stats.scoreDist.map((item, idx) => {
-              const dotColor = ['var(--dg-green-600)', 'var(--dg-teal-600)', 'var(--dg-bronze-500)', 'var(--dg-border-strong)'][idx];
-              const pct = stats.totalCandidates > 0 ? Math.round((item.value / stats.totalCandidates) * 100) : 0;
+
+          <div className="db3-pipeline">
+
+            {funnel.map((stage, index) => {
+
+              const isActive =
+                focusedStage === stage.key;
+
+              const isDimmed =
+                focusedStage &&
+                focusedStage !== stage.key;
+
               return (
-                <div className="dgd-dist-row" key={item.key}>
-                  <span className="dgd-dist-dot" style={{ background: dotColor }} />
-                  <span className="dgd-dist-label">{item.label}</span>
-                  <div className="dgd-dist-track"><div className="dgd-dist-fill" style={{ width: `${pct}%`, background: dotColor }} /></div>
-                  <span className="dgd-dist-count">{item.value}</span>
+                <div
+                  key={stage.key}
+                  className={[
+                    'db3-stage',
+                    isActive
+                      ? 'active'
+                      : '',
+                    isDimmed
+                      ? 'dimmed'
+                      : '',
+                  ].join(' ')}
+                  onClick={() =>
+                    handleStageClick(
+                      stage.key
+                    )
+                  }
+                >
+
+                  <div className="db3-stage-top">
+
+                    <span className="db3-stage-index">
+                      0{index + 1}
+                    </span>
+
+                    <ChevronRight
+                      size={12}
+                      className="db3-stage-arrow"
+                    />
+
+                  </div>
+
+                  <div className="db3-stage-number">
+                    {stage.value}
+                  </div>
+
+                  <div className="db3-stage-label">
+                    {stage.label}
+                  </div>
+
+                  <div className="db3-stage-line" />
+
                 </div>
               );
             })}
+
           </div>
+
+        </section>
+
+
+        {/* ================================================
+            CANDIDATES + SCORE DISTRIBUTION
+        ================================================= */}
+
+        <div className="db3-content-grid">
+
+          {/* -----------------------------------------------
+              CANDIDATES
+          ------------------------------------------------ */}
+
+          <section className="db3-panel">
+
+            <div className="db3-panel-head">
+
+              <div className="db3-panel-head-left">
+
+                <div className="db3-panel-icon">
+                  <Sparkles size={12} />
+                </div>
+
+                <div>
+                  <div className="db3-panel-title">
+                    {t.leaderboard}
+                  </div>
+
+                  <div className="db3-panel-count">
+                    {filteredCandidates.length}{' '}
+                    {t.candidates}
+                  </div>
+                </div>
+
+              </div>
+
+              <button
+                className="db3-view-all"
+                onClick={() =>
+                  onStageClick?.(focusedStage)
+                }
+              >
+                {t.viewAll}
+                <ArrowUpRight size={11} />
+              </button>
+
+            </div>
+
+
+            <div className="db3-candidate-list">
+
+              {filteredCandidates.length === 0 ? (
+
+                <div className="db3-empty">
+                  {t.noCandidates}
+                </div>
+
+              ) : (
+
+                filteredCandidates
+                  .slice(0, 8)
+                  .map((candidate, index) => (
+
+                    <div
+                      key={candidate.id}
+                      className="db3-candidate"
+                      onClick={() =>
+                        onSelectCandidate?.(
+                          candidate
+                        )
+                      }
+                    >
+
+                      <div className="db3-rank">
+                        #{index + 1}
+                      </div>
+
+                      <img
+                        className="db3-avatar"
+                        src={getAvatarUrl(
+                          candidate.fullName
+                        )}
+                        alt={
+                          candidate.fullName
+                        }
+                      />
+
+                      <div className="db3-candidate-main">
+
+                        <div className="db3-candidate-name">
+                          {candidate.fullName}
+                        </div>
+
+                        <div className="db3-candidate-headline">
+                          {candidate.headline ||
+                            'Candidate profile'}
+                        </div>
+
+                      </div>
+
+                      <div className="db3-candidate-role">
+                        {candidate.currentRole ||
+                          candidate.location ||
+                          'Profile'}
+                      </div>
+
+                      <span className="db3-candidate-score">
+                        {candidate.matchScore || 0}%
+                      </span>
+
+                      <ChevronRight
+                        className="db3-candidate-arrow"
+                        size={13}
+                      />
+
+                    </div>
+
+                  ))
+
+              )}
+
+            </div>
+
+          </section>
+
+
+          {/* -----------------------------------------------
+              SCORE DISTRIBUTION
+          ------------------------------------------------ */}
+
+          <section className="db3-panel db3-score-panel">
+
+            <div className="db3-panel-head">
+
+              <div className="db3-panel-head-left">
+
+                <div className="db3-panel-icon">
+                  <Target size={12} />
+                </div>
+
+                <div className="db3-panel-title">
+                  {t.scoreDist}
+                </div>
+
+              </div>
+
+            </div>
+
+
+            <div className="db3-score-body">
+
+              <div className="db3-score-note">
+                {t.scoreHint}
+              </div>
+
+
+              <div className="db3-score-bars">
+
+                {stats.scoreDist.map(
+                  (item, index) => {
+
+                    const percentage =
+                      stats.totalCandidates > 0
+                        ? (item.value /
+                            stats.totalCandidates) *
+                          100
+                        : 0;
+
+                    const active =
+                      selectedRange ===
+                      item.key;
+
+                    const dimmed =
+                      selectedRange &&
+                      selectedRange !== item.key;
+
+                    return (
+                      <div
+                        key={item.key}
+                        className={[
+                          'db3-score-row',
+                          active
+                            ? 'active'
+                            : '',
+                          dimmed
+                            ? 'dimmed'
+                            : '',
+                        ].join(' ')}
+                        onClick={() =>
+                          handleRangeClick(
+                            item.key
+                          )
+                        }
+                      >
+
+                        <span className="db3-score-label">
+                          {item.label}
+                        </span>
+
+                        <div className="db3-score-track">
+                          <div
+                            className="db3-score-fill"
+                            style={{
+                              width: `${percentage}%`,
+                              animationDelay:
+                                `${index * 70}ms`,
+                            }}
+                          />
+                        </div>
+
+                        <span className="db3-score-value">
+                          {item.value}
+                        </span>
+
+                      </div>
+                    );
+                  }
+                )}
+
+              </div>
+
+            </div>
+
+          </section>
+
         </div>
 
-        {/* Bottom row */}
-        <div className="dgd-bottom-row">
-          <div className="dgd-spotlight">
-            <span className="dgd-spotlight-tag"><Star size={13} color="var(--dg-bronze-500)" />{t.topCandidate}</span>
-            {stats.topCandidate ? (
-              <>
-                <div className="dgd-spotlight-person">
-                  <img
-                    className="dgd-spotlight-img"
-                    src={getAvatarUrl(stats.topCandidate.fullName, stats.topCandidate.avatarUrl)}
-                    alt={stats.topCandidate.fullName}
-                    onError={(e) => { e.target.onerror = null; e.target.src = getAvatarUrl(stats.topCandidate.fullName, null); }}
-                  />
-                  <div>
-                    <div className="dgd-spotlight-name dg-display">{stats.topCandidate.fullName}</div>
-                    <div className="dgd-spotlight-headline">{stats.topCandidate.headline}</div>
-                  </div>
-                </div>
-                <div className="dgd-spotlight-foot">
-                  <div>
-                    <div className="dgd-spotlight-score dg-display">{stats.topCandidate.matchScore}%</div>
-                    <div className="dgd-spotlight-score-label">{t.matchScoreLbl}</div>
-                  </div>
-                  <div className="dgd-spotlight-exp">
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{stats.topCandidate.experienceYears}y</div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{t.exp}</div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="dgd-spotlight-empty">{t.noCandidates}</div>
-            )}
+
+        {/* ================================================
+            ACTIVITY
+        ================================================= */}
+
+        <section className="db3-panel db3-activity">
+
+          <div className="db3-activity-tabs">
+
+            <button
+              className={[
+                'db3-tab',
+                activityTab === 0
+                  ? 'active'
+                  : '',
+              ].join(' ')}
+              onClick={() =>
+                setActivityTab(0)
+              }
+            >
+              {t.jobsTab}
+            </button>
+
+            <button
+              className={[
+                'db3-tab',
+                activityTab === 1
+                  ? 'active'
+                  : '',
+              ].join(' ')}
+              onClick={() =>
+                setActivityTab(1)
+              }
+            >
+              {t.searchesTab}
+            </button>
+
           </div>
 
-          <div className="dgd-card">
-            <div className="dgd-card-title dg-display" style={{ marginBottom: 14 }}><FileText size={15} color="var(--dg-teal-600)" />{t.jdTitle}</div>
-            {jobDescriptions.length === 0 ? (
-              <div className="dgd-empty">{t.noJDs}</div>
+
+          {/* ---------------------------------------------
+              JOBS
+          ---------------------------------------------- */}
+
+          {activityTab === 0 && (
+
+            jobDescriptions.length === 0 ? (
+
+              <div className="db3-empty">
+                {t.noJDs}
+              </div>
+
             ) : (
-              <>
-                {jobDescriptions.slice(0, 4).map((job) => {
-                  const savedCount = (savedRoleCandidates[job.id] || []).length;
+
+              jobDescriptions
+                .slice(0, 6)
+                .map((job) => {
+
+                  const savedCount =
+                    (
+                      savedRoleCandidates[
+                        job.id
+                      ] || []
+                    ).length;
+
+                  const isSelected =
+                    selectedJobId === job.id;
+
                   return (
-                    <div className="dgd-list-row" key={job.id}>
-                      <div style={{ minWidth: 0 }}>
-                        <div className="dgd-list-title">{job.title}</div>
-                        <div className="dgd-list-sub">{job.location || 'All locations'}</div>
+                    <div
+                      key={job.id}
+                      className="db3-role-row"
+                      style={
+                        isSelected
+                          ? {
+                              background:
+                                'var(--cyan-soft)',
+                            }
+                          : undefined
+                      }
+                      onClick={() =>
+                        handleSelectJob(
+                          job.id
+                        )
+                      }
+                    >
+
+                      <div className="db3-role-main">
+
+                        <div className="db3-role-title">
+                          {job.title}
+                        </div>
+
+                        <div className="db3-role-meta">
+                          {job.location ||
+                            'All locations'}
+                        </div>
+
                       </div>
-                      <span className={'dgd-list-badge ' + (savedCount > 0 ? 'dgd-list-badge-on' : 'dgd-list-badge-off')}>
-                        {savedCount} {t.saved}
-                      </span>
+
+                      <div className="db3-role-count">
+                        {savedCount}{' '}
+                        {t.saved}
+                      </div>
+
+                      <div className="db3-status">
+                        <span className="db3-status-dot" />
+                        Active
+                      </div>
+
+                      <ChevronRight
+                        className="db3-row-arrow"
+                        size={12}
+                      />
+
                     </div>
                   );
-                })}
-                {jobDescriptions.length > 4 && (
-                  <div className="dgd-list-more">+{jobDescriptions.length - 4} {t.more}</div>
-                )}
-              </>
-            )}
-          </div>
+                })
 
-          <div className="dgd-card">
-            <div className="dgd-card-title dg-display" style={{ marginBottom: 14 }}><Search size={15} color="var(--dg-teal-600)" />{t.recentSearches}</div>
-            {recentSearches.length === 0 ? (
-              <div className="dgd-empty">{t.noSearches}</div>
+            )
+
+          )}
+
+
+          {/* ---------------------------------------------
+              SEARCH HISTORY
+          ---------------------------------------------- */}
+
+          {activityTab === 1 && (
+
+            recentSearches.length === 0 ? (
+
+              <div className="db3-empty">
+                {t.noSearches}
+              </div>
+
             ) : (
-              recentSearches.map((search, idx) => (
-                <div className="dgd-search-row" key={idx}>
-                  <div className="dgd-search-icon"><Search size={11} /></div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div className="dgd-search-query">{search.query || 'Search'}</div>
-                    <div className="dgd-search-meta">
-                      <span className="dgd-search-date">{search.date}</span>
-                      <span className="dgd-search-results">{search.resultsCount} {t.results}</span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
 
-        {/* Agent performance footer */}
-        <div className="dgd-card">
-          <div className="dgd-perf">
-            <div className="dgd-perf-left">
-              <div className="dgd-perf-icon"><Sparkles size={16} /></div>
-              <div>
-                <div className="dgd-perf-title dg-display">{t.agentPerf}</div>
-                <div className="dgd-perf-sub">{t.agentSub}</div>
+              recentSearches.map(
+                (search, index) => (
+
+                  <div
+                    className="db3-search-row"
+                    key={index}
+                  >
+
+                    <div className="db3-search-icon">
+                      <Search size={11} />
+                    </div>
+
+                    <div>
+                      <div className="db3-search-query">
+                        {search.query ||
+                          'Candidate search'}
+                      </div>
+
+                      <div className="db3-search-meta">
+                        {search.date || 'Recent'}{' '}
+                        ·{' '}
+                        {search.resultsCount ||
+                          0}{' '}
+                        {t.results}
+                      </div>
+                    </div>
+
+                    <span className="db3-status">
+                      <Check size={10} />
+                      Done
+                    </span>
+
+                    <button
+                      className="db3-rerun"
+                      title={t.rerun}
+                      onClick={() =>
+                        onRerunSearch?.(
+                          search
+                        )
+                      }
+                    >
+                      <RotateCw size={11} />
+                    </button>
+
+                  </div>
+
+                )
+              )
+
+            )
+
+          )}
+
+        </section>
+
+
+        {/* ================================================
+            AI PERFORMANCE
+        ================================================= */}
+
+        <div className="db3-ai">
+
+          <div className="db3-ai-left">
+
+            <div className="db3-ai-icon">
+              <Sparkles size={13} />
+            </div>
+
+            <div>
+              <div className="db3-ai-title">
+                {t.agent}
+              </div>
+
+              <div className="db3-ai-sub">
+                Automated sourcing performance
               </div>
             </div>
-            <div className="dgd-perf-stats">
-              {[
-                { label: t.totalSearches, value: searchHistory.length || 0, icon: Search },
-                { label: t.avgMatch, value: stats.avgScore > 0 ? `${stats.avgScore}%` : '—', icon: Target },
-                { label: t.inPipeline, value: stats.totalInPipeline, icon: CheckCircle2 },
-                { label: t.profilesSourced, value: stats.totalCandidates, icon: Users },
-              ].map((m, i) => {
-                const Icon = m.icon;
-                return (
-                  <div className="dgd-perf-stat" key={i}>
-                    <div className="dgd-perf-stat-val dg-display"><Icon size={13} />{m.value}</div>
-                    <div className="dgd-perf-stat-label">{m.label}</div>
-                  </div>
-                );
-              })}
-            </div>
+
           </div>
+
+
+          <div className="db3-ai-metrics">
+
+            <div className="db3-ai-metric">
+              <strong>
+                {searchHistory.length || 0}
+              </strong>
+              {t.searches}
+            </div>
+
+            <div className="db3-ai-metric">
+              <strong>
+                {stats.avgScore}%
+              </strong>
+              {t.avgMatch}
+            </div>
+
+            <div className="db3-ai-metric">
+              <strong>
+                {stats.totalInPipeline}
+              </strong>
+              {t.inPipeline}
+            </div>
+
+            <div className="db3-ai-metric">
+              <strong>
+                {stats.totalCandidates}
+              </strong>
+              {t.profiles}
+            </div>
+
+          </div>
+
         </div>
 
       </div>

@@ -1,257 +1,270 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, ArrowRightLeft, MapPin, Briefcase, Sparkles, Mail, Globe, ExternalLink } from 'lucide-react';
+/**
+ * CandidateComparator — redesigned
+ *
+ * Design intent: a comparator's whole job is to make differences visible,
+ * so the redesign leans entirely into that instead of three identical columns:
+ *  - Shared skills are pulled out and marked distinctly from each candidate's
+ *    unique skills, so overlap is legible at a glance.
+ *  - Whichever candidate wins a row (more experience, higher score) gets a
+ *    quiet highlight on that row only — not a decorated whole column.
+ *  - Selecting a candidate chip animates the columns to their new width
+ *    instead of hard-cutting between 2 and 3 columns.
+ *
+ * Same token system as the redesigned CandidateCard: ink #12151B,
+ * paper #F7F5F1, tier colors for score (coral / cyan / slate).
+ */
 
-import { useLanguage } from '../context/LanguageContext';
-import { getAvatarUrl as getAvatarUrlUtil } from '../utils/avatar';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { X, ArrowRightLeft, MapPin, Briefcase, Sparkles, Mail, Globe, ExternalLink, Crown, Check } from 'lucide-react';
 
-function getAvatarUrl(name, avatarUrl) {
-  return getAvatarUrlUtil(name, avatarUrl);
-}
-
-function scoreTone(score) {
-  if (score >= 90) return 'green';
-  if (score >= 80) return 'teal';
-  return 'bronze';
-}
-
-const T = {
-  title: 'Side-by-side candidate comparator',
-  sub: 'Compare 2 to 3 candidates on skills, experience and AI score',
-  selectLabel: 'Select candidates to compare (max 3)',
-  match: 'match',
-  expLocation: 'Experience & location',
-  yearsExp: 'years experience',
-  expectations: 'Expectations & availability',
-  keySkills: 'Key tech skills',
-  aiRationale: 'AI match rationale',
-};
-
-export function CandidateComparator({
-  isOpen = true,
-  onClose = () => { },
-  candidates = [],
-  initialSelectedIds = [],
-}) {
-  const [selectedIds, setSelectedIds] = useState(() => {
-    if (initialSelectedIds && initialSelectedIds.length > 0) return initialSelectedIds.slice(0, 3);
-    return candidates.slice(0, 2).map((c) => c.id);
-  });
-  const fontsLoaded = useRef(false);
-
+function useFonts() {
+  const loaded = useRef(false);
   useEffect(() => {
-    if (fontsLoaded.current) return;
-    fontsLoaded.current = true;
+    if (loaded.current) return;
+    loaded.current = true;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href =
-      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
+    link.href = 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap';
     document.head.appendChild(link);
   }, []);
+}
 
+function scoreTier(score) {
+  if (score >= 90) return { color: '#E85D3D', soft: '#FDEEE9', label: 'hot lead' };
+  if (score >= 80) return { color: '#0BA5C9', soft: '#E9F7FA', label: 'good match' };
+  return { color: '#8A8F98', soft: '#F1F1F2', label: 'possible fit' };
+}
+
+function avatarUrl(name) {
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=12151B&textColor=ffffff&fontWeight=600&fontSize=38`;
+}
+
+function MiniRing({ score, color, size = 44 }) {
+  const [drawn, setDrawn] = useState(0);
+  const r = (size - 5) / 2;
+  const c = 2 * Math.PI * r;
+  useEffect(() => { const t = setTimeout(() => setDrawn(score), 100); return () => clearTimeout(t); }, [score]);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#EAE7E0" strokeWidth="3" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={c - (drawn / 100) * c}
+        style={{ transition: 'stroke-dashoffset .9s cubic-bezier(0.22,1,0.36,1)' }} />
+    </svg>
+  );
+}
+
+export function CandidateComparator({ isOpen = true, onClose = () => { }, candidates = [], initialSelectedIds = [] }) {
+  useFonts();
+  const [selectedIds, setSelectedIds] = useState(() => {
+    if (initialSelectedIds?.length) return initialSelectedIds.slice(0, 3);
+    return candidates.slice(0, 2).map(c => c.id);
+  });
+
+  // Derive selected list BEFORE hooks so useMemo deps are stable
+  const selected = candidates.filter(c => selectedIds.includes(c.id));
+  const count = selected.length;
+
+  // ── ALL hooks must be called unconditionally before any early return ──
+  const sharedSkills = useMemo(() => {
+    if (selected.length < 2) return new Set();
+    const [first, ...rest] = selected.map(c => new Set(c.skills));
+    return new Set([...first].filter(skill => rest.every(set => set.has(skill))));
+  }, [selected]);
+
+  const maxExp   = useMemo(() => Math.max(...selected.map(c => c.experienceYears), 0), [selected]);
+  const maxScore = useMemo(() => Math.max(...selected.map(c => c.matchScore),       0), [selected]);
+
+  const expTied   = selected.filter(c => c.experienceYears === maxExp).length  === selected.length;
+  const scoreTied = selected.filter(c => c.matchScore      === maxScore).length === selected.length;
+
+  function toggleSelect(id) {
+    if (selectedIds.includes(id)) {
+      if (selectedIds.length > 1) setSelectedIds(selectedIds.filter(x => x !== id));
+    } else if (selectedIds.length < 3) {
+      setSelectedIds([...selectedIds, id]);
+    }
+  }
+
+  // Guard after all hooks
   if (!isOpen) return null;
 
-  const selectedCandidates = candidates.filter((c) => selectedIds.includes(c.id));
-
-  const toggleSelect = (candId) => {
-    if (selectedIds.includes(candId)) {
-      if (selectedIds.length > 1) setSelectedIds(selectedIds.filter((id) => id !== candId));
-    } else if (selectedIds.length < 3) {
-      setSelectedIds([...selectedIds, candId]);
-    }
-  };
-
   return (
-    <div className="dg-root dgcm-overlay">
+    <div className="cp-overlay">
       <style>{`
-        .dg-root {
-          --dg-paper: #F6F7F9; --dg-surface: #FFFFFF; --dg-sunken: #EFF1F4;
-          --dg-border: #E3E6EB; --dg-border-strong: #CBD2DC;
-          --dg-ink-900: #10151F; --dg-ink-700: #38414F; --dg-ink-500: #6B7280; --dg-ink-400: #96A0AC;
-          --dg-teal-700: #0A5C68; --dg-teal-600: #0E7C8C; --dg-teal-100: #E1F2F3;
-          --dg-bronze-700: #8A4B0C; --dg-bronze-600: #B4650F; --dg-bronze-100: #FBEEDD;
-          --dg-green-700: #1F6E4A; --dg-green-600: #278F5E; --dg-green-100: #E3F5EC;
-          --font-display: 'Space Grotesk', 'Inter', sans-serif;
-          --font-body: 'Inter', system-ui, sans-serif;
-          --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-          font-family: var(--font-body); color: var(--dg-ink-900);
-        }
-        .dg-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+        @keyframes cpFadeIn { from { opacity:0; } to { opacity:1; } }
+        @keyframes cpModalIn { from { opacity:0; transform: scale(0.97) translateY(6px); } to { opacity:1; transform:scale(1) translateY(0); } }
+        @keyframes cpColIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:translateY(0); } }
 
-        .dgcm-overlay {
+        .cp-overlay {
           position: fixed; inset: 0; z-index: 50; overflow-y: auto;
-          background: rgba(16,21,31,0.55); backdrop-filter: blur(3px);
-          display: flex; align-items: center; justify-content: center; padding: 16px;
+          background: rgba(18,21,27,0.55); backdrop-filter: blur(3px);
+          display:flex; align-items:center; justify-content:center; padding:16px;
+          animation: cpFadeIn .2s ease both;
+          font-family: 'Inter', system-ui, sans-serif;
         }
-        .dgcm-modal {
-          background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 20px;
-          max-width: 1080px; width: 100%; max-height: 90vh; overflow: hidden;
-          display: flex; flex-direction: column;
-          box-shadow: 0 30px 70px -30px rgba(16,21,31,0.4);
+        .cp-modal {
+          background:#FBFAF7; border:1px solid #E4E1D9; border-radius:20px;
+          max-width: 1080px; width:100%; max-height:90vh; overflow:hidden;
+          display:flex; flex-direction:column; box-shadow: 0 30px 70px -30px rgba(18,21,27,0.45);
+          animation: cpModalIn .25s cubic-bezier(0.22,1,0.36,1) both;
+        }
+        .cp-header { padding:18px 22px; border-bottom:1px solid #E4E1D9; display:flex; align-items:center; justify-content:space-between; }
+        .cp-header-left { display:flex; align-items:center; gap:12px; }
+        .cp-header-icon { width:32px; height:32px; border-radius:9px; background:#F1F1EC; color:#12151B; display:flex; align-items:center; justify-content:center; }
+        .cp-title { font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:700; color:#12151B; }
+        .cp-sub { font-size:11.5px; color:#63666E; margin-top:2px; }
+        .cp-close { background:none; border:none; color:#9B9C9E; cursor:pointer; padding:6px; border-radius:8px; }
+        .cp-close:hover { color:#12151B; background:#F1F1EC; }
+
+        .cp-selector { padding:12px 22px; border-bottom:1px solid #E4E1D9; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+        .cp-selector-label { font-size:11px; font-weight:600; color:#63666E; }
+        .cp-chip-row { display:flex; flex-wrap:wrap; gap:8px; }
+        .cp-chip {
+          display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600;
+          padding:5px 12px 5px 5px; border-radius:20px; border:1px solid #E4E1D9; background:#fff; color:#3A3D44;
+          cursor:pointer; transition: background .15s ease, color .15s ease, border-color .15s ease;
+        }
+        .cp-chip img { width:20px; height:20px; border-radius:50%; }
+        .cp-chip:hover { border-color:#C9C5BA; }
+        .cp-chip.active { background:#12151B; color:#fff; border-color:#12151B; }
+        .cp-chip-score { font-family:'JetBrains Mono',monospace; font-size:10px; opacity:0.7; }
+
+        .cp-body { padding:20px 22px 24px; overflow-y:auto; flex:1; }
+        .cp-grid { display:flex; gap:16px; align-items:stretch; }
+        .cp-col {
+          background:#fff; border:1px solid #E4E1D9; border-radius:16px; padding:16px;
+          display:flex; flex-direction:column; gap:14px;
+          flex: 1 1 0; min-width:0;
+          transition: flex-basis .3s cubic-bezier(0.22,1,0.36,1);
+          animation: cpColIn .35s cubic-bezier(0.22,1,0.36,1) both;
         }
 
-        .dgcm-header { padding: 20px 22px; border-bottom: 1px solid var(--dg-border); display: flex; align-items: center; justify-content: space-between; background: var(--dg-paper); }
-        .dgcm-header-left { display: flex; align-items: center; gap: 12px; }
-        .dgcm-header-icon { width: 34px; height: 34px; border-radius: 10px; background: var(--dg-teal-100); color: var(--dg-teal-700); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .dgcm-header-title { font-size: 14px; font-weight: 700; }
-        .dgcm-header-sub { font-size: 11px; color: var(--dg-ink-500); margin-top: 2px; }
-        .dgcm-close { background: none; border: none; color: var(--dg-ink-400); cursor: pointer; padding: 6px; border-radius: 8px; }
-        .dgcm-close:hover { color: var(--dg-ink-700); background: var(--dg-sunken); }
+        .cp-col-head { text-align:center; padding-bottom:12px; border-bottom:1px solid #EFEDE7; position:relative; }
+        .cp-crown { position:absolute; top:-6px; left:50%; transform:translateX(-50%); color:#E8B23D; }
+        .cp-ring-wrap { position:relative; width:44px; height:44px; margin:0 auto 8px; }
+        .cp-col-avatar { position:absolute; top:4px; left:4px; width:36px; height:36px; border-radius:50%; object-fit:cover; }
+        .cp-col-name { font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:700; color:#12151B; }
+        .cp-col-headline { font-size:11px; color:#63666E; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .cp-tier-pill { display:inline-block; font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:20px; margin-top:8px; }
 
-        .dgcm-selector { padding: 14px 22px; background: var(--dg-paper); border-bottom: 1px solid var(--dg-border); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-        .dgcm-selector-label { font-size: 11.5px; font-weight: 700; color: var(--dg-ink-700); }
-        .dgcm-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
-        .dgcm-chip {
-          font-size: 12px; font-weight: 600; padding: 7px 13px; border-radius: 10px;
-          border: 1px solid var(--dg-border); background: var(--dg-surface); color: var(--dg-ink-700);
-          cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease;
-        }
-        .dgcm-chip:hover { border-color: var(--dg-border-strong); }
-        .dgcm-chip-active { background: var(--dg-teal-600); color: #fff; border-color: var(--dg-teal-600); }
-        .dgcm-chip-active:hover { border-color: var(--dg-teal-600); }
+        .cp-block-label { font-size:10px; font-weight:700; color:#9B9C9E; letter-spacing:.03em; margin-bottom:6px; }
+        .cp-block-box { background:#FBFAF7; border:1px solid #EFEDE7; border-radius:10px; padding:9px 10px; font-size:11.5px; color:#3A3D44; font-weight:500; transition: background .2s ease, border-color .2s ease; }
+        .cp-block-box.winner { background:#FDEEE9; border-color:rgba(232,93,61,0.3); }
+        .cp-block-row { display:flex; align-items:center; gap:7px; }
+        .cp-block-row + .cp-block-row { margin-top:5px; }
+        .cp-winner-tag { margin-left:auto; display:flex; align-items:center; gap:3px; font-size:9.5px; font-weight:700; color:#E85D3D; }
+        .cp-avail { font-size:10px; color:#9B9C9E; margin-top:3px; }
 
-        .dgcm-body { padding: 22px; overflow-y: auto; flex: 1; }
-        .dgcm-grid { display: grid; gap: 18px; }
-        .dgcm-grid-2 { grid-template-columns: 1fr 1fr; }
-        .dgcm-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .cp-skills-count { font-size:10.5px; color:#63666E; margin-bottom:7px; }
+        .cp-skills { display:flex; flex-wrap:wrap; gap:5px; }
+        .cp-skill { font-size:10.5px; font-weight:500; padding:3px 9px; border-radius:20px; border:1px solid transparent; }
+        .cp-skill.shared { background:#12151B; color:#fff; }
+        .cp-skill.unique { background:#F1F1EC; color:#63666E; }
 
-        .dgcm-col { background: var(--dg-paper); border: 1px solid var(--dg-border); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+        .cp-reasons { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+        .cp-reason { display:flex; align-items:flex-start; gap:7px; font-size:11px; color:#3A3D44; line-height:1.5; }
+        .cp-reason-dot { width:4px; height:4px; border-radius:50%; background:#0BA5C9; flex-shrink:0; margin-top:6px; }
 
-        .dgcm-col-head { text-align: center; padding-bottom: 14px; border-bottom: 1px solid var(--dg-border); }
-        .dgcm-col-avatar { width: 60px; height: 60px; border-radius: 16px; object-fit: cover; border: 1px solid var(--dg-border-strong); margin: 0 auto 10px; display: block; }
-        .dgcm-col-name { font-size: 13.5px; font-weight: 700; }
-        .dgcm-col-headline { font-size: 11px; color: var(--dg-ink-500); font-weight: 500; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .dgcm-match-pill {
-          display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono);
-          font-size: 11.5px; font-weight: 700; padding: 5px 12px; border-radius: 999px; border: 1px solid; margin-top: 10px;
-        }
-        .dgcm-match-green { color: var(--dg-green-700); background: var(--dg-green-100); border-color: rgba(31,110,74,0.25); }
-        .dgcm-match-teal { color: var(--dg-teal-700); background: var(--dg-teal-100); border-color: rgba(14,124,140,0.25); }
-        .dgcm-match-bronze { color: var(--dg-bronze-700); background: var(--dg-bronze-100); border-color: rgba(180,101,15,0.25); }
-
-        .dgcm-block-label { font-size: 10px; font-weight: 700; color: var(--dg-ink-400); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 7px; }
-        .dgcm-block-box { background: var(--dg-surface); border: 1px solid var(--dg-border); border-radius: 12px; padding: 11px 12px; font-size: 11.5px; color: var(--dg-ink-700); font-weight: 500; }
-        .dgcm-block-row { display: flex; align-items: center; gap: 7px; }
-        .dgcm-block-row + .dgcm-block-row { margin-top: 6px; }
-        .dgcm-avail { font-size: 10.5px; color: var(--dg-ink-400); margin-top: 3px; }
-
-        .dgcm-skills { display: flex; flex-wrap: wrap; gap: 6px; }
-        .dgcm-skill { font-family: var(--font-mono); font-size: 10px; font-weight: 500; background: var(--dg-teal-100); color: var(--dg-teal-700); border: 1px solid rgba(14,124,140,0.18); padding: 3px 8px; border-radius: 7px; }
-
-        .dgcm-reasons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
-        .dgcm-reason { display: flex; align-items: flex-start; gap: 8px; font-size: 11px; color: var(--dg-ink-700); line-height: 1.5; }
-        .dgcm-reason-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--dg-teal-600); flex-shrink: 0; margin-top: 6px; }
-
-        .dgcm-contacts { display: flex; align-items: center; justify-content: center; gap: 14px; padding-top: 4px; }
-        .dgcm-contact-link { color: var(--dg-ink-400); transition: color .15s ease; }
-        .dgcm-contact-link:hover { color: var(--dg-teal-700); }
+        .cp-contacts { display:flex; align-items:center; justify-content:center; gap:14px; padding-top:2px; margin-top:auto; }
+        .cp-contact-link { color:#9B9C9E; transition:color .15s ease; }
+        .cp-contact-link:hover { color:#12151B; }
       `}</style>
 
-      <div className="dgcm-modal">
-        <div className="dgcm-header">
-          <div className="dgcm-header-left">
-            <div className="dgcm-header-icon"><ArrowRightLeft size={16} /></div>
+      <div className="cp-modal">
+        <div className="cp-header">
+          <div className="cp-header-left">
+            <div className="cp-header-icon"><ArrowRightLeft size={15} /></div>
             <div>
-              <div className="dgcm-header-title dg-display">{T.title}</div>
-              <div className="dgcm-header-sub">{T.sub}</div>
+              <div className="cp-title">Compare candidates</div>
+              <div className="cp-sub">Shared skills and the stronger value in each row are highlighted automatically</div>
             </div>
           </div>
-          <button className="dgcm-close" onClick={onClose} aria-label="Close">
-            <X size={17} />
-          </button>
+          <button className="cp-close" onClick={onClose} aria-label="Close"><X size={16} /></button>
         </div>
 
-        <div className="dgcm-selector">
-          <span className="dgcm-selector-label">{T.selectLabel}:</span>
-          <div className="dgcm-chip-row">
-            {candidates.map((c) => {
-              const isSelected = selectedIds.includes(c.id);
+        <div className="cp-selector">
+          <span className="cp-selector-label">Comparing (max 3):</span>
+          <div className="cp-chip-row">
+            {candidates.map(c => {
+              const isSel = selectedIds.includes(c.id);
               return (
-                <button
-                  key={c.id}
-                  className={'dgcm-chip' + (isSelected ? ' dgcm-chip-active' : '')}
-                  onClick={() => toggleSelect(c.id)}
-                >
+                <button key={c.id} className={`cp-chip${isSel ? ' active' : ''}`} onClick={() => toggleSelect(c.id)}>
+                  <img src={avatarUrl(c.fullName)} alt="" />
                   {c.fullName}
+                  <span className="cp-chip-score">{c.matchScore}%</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        <div className="dgcm-body">
-          <div className={'dgcm-grid ' + (selectedCandidates.length === 3 ? 'dgcm-grid-3' : 'dgcm-grid-2')}>
-            {selectedCandidates.map((candidate) => {
-              const tone = scoreTone(candidate.matchScore);
+        <div className="cp-body">
+          <div className="cp-grid">
+            {selected.map((candidate, i) => {
+              const tier = scoreTier(candidate.matchScore);
+              const isTopScore = candidate.matchScore === maxScore && !scoreTied && count > 1;
+              const isTopExp = candidate.experienceYears === maxExp && !expTied && count > 1;
+              const unique = candidate.skills.filter(s => !sharedSkills.has(s));
+              const shared = candidate.skills.filter(s => sharedSkills.has(s));
+
               return (
-                <div className="dgcm-col" key={candidate.id}>
-                  <div className="dgcm-col-head">
-                    <img
-                      className="dgcm-col-avatar"
-                      src={getAvatarUrl(candidate.fullName, candidate.avatarUrl)}
-                      alt={candidate.fullName}
-                      onError={(e) => { e.target.onerror = null; e.target.src = getAvatarUrl(candidate.fullName, null); }}
-                    />
-                    <div className="dgcm-col-name dg-display">{candidate.fullName}</div>
-                    <div className="dgcm-col-headline">{candidate.headline}</div>
-                    <div className={`dgcm-match-pill dgcm-match-${tone}`}>
-                      <Sparkles size={12} />
-                      {candidate.matchScore}% {T.match}
+                <div className="cp-col" key={candidate.id} style={{ animationDelay: `${i * 40}ms` }}>
+                  <div className="cp-col-head">
+                    {isTopScore && <Crown size={16} className="cp-crown" fill="#E8B23D" />}
+                    <div className="cp-ring-wrap">
+                      <MiniRing score={candidate.matchScore} color={tier.color} />
+                      <img className="cp-col-avatar" src={avatarUrl(candidate.fullName)} alt={candidate.fullName} />
+                    </div>
+                    <div className="cp-col-name">{candidate.fullName}</div>
+                    <div className="cp-col-headline">{candidate.headline}</div>
+                    <div className="cp-tier-pill" style={{ color: tier.color, background: tier.soft }}>{candidate.matchScore}% · {tier.label}</div>
+                  </div>
+
+                  <div>
+                    <div className="cp-block-label">Experience &amp; location</div>
+                    <div className={`cp-block-box${isTopExp ? ' winner' : ''}`}>
+                      <div className="cp-block-row">
+                        <Briefcase size={12} color={isTopExp ? '#E85D3D' : '#63666E'} />
+                        {candidate.experienceYears} years experience
+                        {isTopExp && <span className="cp-winner-tag"><Crown size={10} /> most</span>}
+                      </div>
+                      <div className="cp-block-row"><MapPin size={12} color="#63666E" />{candidate.location}</div>
                     </div>
                   </div>
 
                   <div>
-                    <div className="dgcm-block-label">{T.expLocation}</div>
-                    <div className="dgcm-block-box">
-                      <div className="dgcm-block-row"><Briefcase size={13} color="var(--dg-teal-600)" />{candidate.experienceYears} {T.yearsExp}</div>
-                      <div className="dgcm-block-row"><MapPin size={13} color="var(--dg-teal-600)" />{candidate.location}</div>
+                    <div className="cp-block-label">Expectations &amp; availability</div>
+                    <div className="cp-block-box">
+                      <div>{candidate.salaryExpectation || 'Not specified'}</div>
+                      <div className="cp-avail">{candidate.availability || 'Immediate'}</div>
                     </div>
                   </div>
 
                   <div>
-                    <div className="dgcm-block-label">{T.expectations}</div>
-                    <div className="dgcm-block-box">
-                      <div>{candidate.salaryExpectation || 'N/A'}</div>
-                      <div className="dgcm-avail">{candidate.availability || 'Immediate'}</div>
+                    <div className="cp-block-label">Tech skills</div>
+                    {sharedSkills.size > 0 && (
+                      <div className="cp-skills-count">{shared.length} shared across everyone compared</div>
+                    )}
+                    <div className="cp-skills">
+                      {shared.map(s => <span className="cp-skill shared" key={s}><Check size={9} style={{ marginRight: 3, verticalAlign: -1 }} />{s}</span>)}
+                      {unique.map(s => <span className="cp-skill unique" key={s}>{s}</span>)}
                     </div>
                   </div>
 
                   <div>
-                    <div className="dgcm-block-label">{T.keySkills}</div>
-                    <div className="dgcm-skills">
-                      {candidate.skills.map((skill, idx) => (
-                        <span className="dgcm-skill" key={idx}>{skill}</span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="dgcm-block-label">{T.aiRationale}</div>
-                    <ul className="dgcm-reasons">
+                    <div className="cp-block-label">AI match rationale</div>
+                    <ul className="cp-reasons">
                       {(candidate.verifiedMatchReasons || [candidate.summary]).slice(0, 3).map((r, idx) => (
-                        <li className="dgcm-reason" key={idx}>
-                          <span className="dgcm-reason-dot" />
-                          <span>{r}</span>
-                        </li>
+                        <li className="cp-reason" key={idx}><span className="cp-reason-dot" /><span>{r}</span></li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="dgcm-contacts">
-                    {candidate.email && (
-                      <a className="dgcm-contact-link" href={`mailto:${candidate.email}`} title={candidate.email}>
-                        <Mail size={15} />
-                      </a>
-                    )}
-                    {candidate.linkedin && (
-                      <a className="dgcm-contact-link" href={`https://${candidate.linkedin}`} target="_blank" rel="noreferrer" title="LinkedIn profile">
-                        <Globe size={15} />
-                      </a>
-                    )}
-                    {candidate.github && (
-                      <a className="dgcm-contact-link" href={`https://${candidate.github}`} target="_blank" rel="noreferrer" title="GitHub profile">
-                        <ExternalLink size={15} />
-                      </a>
-                    )}
+                  <div className="cp-contacts">
+                    {candidate.email && <a className="cp-contact-link" href={`mailto:${candidate.email}`} title={candidate.email}><Mail size={14} /></a>}
+                    {candidate.linkedin && <a className="cp-contact-link" href={candidate.linkedin} target="_blank" rel="noreferrer" title="LinkedIn"><Globe size={14} /></a>}
+                    {candidate.github && <a className="cp-contact-link" href={candidate.github} target="_blank" rel="noreferrer" title="GitHub"><ExternalLink size={14} /></a>}
                   </div>
                 </div>
               );

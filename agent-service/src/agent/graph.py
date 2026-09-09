@@ -432,6 +432,23 @@ async def enrich_node(state: SourcingState) -> SourcingState:
 
                         profile["current_company"] = valid_exps[0].get("company") or profile.get("current_company")
 
+                        # Recalculate experience_years from enriched experiences
+                        total_years = 0
+                        for exp in valid_exps:
+                            start = exp.get("start")
+                            end = exp.get("end")
+                            if start:
+                                from datetime import datetime
+                                try:
+                                    start_date = datetime.fromisoformat(start) if isinstance(start, str) else start
+                                    end_date = datetime.now() if not end or exp.get("period", "").lower() == "present" else (datetime.fromisoformat(end) if isinstance(end, str) else end)
+                                    years = (end_date - start_date).days / 365.25
+                                    total_years += max(0, years)
+                                except Exception:
+                                    pass
+                        if total_years > 0:
+                            profile["experience_years"] = int(round(total_years))
+
                 if enrich_result.summary:
 
                     profile["summary"] = enrich_result.summary
@@ -441,6 +458,40 @@ async def enrich_node(state: SourcingState) -> SourcingState:
                     profile["email"] = enrich_result.email
 
                     profile["email_is_verified"] = enrich_result.email_is_verified
+
+                # Add additional Apollo fields
+                if enrich_result.email_status:
+                    profile["email_status"] = enrich_result.email_status
+
+                if enrich_result.extrapolated_email_confidence is not None:
+                    profile["extrapolated_email_confidence"] = enrich_result.extrapolated_email_confidence
+
+                if enrich_result.match_confidence:
+                    profile["match_confidence"] = enrich_result.match_confidence
+
+                if enrich_result.photo_url:
+                    profile["photo_url"] = enrich_result.photo_url
+
+                if enrich_result.linkedin_url:
+                    profile["linkedin_url"] = enrich_result.linkedin_url
+
+                if enrich_result.github_url:
+                    profile["github_url"] = enrich_result.github_url
+
+                if enrich_result.organization_name:
+                    profile["organization_name"] = enrich_result.organization_name
+
+                if enrich_result.organization_domain:
+                    profile["organization_domain"] = enrich_result.organization_domain
+
+                if enrich_result.organization_departments:
+                    profile["organization_departments"] = enrich_result.organization_departments
+
+                if enrich_result.organization_functions:
+                    profile["organization_functions"] = enrich_result.organization_functions
+
+                if enrich_result.organization_seniority:
+                    profile["organization_seniority"] = enrich_result.organization_seniority
 
 
 

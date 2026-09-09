@@ -687,7 +687,13 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
         name = temp.strip() or f"Profile {idx + 1}"
     else:
         name = f"Profile {idx + 1}"
-    role = title.split(" - ")[1].strip() if " - " in title and len(title.split(" - ")) > 1 else title
+    
+    # Safe role extraction with proper bounds checking
+    title_parts = title.split(" - ") if " - " in title else [title]
+    if len(title_parts) > 1:
+        role = title_parts[1].strip()
+    else:
+        role = title
 
     candidate_skills = _extract_skills(role, full_text, criteria)
     exp_years = _estimate_experience_years(role, full_text)
