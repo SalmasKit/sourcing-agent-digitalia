@@ -8,6 +8,7 @@
  * - Persistent filter / search controls
  * - Optimized for large note collections
  * - Matches the CandidateGridView visual language
+ * - Header typography matches KanbanPipeline header exactly
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -16,6 +17,7 @@ import {
   Trash2,
   Clock,
   ChevronRight,
+  ChevronLeft,
   Search,
   X,
   Briefcase,
@@ -25,6 +27,7 @@ import {
   ArrowUpRight,
   Layers3,
   Sparkles,
+  Plus,
 } from 'lucide-react';
 
 import { getAvatarUrl as getAvatarUrlUtil } from '../utils/avatar';
@@ -66,16 +69,30 @@ export function RecruiterNotesView({
   jobDescriptions = [],
   savedRoleCandidates = {},
   jobResultsCache = {},
-  onViewCandidate = () => {},
-  onDeleteNote = () => {},
+  onViewCandidate = () => { },
+  onDeleteNote = () => { },
+  onAddNote = () => { },
 }) {
   const { lang } = useLanguage();
 
   const [selectedJobId, setSelectedJobId] = useState('all');
   const [filterText, setFilterText] = useState('');
-  const [expandedCandidates, setExpandedCandidates] = useState(new Set());
+  const [page, setPage] = useState(0);
+  const [addingNoteCandidateId, setAddingNoteCandidateId] = useState(null);
+  const [newNoteText, setNewNoteText] = useState('');
+
+  const PAGE_SIZE = 6;
+  const NOTES_SCROLL_AFTER = 2;
 
   const fontsLoaded = useRef(false);
+
+  const handleCompleteNote = (candidateId) => {
+    if (newNoteText.trim()) {
+      onAddNote(candidateId, newNoteText.trim());
+      setNewNoteText('');
+      setAddingNoteCandidateId(null);
+    }
+  };
 
   useEffect(() => {
     if (fontsLoaded.current) return;
@@ -94,9 +111,9 @@ export function RecruiterNotesView({
   const cleanFilter = filterText.trim().toLowerCase();
 
   /*
-   * ------------------------------------------------------------
+   * ============================================================
    * DATA
-   * ------------------------------------------------------------
+   * ============================================================
    */
 
   const candidatesWithNotes = useMemo(
@@ -113,67 +130,97 @@ export function RecruiterNotesView({
     [candidatesWithNotes]
   );
 
+  const normalizeId = value => {
+    if (value === null || value === undefined) return '';
+    return String(value).trim();
+  };
+
+  const getCandidateIds = candidate => {
+    const ids = [
+      candidate.id,
+      candidate.candidateId,
+      candidate.profileId,
+      candidate.linkedinId,
+    ]
+      .map(normalizeId)
+      .filter(Boolean);
+
+    return new Set(ids);
+  };
+
   const isCandidateInJob = (candidate, jobId) => {
     if (jobId === 'all') return true;
 
-    // 1. Saved candidate in specific job role
-    const savedIds = savedRoleCandidates[jobId] || [];
+    const normalizedJobId = normalizeId(jobId);
+    const candidateIds = getCandidateIds(candidate);
 
-    if (savedIds.includes(candidate.id)) return true;
+    // 1) Candidate explicitly saved to this role.
+    const savedIds =
+      savedRoleCandidates[jobId] ||
+      savedRoleCandidates[normalizedJobId] ||
+      [];
 
-    // 2. Candidate returned in search cache
-    const cachedList = jobResultsCache[jobId] || [];
-
-    if (cachedList.some(c => c.id === candidate.id)) return true;
-
-    // 3. Direct candidate association
     if (
-      candidate.jobId === jobId ||
-      candidate.savedJobId === jobId
+      savedIds.some(savedId =>
+        candidateIds.has(normalizeId(savedId))
+      )
     ) {
       return true;
     }
 
-    // 4. Smart match against job title
-    const job = jobDescriptions.find(j => j.id === jobId);
+    // 2) Candidate exists in this role's cached sourcing results.
+    const cachedList =
+      jobResultsCache[jobId] ||
+      jobResultsCache[normalizedJobId] ||
+      [];
 
-    if (job && job.title) {
-      const titleLower = job.title.toLowerCase();
+    if (
+      cachedList.some(cachedCandidate => {
+        const cachedIds = getCandidateIds(cachedCandidate);
 
-      const candHeadline = (
-        candidate.headline || ''
-      ).toLowerCase();
-
-      const candRole = (
-        candidate.current_role ||
-        candidate.currentRole ||
-        ''
-      ).toLowerCase();
-
-      if (
-        candHeadline.includes(titleLower) ||
-        candRole.includes(titleLower)
-      ) {
-        return true;
-      }
-
-      const tokens = titleLower
-        .split(/[\s,/-]+/)
-        .filter(token => token.length > 3);
-
-      if (
-        tokens.length > 0 &&
-        tokens.some(
-          token =>
-            candHeadline.includes(token) ||
-            candRole.includes(token)
-        )
-      ) {
-        return true;
-      }
+        return [...cachedIds].some(id =>
+          candidateIds.has(id)
+        );
+      })
+    ) {
+      return true;
     }
 
-    return false;
+    // 3) Candidate object explicitly carries this job/role id.
+    const directJobIds = [
+      candidate.jobId,
+      candidate.savedJobId,
+      candidate.roleId,
+      candidate.savedRoleId,
+      candidate.jobDescriptionId,
+      candidate.sourceJobId,
+    ]
+      .map(normalizeId)
+      .filter(Boolean);
+
+    if (directJobIds.includes(normalizedJobId)) {
+      return true;
+    }
+
+    // 4) Support candidates associated with several roles.
+    const multiJobIds = [
+      ...(Array.isArray(candidate.jobIds)
+        ? candidate.jobIds
+        : []),
+      ...(Array.isArray(candidate.roleIds)
+        ? candidate.roleIds
+        : []),
+      ...(Array.isArray(candidate.savedJobIds)
+        ? candidate.savedJobIds
+        : []),
+      ...(Array.isArray(candidate.savedRoleIds)
+        ? candidate.savedRoleIds
+        : []),
+    ]
+      .map(normalizeId)
+      .filter(Boolean);
+
+    return multiJobIds.includes(normalizedJobId);
   };
 
   const filteredCandidates = useMemo(() => {
@@ -182,35 +229,54 @@ export function RecruiterNotesView({
         isCandidateInJob(candidate, selectedJobId)
       )
       .map(candidate => {
-        const matchingNotes = cleanFilter
-          ? candidate.notes.filter(note =>
+        const candidateName = (
+          candidate.fullName ||
+          candidate.name ||
+          ''
+        ).toLowerCase();
+
+        const candidateRole = (
+          candidate.headline ||
+          candidate.current_role ||
+          candidate.currentRole ||
+          ''
+        ).toLowerCase();
+
+        const candidateMatchesSearch =
+          Boolean(cleanFilter) &&
+          (
+            candidateName.includes(cleanFilter) ||
+            candidateRole.includes(cleanFilter)
+          );
+
+        // If the search matches the candidate's name/role,
+        // keep all their notes.
+        //
+        // Otherwise, only show notes whose text matches
+        // the search.
+        const matchingNotes =
+          !cleanFilter || candidateMatchesSearch
+            ? candidate.notes
+            : candidate.notes.filter(note =>
               (note.text || '')
                 .toLowerCase()
                 .includes(cleanFilter)
-            )
-          : candidate.notes;
+            );
 
-        /*
-         * Sort newest first when a timestamp is available.
-         * Falls back to original ordering when timestamps aren't usable.
-         */
-        const sortedNotes = [...matchingNotes].sort((a, b) => {
-          const aDate = a.createdAt
-            ? new Date(a.createdAt).getTime()
-            : typeof a.id === 'number'
-              ? a.id
-              : 0;
+        const sortedNotes = matchingNotes
+          .map((note, idx) => ({ note, idx })) // idx = original chronological position
+          .sort((a, b) => {
+            const aTime = a.note.createdAt ? new Date(a.note.createdAt).getTime() : NaN;
+            const bTime = b.note.createdAt ? new Date(b.note.createdAt).getTime() : NaN;
 
-          const bDate = b.createdAt
-            ? new Date(b.createdAt).getTime()
-            : typeof b.id === 'number'
-              ? b.id
-              : 0;
+            if (!isNaN(aTime) && !isNaN(bTime)) {
+              return bTime - aTime; // newest createdAt first
+            }
 
-          if (!aDate && !bDate) return 0;
-
-          return bDate - aDate;
-        });
+            // Fallback when createdAt is missing: rely on insertion order (newest = highest idx)
+            return b.idx - a.idx;
+          })
+          .map(x => x.note);
 
         return {
           ...candidate,
@@ -224,7 +290,6 @@ export function RecruiterNotesView({
     cleanFilter,
     savedRoleCandidates,
     jobResultsCache,
-    jobDescriptions,
   ]);
 
   const totalFilteredNotes = useMemo(
@@ -237,28 +302,27 @@ export function RecruiterNotesView({
     [filteredCandidates]
   );
 
+  const totalPages = Math.ceil(
+    filteredCandidates.length / PAGE_SIZE
+  );
+
+  const paginatedCandidates = filteredCandidates.slice(
+    page * PAGE_SIZE,
+    page * PAGE_SIZE + PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setPage(0);
+  }, [selectedJobId, cleanFilter]);
+
   const hasActiveFilters =
     selectedJobId !== 'all' || Boolean(filterText);
 
   /*
-   * ------------------------------------------------------------
+   * ============================================================
    * HELPERS
-   * ------------------------------------------------------------
+   * ============================================================
    */
-
-  const toggleCandidate = candidateId => {
-    setExpandedCandidates(prev => {
-      const next = new Set(prev);
-
-      if (next.has(candidateId)) {
-        next.delete(candidateId);
-      } else {
-        next.add(candidateId);
-      }
-
-      return next;
-    });
-  };
 
   const resetFilters = () => {
     setSelectedJobId('all');
@@ -274,9 +338,9 @@ export function RecruiterNotesView({
       .slice(0, 2);
 
   /*
-   * ------------------------------------------------------------
+   * ============================================================
    * RENDER
-   * ------------------------------------------------------------
+   * ============================================================
    */
 
   return (
@@ -347,63 +411,38 @@ export function RecruiterNotesView({
 
         /* ======================================================
            HEADER
+           (aligned to KanbanPipeline .kb-header / .kb-header-title)
         ====================================================== */
 
         .rn-header {
-          background: var(--rn-surface);
-          border: 1px solid var(--rn-border);
-          border-radius: 16px;
-          padding: 18px 20px;
-
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          gap: 18px;
-
-          box-shadow:
-            0 1px 3px rgba(18, 21, 27, 0.04);
+          align-items: flex-start;
+          gap: 32px;
+          padding-bottom: 20px;
+          margin-bottom: 4px;
+          border-bottom: 1px solid var(--rn-border);
+          flex-wrap: wrap;
         }
 
         .rn-header-left {
-          display: flex;
-          align-items: center;
-          gap: 13px;
-          min-width: 0;
-        }
-
-        .rn-header-icon {
-          width: 42px;
-          height: 42px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border-radius: 12px;
-
-          background: var(--rn-cyan-soft);
-          border: 1px solid rgba(14, 124, 140, 0.18);
-
-          color: var(--rn-cyan);
-
-          flex-shrink: 0;
-        }
-
-        .rn-header-copy {
           min-width: 0;
         }
 
         .rn-title {
-          font-size: 16px;
-          font-weight: 800;
-          line-height: 1.2;
+          margin: 0;
+          font-family: var(--rn-font-display);
+          font-size: 26px;
+          letter-spacing: -.03em;
+          color: var(--rn-ink-900);
         }
 
         .rn-subtitle {
-          margin-top: 3px;
+          max-width: 620px;
+          margin: 7px 0 0;
           color: var(--rn-ink-500);
-          font-size: 12px;
-          line-height: 1.45;
+          font-size: 13px;
+          line-height: 1.6;
         }
 
         .rn-header-stats {
@@ -416,232 +455,803 @@ export function RecruiterNotesView({
         .rn-stat {
           min-width: 72px;
           padding: 8px 11px;
-
           border: 1px solid var(--rn-border);
           background: var(--rn-paper);
           border-radius: 10px;
-
           text-align: center;
         }
 
         .rn-stat-value {
-          font-family: var(--rn-font-mono);
-          font-size: 13px;
+          font-family: var(--rn-font-display);
+          font-size: 17px;
           font-weight: 700;
+          line-height: 1.1;
           color: var(--rn-ink-900);
         }
 
         .rn-stat-label {
-          margin-top: 2px;
-          font-size: 9px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: .06em;
+          margin-top: 3px;
           color: var(--rn-ink-400);
-        }
-
-        .rn-stat-primary {
-          background: var(--rn-cyan-soft);
-          border-color: rgba(14, 124, 140, 0.22);
-        }
-
-        .rn-stat-primary .rn-stat-value {
-          color: var(--rn-cyan-dark);
+          font-size: 8px;
+          font-weight: 700;
+          letter-spacing: .08em;
+          text-transform: uppercase;
         }
 
         /* ======================================================
            FILTER BAR
         ====================================================== */
 
-        .rn-controls {
+        .rn-toolbar {
           display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .rn-control-row {
-          display: flex;
-          gap: 9px;
-          align-items: stretch;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 0 14px;
         }
 
         .rn-search {
+          position: relative;
           flex: 1;
-          min-width: 240px;
-
-          display: flex;
-          align-items: center;
-          gap: 9px;
-
-          padding: 0 13px;
-
-          background: var(--rn-surface);
-          border: 1px solid var(--rn-border);
-          border-radius: 11px;
-
-          transition:
-            border-color .15s ease,
-            box-shadow .15s ease;
+          min-width: 180px;
         }
 
-        .rn-search:focus-within {
-          border-color: var(--rn-cyan);
-          box-shadow:
-            0 0 0 3px rgba(14, 124, 140, .10);
+        .rn-search-icon {
+          position: absolute;
+          left: 11px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--rn-ink-400);
+          pointer-events: none;
         }
 
         .rn-search-input {
-          flex: 1;
-          min-width: 0;
-
-          border: none;
-          outline: none;
-          background: transparent;
-
-          height: 42px;
-
-          font-family: var(--rn-font-body);
-          font-size: 12.5px;
+          width: 100%;
+          height: 36px;
+          padding: 0 34px 0 34px;
+          border: 1px solid var(--rn-border);
+          border-radius: 9px;
+          background: var(--rn-surface);
           color: var(--rn-ink-900);
+          outline: none;
+          font-family: var(--rn-font-body);
+          font-size: 11px;
+          transition:
+            border-color .18s ease,
+            box-shadow .18s ease,
+            background .18s ease;
         }
 
         .rn-search-input::placeholder {
           color: var(--rn-ink-400);
         }
 
-        .rn-search-clear {
-          width: 25px;
-          height: 25px;
+        .rn-search-input:focus {
+          border-color: rgba(14, 124, 140, .42);
+          box-shadow: 0 0 0 3px rgba(14, 124, 140, .08);
+        }
 
+        .rn-search-clear {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          width: 23px;
+          height: 23px;
+          transform: translateY(-50%);
           display: flex;
           align-items: center;
           justify-content: center;
-
           border: none;
+          border-radius: 6px;
           background: transparent;
           color: var(--rn-ink-400);
-
-          border-radius: 7px;
           cursor: pointer;
         }
 
         .rn-search-clear:hover {
-          background: var(--rn-sunken);
-          color: var(--rn-ink-900);
+          background: var(--rn-slate-soft);
+          color: var(--rn-ink-700);
+        }
+
+        .rn-job-select-wrap {
+          position: relative;
+          flex-shrink: 0;
+        }
+
+        .rn-job-icon {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--rn-cyan);
+          pointer-events: none;
         }
 
         .rn-job-select {
-          width: 260px;
-
-          display: flex;
-          align-items: center;
-          gap: 9px;
-
-          padding: 0 13px;
-
-          background: var(--rn-surface);
+          height: 36px;
+          min-width: 205px;
+          padding: 0 30px 0 31px;
           border: 1px solid var(--rn-border);
-          border-radius: 11px;
-
-          transition:
-            border-color .15s ease,
-            box-shadow .15s ease;
-        }
-
-        .rn-job-select:focus-within {
-          border-color: var(--rn-cyan);
-          box-shadow:
-            0 0 0 3px rgba(14, 124, 140, .10);
-        }
-
-        .rn-select {
-          flex: 1;
-          min-width: 0;
-
-          height: 42px;
-
-          border: none;
+          border-radius: 9px;
+          background: var(--rn-surface);
+          color: var(--rn-ink-700);
           outline: none;
-          background: transparent;
-
-          color: var(--rn-ink-900);
-
           font-family: var(--rn-font-body);
-          font-size: 12.5px;
+          font-size: 10.5px;
           font-weight: 600;
-
           cursor: pointer;
         }
 
-        .rn-reset {
+        .rn-reset-btn {
+          height: 36px;
           display: inline-flex;
           align-items: center;
           gap: 6px;
-
-          height: 42px;
-          padding: 0 13px;
-
+          padding: 0 10px;
           border: 1px solid var(--rn-border);
-          border-radius: 11px;
-
+          border-radius: 9px;
           background: var(--rn-surface);
           color: var(--rn-ink-500);
-
-          font-size: 11.5px;
+          font-size: 10px;
           font-weight: 700;
-
           cursor: pointer;
-
           transition:
-            background .15s ease,
-            border-color .15s ease,
-            color .15s ease;
+            background .18s ease,
+            color .18s ease,
+            border-color .18s ease;
         }
 
-        .rn-reset:hover {
-          background: var(--rn-sunken);
+        .rn-reset-btn:hover {
+          background: var(--rn-paper);
           border-color: var(--rn-border-strong);
-          color: var(--rn-ink-900);
+          color: var(--rn-ink-800);
+        }
+
+        .rn-filter-status {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding-left: 4px;
+          color: var(--rn-ink-400);
+          font-size: 9px;
+          white-space: nowrap;
+        }
+
+        .rn-filter-dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: var(--rn-cyan);
+          box-shadow: 0 0 0 3px var(--rn-cyan-soft);
         }
 
         /* ======================================================
-           JOB CHIPS
+           EMPTY STATE
         ====================================================== */
 
-        .rn-job-chips {
+        .rn-empty {
+          padding: 52px 24px;
+          border: 1px dashed var(--rn-border-strong);
+          border-radius: 16px;
+          background:
+            radial-gradient(
+              circle at 50% 0%,
+              rgba(14, 124, 140, .06),
+              transparent 42%
+            ),
+            var(--rn-surface);
+          text-align: center;
+        }
+
+        .rn-empty-icon {
+          width: 44px;
+          height: 44px;
+          margin: 0 auto 13px;
           display: flex;
-          gap: 7px;
-
-          overflow-x: auto;
-          padding-bottom: 2px;
-
-          scrollbar-width: none;
+          align-items: center;
+          justify-content: center;
+          border-radius: 12px;
+          background: var(--rn-cyan-soft);
+          color: var(--rn-cyan-dark);
         }
 
-        .rn-job-chips::-webkit-scrollbar {
-          display: none;
+        .rn-empty-title {
+          margin: 0;
+          font-family: var(--rn-font-display);
+          font-size: 15px;
+          font-weight: 700;
+          color: var(--rn-ink-800);
         }
 
-        .rn-chip {
+        .rn-empty-text {
+          max-width: 390px;
+          margin: 7px auto 0;
+          color: var(--rn-ink-500);
+          font-size: 11px;
+          line-height: 1.6;
+        }
+
+        /* ======================================================
+           CARD GRID
+        ====================================================== */
+
+        .rn-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        /* ======================================================
+           CANDIDATE CARD
+        ====================================================== */
+
+        .rn-candidate {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          overflow: hidden;
+          background:
+            linear-gradient(
+              180deg,
+              #FFFFFF 0%,
+              #FCFCFA 100%
+            );
+          border: 1px solid var(--rn-border);
+          border-radius: 16px;
+          box-shadow:
+            0 2px 5px rgba(18, 21, 27, .025),
+            0 8px 22px rgba(18, 21, 27, .025);
+          transition:
+            transform .2s ease,
+            border-color .2s ease,
+            box-shadow .2s ease;
+        }
+
+        .rn-candidate::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 2px;
+          background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(14, 124, 140, .35) 50%,
+            transparent 100%
+          );
+          opacity: 0;
+          transition: opacity .2s ease;
+        }
+
+        .rn-candidate:hover {
+          transform: translateY(-3px);
+          border-color: #CFE6EA;
+          box-shadow:
+            0 10px 28px rgba(18, 21, 27, .07),
+            0 2px 6px rgba(14, 124, 140, .04);
+        }
+
+        .rn-candidate:hover::before {
+          opacity: 1;
+        }
+
+        .rn-candidate-expanded {
+          border-color: rgba(14, 124, 140, .30);
+          box-shadow:
+            0 10px 28px rgba(14, 124, 140, .08),
+            0 2px 6px rgba(18, 21, 27, .04);
+        }
+
+        .rn-candidate-expanded::before {
+          opacity: 1;
+        }
+
+        /* ======================================================
+           CANDIDATE HEADER
+        ====================================================== */
+
+        .rn-candidate-head {
+          position: relative;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px 16px;
+          background:
+            linear-gradient(
+              135deg,
+              rgba(225, 242, 243, .30),
+              rgba(255, 255, 255, .92) 55%
+            );
+          border-bottom: 1px solid var(--rn-border);
+        }
+
+        .rn-avatar {
+          width: 42px;
+          height: 42px;
+          flex-shrink: 0;
+          object-fit: cover;
+          border-radius: 12px;
+          border: 2px solid #FFFFFF;
+          box-shadow:
+            0 0 0 1px rgba(14, 124, 140, .20),
+            0 4px 10px rgba(18, 21, 27, .08);
+          transition:
+            transform .2s ease,
+            box-shadow .2s ease;
+        }
+
+        .rn-candidate:hover .rn-avatar {
+          transform: translateY(-1px);
+          box-shadow:
+            0 0 0 1px rgba(14, 124, 140, .35),
+            0 6px 13px rgba(18, 21, 27, .11);
+        }
+
+        .rn-avatar-fallback {
+          width: 42px;
+          height: 42px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 12px;
+          background: var(--rn-ink-900);
+          color: #FFFFFF;
+          font-family: var(--rn-font-display);
+          font-size: 12px;
+          font-weight: 800;
+          box-shadow:
+            0 0 0 1px rgba(14, 124, 140, .22),
+            0 4px 10px rgba(18, 21, 27, .08);
+        }
+
+        .rn-candidate-copy {
+          min-width: 0;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 3px;
+        }
+
+        .rn-candidate-name {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-family: var(--rn-font-display);
+          font-size: 14px;
+          font-weight: 700;
+          line-height: 1.2;
+          letter-spacing: -.015em;
+          color: var(--rn-ink-900);
+        }
+
+        .rn-candidate-role {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: var(--rn-ink-500);
+          font-size: 10.5px;
+          font-weight: 500;
+          line-height: 1.35;
+        }
+
+        /*
+         * IMPORTANT:
+         * No note-count badge here.
+         * The total note count is intentionally shown only
+         * once in the footer below.
+         */
+
+        .rn-candidate-head-meta {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          flex-shrink: 0;
+        }
+
+        .rn-match-count {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 7px;
+          border-radius: 6px;
+          background: var(--rn-sunken);
+          color: var(--rn-ink-500);
+          font-family: var(--rn-font-mono);
+          font-size: 8.5px;
+          font-weight: 600;
+        }
+
+        /* ======================================================
+           NOTES
+        ====================================================== */
+
+        .rn-notes {
+          display: flex;
+          flex: 1;
+          min-height: 0;
+          flex-direction: column;
+        }
+
+        .rn-notes-list {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .rn-notes-list-scrollable {
+          max-height: 132px;
+          overflow-y: auto;
+          scrollbar-width: thin;
+          scrollbar-color: #D8D4CA transparent;
+        }
+
+        .rn-notes-list-scrollable::-webkit-scrollbar {
+          width: 5px;
+        }
+
+        .rn-notes-list-scrollable::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .rn-notes-list-scrollable::-webkit-scrollbar-thumb {
+          background: #D8D4CA;
+          border-radius: 999px;
+        }
+
+        .rn-note-item {
+          position: relative;
+          display: flex;
+          gap: 10px;
+          padding: 11px 16px;
+          border-bottom: 1px solid var(--rn-border);
+          transition:
+            background .18s ease,
+            padding-left .18s ease;
+        }
+
+        .rn-note-item:last-child {
+          border-bottom: none;
+        }
+
+        .rn-note-item:hover {
+          background: #FAFAF7;
+          padding-left: 18px;
+        }
+
+        .rn-note-item-latest {
+          background:
+            linear-gradient(
+              90deg,
+              rgba(225, 242, 243, .52),
+              rgba(255, 255, 255, 0)
+            );
+        }
+
+        .rn-note-item-latest:hover {
+          background:
+            linear-gradient(
+              90deg,
+              rgba(225, 242, 243, .70),
+              rgba(255, 255, 255, 0)
+            );
+        }
+
+        .rn-note-item-spine {
+          width: 3px;
+          min-height: 100%;
+          flex-shrink: 0;
+          border-radius: 999px;
+          background: var(--rn-border);
+          transition:
+            width .18s ease,
+            background .18s ease,
+            box-shadow .18s ease;
+        }
+
+        .rn-note-item-latest .rn-note-item-spine {
+          width: 4px;
+          background: var(--rn-cyan);
+          box-shadow: 0 0 8px rgba(14, 124, 140, .18);
+        }
+
+        .rn-note-item-body {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .rn-note-item-head {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 22px;
+          margin-bottom: 4px;
+        }
+
+        .rn-note-item-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          color: var(--rn-cyan-dark);
+          font-size: 8.5px;
+          font-weight: 800;
+          letter-spacing: .06em;
+          text-transform: uppercase;
+        }
+
+        .rn-note-item-time {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          color: var(--rn-ink-400);
+          font-family: var(--rn-font-mono);
+          font-size: 8.5px;
+        }
+
+        .rn-note-item-delete {
+          width: 24px;
+          height: 24px;
+          margin-left: auto;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: none;
+          border-radius: 7px;
+          background: transparent;
+          color: var(--rn-ink-400);
+          cursor: pointer;
+          opacity: .25;
+          transition:
+            opacity .15s ease,
+            background .15s ease,
+            color .15s ease,
+            transform .15s ease;
+        }
+
+        .rn-note-item:hover .rn-note-item-delete {
+          opacity: 1;
+        }
+
+        .rn-note-item-delete:hover {
+          color: var(--rn-danger);
+          background: var(--rn-danger-soft);
+          transform: scale(1.04);
+        }
+
+        .rn-note-item-text {
+          min-width: 0;
+          color: var(--rn-ink-700);
+          font-size: 11.5px;
+          line-height: 1.6;
+          word-break: break-word;
+        }
+
+        .rn-note-item-latest .rn-note-item-text {
+          color: var(--rn-ink-800);
+          font-weight: 500;
+        }
+
+        /* ======================================================
+           FOOTER
+        ====================================================== */
+
+        .rn-notes-footer {
+          margin-top: auto;
+          flex-shrink: 0;
+          padding: 10px 16px;
+          border-top: 1px solid var(--rn-border);
+          background: rgba(247, 245, 241, .48);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        /*
+         * SINGLE SOURCE FOR NOTE COUNT
+         */
+
+        .rn-note-index {
           display: inline-flex;
           align-items: center;
           gap: 6px;
+          color: var(--rn-ink-400);
+          font-family: var(--rn-font-mono);
+          font-size: 8.5px;
+          font-weight: 500;
+          letter-spacing: -.01em;
+        }
 
-          flex-shrink: 0;
+        .rn-note-index::before {
+          content: "";
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: var(--rn-cyan);
+          box-shadow: 0 0 0 3px var(--rn-cyan-soft);
+        }
 
-          padding: 7px 11px;
-
-          border: 1px solid var(--rn-border);
-          border-radius: 999px;
-
-          background: var(--rn-surface);
-          color: var(--rn-ink-700);
-
-          font-size: 11px;
+        .rn-profile-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 7px 10px;
+          border: 1px solid rgba(14, 124, 140, .16);
+          border-radius: 8px;
+          background: var(--rn-cyan-soft);
+          color: var(--rn-cyan-dark);
+          font-size: 9.5px;
           font-weight: 700;
-
           cursor: pointer;
+          transition:
+            background .18s ease,
+            border-color .18s ease,
+            transform .18s ease,
+            box-shadow .18s ease;
+        }
 
+        .rn-profile-btn svg {
+          transition: transform .18s ease;
+        }
+
+        .rn-profile-btn:hover {
+          background: #D9F1F6;
+          border-color: rgba(14, 124, 140, .28);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 10px rgba(14, 124, 140, .10);
+        }
+
+        .rn-profile-btn:hover svg {
+          transform: translate(1px, -1px);
+        }
+
+        .rn-footer-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .rn-add-inline-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          height: 30px;
+          padding: 0 10px;
+          border: 1px solid rgba(14, 124, 140, .24);
+          border-radius: 7px;
+          background: var(--rn-cyan-soft);
+          color: var(--rn-cyan-dark);
+          font-size: 9.5px;
+          font-weight: 700;
+          cursor: pointer;
+          transition:
+            background .18s ease,
+            border-color .18s ease,
+            transform .18s ease;
+        }
+
+        .rn-add-inline-btn:hover {
+          background: #D9F1F6;
+          border-color: rgba(14, 124, 140, .36);
+          transform: translateY(-1px);
+        }
+
+        .rn-new-note-textarea {
+          width: 100%;
+          padding: 8px;
+          border: 1px solid var(--rn-border);
+          border-radius: 6px;
+          background: var(--rn-paper);
+          color: var(--rn-ink-800);
+          font-family: var(--rn-font-body);
+          font-size: 11.5px;
+          line-height: 1.6;
+          resize: vertical;
+          min-height: 60px;
+        }
+
+        .rn-new-note-textarea:focus {
+          outline: none;
+          border-color: rgba(14, 124, 140, .42);
+          box-shadow: 0 0 0 3px rgba(14, 124, 140, .08);
+        }
+
+        .rn-new-note-actions {
+          display: flex;
+          justify-content: flex-end;
+          margin-top: 8px;
+        }
+
+        .rn-new-note-done {
+          height: 28px;
+          padding: 0 12px;
+          border: none;
+          border-radius: 6px;
+          background: var(--rn-cyan);
+          color: #fff;
+          font-size: 10px;
+          font-weight: 700;
+          cursor: pointer;
+          transition:
+            background .18s ease,
+            transform .18s ease;
+        }
+
+        .rn-new-note-done:hover:not(:disabled) {
+          background: var(--rn-cyan-dark);
+          transform: translateY(-1px);
+        }
+
+        .rn-new-note-done:disabled {
+          background: var(--rn-border-strong);
+          color: var(--rn-ink-400);
+          cursor: not-allowed;
+        }
+
+        /* ======================================================
+           PAGINATION
+        ====================================================== */
+
+        .rn-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          padding: 20px 0 8px;
+        }
+
+        .rn-pagination-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          height: 34px;
+          padding: 0 12px;
+          border: 1px solid var(--rn-border);
+          border-radius: 8px;
+          background: var(--rn-surface);
+          color: var(--rn-ink-800);
+          font-size: 10px;
+          font-weight: 600;
+          cursor: pointer;
+          transition:
+            background .15s ease,
+            border-color .15s ease,
+            transform .15s ease;
+        }
+
+        .rn-pagination-button:hover:not(:disabled) {
+          background: var(--rn-paper);
+          border-color: var(--rn-border-strong);
+          transform: translateY(-1px);
+        }
+
+        .rn-pagination-button:disabled {
+          background: var(--rn-paper);
+          color: var(--rn-ink-400);
+          cursor: not-allowed;
+        }
+
+        .rn-pagination-pages {
+          display: flex;
+          gap: 6px;
+        }
+
+        .rn-pagination-page {
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--rn-border);
+          border-radius: 8px;
+          background: var(--rn-surface);
+          color: var(--rn-ink-900);
+          font-size: 10px;
+          font-weight: 600;
+          cursor: pointer;
           transition:
             background .15s ease,
             border-color .15s ease,
@@ -649,628 +1259,35 @@ export function RecruiterNotesView({
             transform .15s ease;
         }
 
-        .rn-chip:hover {
+        .rn-pagination-page:hover {
           background: var(--rn-paper);
           border-color: var(--rn-border-strong);
           transform: translateY(-1px);
         }
 
-        .rn-chip-active {
-          background: var(--rn-ink-900);
-          border-color: var(--rn-ink-900);
-          color: #fff;
-        }
-
-        .rn-chip-count {
-          font-family: var(--rn-font-mono);
-          font-size: 9px;
-          padding: 2px 5px;
-          border-radius: 5px;
-
-          background: rgba(18, 21, 27, .07);
-        }
-
-        .rn-chip-active .rn-chip-count {
-          background: rgba(255,255,255,.14);
-          color: #fff;
-        }
-
-        /* ======================================================
-           FILTER STATUS
-        ====================================================== */
-
-        .rn-filter-status {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-
-          padding: 8px 12px;
-
-          border: 1px dashed var(--rn-border-strong);
-          border-radius: 9px;
-
-          background: var(--rn-paper);
-        }
-
-        .rn-filter-status-copy {
-          min-width: 0;
-
-          font-size: 11px;
-          color: var(--rn-ink-500);
-
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .rn-filter-status-copy strong {
-          color: var(--rn-ink-800);
-        }
-
-        .rn-filter-reset {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-
-          flex-shrink: 0;
-
-          border: none;
-          background: transparent;
-
-          color: var(--rn-cyan-dark);
-
-          font-size: 10.5px;
-          font-weight: 800;
-
-          cursor: pointer;
-        }
-
-        /* ======================================================
-           MAIN LIST
-        ====================================================== */
-
-        .rn-list {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        /*
-         * Candidate lane
-         *
-         * The important change:
-         * candidate identity and note activity live in one
-         * horizontal workspace instead of a giant card.
-         */
-
-        .rn-candidate {
-          background: var(--rn-surface);
-          border: 1px solid var(--rn-border);
-          border-radius: 14px;
-
-          overflow: hidden;
-
-          box-shadow:
-            0 1px 3px rgba(18, 21, 27, .035);
-
-          transition:
-            border-color .15s ease,
-            box-shadow .15s ease,
-            transform .15s ease;
-        }
-
-        .rn-candidate:hover {
-          border-color: var(--rn-border-strong);
-          box-shadow:
-            0 4px 14px rgba(18, 21, 27, .055);
-        }
-
-        .rn-candidate-expanded {
-          border-color: rgba(14, 124, 140, .28);
-        }
-
-        /* ======================================================
-           CANDIDATE IDENTITY COLUMN
-        ====================================================== */
-
-        .rn-candidate-top {
-          display: grid;
-          grid-template-columns: minmax(230px, 0.75fr) minmax(0, 2fr);
-          min-height: 116px;
-        }
-
-        .rn-candidate-identity {
-          position: relative;
-
-          padding: 15px 16px;
-
-          display: flex;
-          align-items: center;
-          gap: 12px;
-
-          background:
-            linear-gradient(
-              135deg,
-              var(--rn-paper),
-              #fff
-            );
-
-          border-right: 1px solid var(--rn-border);
-        }
-
-        .rn-candidate-accent {
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-
-          width: 3px;
-
+        .rn-pagination-page-active {
+          border-color: var(--rn-cyan);
           background: var(--rn-cyan);
-
-          opacity: .85;
+          color: #FFFFFF;
         }
 
-        .rn-avatar {
-          width: 42px;
-          height: 42px;
-
-          object-fit: cover;
-
-          border-radius: 11px;
-
-          border: 1px solid var(--rn-border);
-
-          flex-shrink: 0;
-        }
-
-        .rn-avatar-fallback {
-          width: 42px;
-          height: 42px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border-radius: 11px;
-
-          background: var(--rn-ink-900);
-          color: #fff;
-
-          font-family: var(--rn-font-display);
-          font-size: 12px;
-          font-weight: 800;
-
-          flex-shrink: 0;
-        }
-
-        .rn-candidate-copy {
-          min-width: 0;
-        }
-
-        .rn-candidate-name {
-          font-size: 13px;
-          font-weight: 800;
-
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .rn-candidate-role {
-          margin-top: 3px;
-
-          color: var(--rn-ink-500);
-
-          font-size: 10.5px;
-          font-weight: 500;
-
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .rn-candidate-meta {
-          display: flex;
-          align-items: center;
-          gap: 5px;
-
-          margin-top: 7px;
-        }
-
-        .rn-note-count {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-
-          padding: 3px 7px;
-
-          border-radius: 6px;
-
-          background: var(--rn-cyan-soft);
-          color: var(--rn-cyan-dark);
-
-          font-family: var(--rn-font-mono);
-          font-size: 9px;
-          font-weight: 700;
-        }
-
-        .rn-match-count {
-          display: inline-flex;
-          align-items: center;
-
-          padding: 3px 7px;
-
-          border-radius: 6px;
-
-          background: var(--rn-sunken);
-          color: var(--rn-ink-500);
-
-          font-family: var(--rn-font-mono);
-          font-size: 9px;
-          font-weight: 600;
-        }
-
-        /* ======================================================
-           FEATURED NOTE
-        ====================================================== */
-
-        .rn-featured {
-          padding: 14px 16px;
-
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-
-          min-width: 0;
-        }
-
-        .rn-featured-label {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-
-          margin-bottom: 7px;
-        }
-
-        .rn-latest-label {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-
-          color: var(--rn-cyan-dark);
-
-          font-size: 9px;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: .07em;
-        }
-
-        .rn-latest-time {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-
-          color: var(--rn-ink-400);
-
-          font-family: var(--rn-font-mono);
-          font-size: 9px;
-
-          white-space: nowrap;
-        }
-
-        .rn-featured-text {
-          color: var(--rn-ink-700);
-
-          font-size: 12.5px;
-          line-height: 1.55;
-
-          display: -webkit-box;
-          -webkit-line-clamp: 3;
-          -webkit-box-orient: vertical;
-
-          overflow: hidden;
-        }
-
-        .rn-featured-footer {
-          margin-top: 9px;
-
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-        }
-
-        .rn-note-index {
-          color: var(--rn-ink-400);
-
-          font-family: var(--rn-font-mono);
-          font-size: 9px;
-        }
-
-        .rn-profile-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-
-          padding: 6px 9px;
-
-          border: 1px solid var(--rn-border);
-          border-radius: 7px;
-
-          background: transparent;
-          color: var(--rn-ink-700);
-
-          font-size: 10px;
-          font-weight: 700;
-
-          cursor: pointer;
-
-          transition:
-            background .15s ease,
-            border-color .15s ease,
-            color .15s ease;
-        }
-
-        .rn-profile-btn:hover {
-          background: var(--rn-ink-900);
-          border-color: var(--rn-ink-900);
-          color: #fff;
-        }
-
-        /* ======================================================
-           EXPANDED TIMELINE
-        ====================================================== */
-
-        .rn-expanded {
-          border-top: 1px solid var(--rn-border);
-          background: var(--rn-paper);
-
-          padding: 12px 16px 14px;
-        }
-
-        .rn-expanded-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-
-          margin-bottom: 8px;
-        }
-
-        .rn-expanded-title {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-
-          color: var(--rn-ink-700);
-
-          font-size: 10px;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: .05em;
-        }
-
-        .rn-collapse {
-          border: none;
-          background: transparent;
-          color: var(--rn-ink-400);
-
-          font-size: 10px;
-          font-weight: 700;
-
-          cursor: pointer;
-        }
-
-        .rn-collapse:hover {
-          color: var(--rn-ink-900);
-        }
-
-        .rn-timeline {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .rn-note {
-          display: grid;
-          grid-template-columns: 105px minmax(0, 1fr) auto;
-          gap: 12px;
-          align-items: center;
-
-          padding: 9px 10px;
-
-          background: var(--rn-surface);
-          border: 1px solid var(--rn-border);
-          border-radius: 9px;
-
-          transition:
-            border-color .15s ease,
-            background .15s ease;
-        }
-
-        .rn-note:hover {
-          border-color: var(--rn-border-strong);
-        }
-
-        .rn-note-time {
-          display: flex;
-          align-items: center;
-          gap: 5px;
-
-          color: var(--rn-ink-400);
-
-          font-family: var(--rn-font-mono);
-          font-size: 9px;
-        }
-
-        .rn-note-text {
-          min-width: 0;
-
-          color: var(--rn-ink-700);
-
-          font-size: 11.5px;
-          line-height: 1.5;
-
-          word-break: break-word;
-        }
-
-        .rn-delete {
-          width: 28px;
-          height: 28px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border: 1px solid var(--rn-border);
-          border-radius: 7px;
-
-          background: var(--rn-surface);
-          color: var(--rn-ink-400);
-
-          cursor: pointer;
-
-          transition:
-            background .15s ease,
-            border-color .15s ease,
-            color .15s ease;
-        }
-
-        .rn-delete:hover {
-          color: var(--rn-danger);
-          background: var(--rn-danger-soft);
-          border-color: rgba(193,54,31,.22);
-        }
-
-        /* ======================================================
-           SHOW MORE
-        ====================================================== */
-
-        .rn-expand-row {
-          display: flex;
-          justify-content: center;
-
-          border-top: 1px solid var(--rn-border);
-
-          background: #fff;
-        }
-
-        .rn-expand-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-
-          padding: 8px 13px;
-
-          border: none;
-          background: transparent;
-
-          color: var(--rn-ink-500);
-
-          font-size: 10.5px;
-          font-weight: 700;
-
-          cursor: pointer;
-
-          transition: color .15s ease;
-        }
-
-        .rn-expand-btn:hover {
-          color: var(--rn-cyan-dark);
-        }
-
-        /* ======================================================
-           EMPTY
-        ====================================================== */
-
-        .rn-empty {
-          min-height: 300px;
-
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-
-          padding: 50px 24px;
-
-          background: var(--rn-surface);
-          border: 1px solid var(--rn-border);
-          border-radius: 16px;
-
-          text-align: center;
-        }
-
-        .rn-empty-icon {
-          width: 52px;
-          height: 52px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          margin-bottom: 14px;
-
-          border-radius: 14px;
-
-          background: var(--rn-sunken);
-          border: 1px solid var(--rn-border);
-
-          color: var(--rn-ink-400);
-        }
-
-        .rn-empty-title {
-          font-size: 14px;
-          font-weight: 800;
-
-          color: var(--rn-ink-800);
-        }
-
-        .rn-empty-description {
-          max-width: 390px;
-
-          margin-top: 6px;
-
-          color: var(--rn-ink-500);
-
-          font-size: 11.5px;
-          line-height: 1.55;
-        }
-
-        .rn-empty-action {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-
-          margin-top: 15px;
-          padding: 8px 12px;
-
-          border: 1px solid var(--rn-border);
-          border-radius: 8px;
-
-          background: var(--rn-surface);
-          color: var(--rn-ink-700);
-
-          font-size: 10.5px;
-          font-weight: 700;
-
-          cursor: pointer;
-        }
-
-        .rn-empty-action:hover {
-          background: var(--rn-ink-900);
-          border-color: var(--rn-ink-900);
-          color: #fff;
+        .rn-pagination-page-active:hover {
+          border-color: var(--rn-cyan);
+          background: var(--rn-cyan);
+          color: #FFFFFF;
         }
 
         /* ======================================================
            RESPONSIVE
         ====================================================== */
 
-        @media (max-width: 850px) {
+        @media (max-width: 900px) {
+          .rn-grid {
+            grid-template-columns: 1fr;
+          }
+        }
 
+        @media (max-width: 700px) {
           .rn-header {
             align-items: flex-start;
             flex-direction: column;
@@ -1284,487 +1301,284 @@ export function RecruiterNotesView({
             flex: 1;
           }
 
-          .rn-control-row {
-            flex-direction: column;
+          .rn-toolbar {
+            flex-wrap: wrap;
           }
 
-          .rn-search,
+          .rn-search {
+            flex-basis: 100%;
+          }
+
+          .rn-job-select-wrap {
+            flex: 1;
+          }
+
           .rn-job-select {
             width: 100%;
           }
-
-          .rn-candidate-top {
-            grid-template-columns: 1fr;
-          }
-
-          .rn-candidate-identity {
-            border-right: none;
-            border-bottom: 1px solid var(--rn-border);
-          }
-
-          .rn-note {
-            grid-template-columns: 1fr auto;
-          }
-
-          .rn-note-time {
-            grid-column: 1 / -1;
-            grid-row: 1;
-          }
-
-          .rn-note-text {
-            grid-column: 1;
-            grid-row: 2;
-          }
-
-          .rn-delete {
-            grid-column: 2;
-            grid-row: 2;
-          }
         }
 
-        @media (max-width: 560px) {
-
-          .rn-header {
-            padding: 15px;
-          }
-
-          .rn-header-icon {
-            width: 38px;
-            height: 38px;
-          }
-
-          .rn-subtitle {
-            display: none;
-          }
-
-          .rn-candidate-top {
-            min-height: 0;
-          }
-
-          .rn-featured {
-            padding: 13px;
-          }
-
-          .rn-candidate-identity {
-            padding: 13px;
-          }
-
-          .rn-expanded {
-            padding: 10px;
-          }
-
-          .rn-note {
-            padding: 9px;
-          }
-
-          .rn-reset {
-            width: 100%;
-            justify-content: center;
+        @media (prefers-reduced-motion: reduce) {
+          .rn-root *,
+          .rn-root *::before,
+          .rn-root *::after {
+            scroll-behavior: auto !important;
+            transition-duration: .01ms !important;
+            animation-duration: .01ms !important;
+            animation-iteration-count: 1 !important;
           }
         }
 
       `}</style>
 
-      {/* ======================================================
+      {/* ========================================================
           HEADER
-      ====================================================== */}
+      ======================================================== */}
 
       <div className="rn-header">
+
         <div className="rn-header-left">
-          <div className="rn-header-icon">
-            <NotebookPen size={18} />
-          </div>
 
-          <div className="rn-header-copy">
-            <div className="rn-title rn-display">
-              {isFR ? 'Notes Recruteur' : 'Recruiter Notes'}
-            </div>
+          <h2 className="rn-title">
+            {isFR ? 'Notes recruteur' : 'Recruiter Notes'}
+          </h2>
 
-            <div className="rn-subtitle">
-              {isFR
-                ? 'Un espace de travail pour suivre les observations et décisions sur les candidats.'
-                : 'A focused workspace for candidate observations, decisions and follow-ups.'}
-            </div>
-          </div>
+          <p className="rn-subtitle">
+            {isFR
+              ? 'Retrouvez et gérez les notes associées à vos candidats.'
+              : 'Review and manage notes attached to your candidates.'}
+          </p>
+
         </div>
 
         <div className="rn-header-stats">
-          <div className="rn-stat rn-stat-primary">
+
+          <div className="rn-stat">
             <div className="rn-stat-value">
-              {totalFilteredNotes}
+              {candidatesWithNotes.length}
             </div>
 
             <div className="rn-stat-label">
-              {isFR ? 'notes' : 'notes'}
+              {isFR ? 'Candidats' : 'Candidates'}
             </div>
           </div>
 
           <div className="rn-stat">
             <div className="rn-stat-value">
-              {filteredCandidates.length}
+              {totalNotes}
             </div>
 
             <div className="rn-stat-label">
-              {isFR ? 'profils' : 'profiles'}
+              {isFR ? 'Notes' : 'Notes'}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* ======================================================
-          CONTROLS
-      ====================================================== */}
-
-      {candidatesWithNotes.length > 0 && (
-        <div className="rn-controls">
-
-          <div className="rn-control-row">
-
-            <div className="rn-search">
-              <Search
-                size={15}
-                color="var(--rn-ink-400)"
-              />
-
-              <input
-                type="text"
-                className="rn-search-input"
-                value={filterText}
-                onChange={e =>
-                  setFilterText(e.target.value)
-                }
-                placeholder={
-                  isFR
-                    ? 'Rechercher dans les notes...'
-                    : 'Search notes, keywords or observations...'
-                }
-              />
-
-              {filterText && (
-                <button
-                  type="button"
-                  className="rn-search-clear"
-                  onClick={() => setFilterText('')}
-                  title={
-                    isFR
-                      ? 'Effacer la recherche'
-                      : 'Clear search'
-                  }
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            {jobDescriptions.length > 0 && (
-              <div className="rn-job-select">
-
-                <Briefcase
-                  size={14}
-                  color="var(--rn-cyan)"
-                />
-
-                <select
-                  className="rn-select"
-                  value={selectedJobId}
-                  onChange={e =>
-                    setSelectedJobId(e.target.value)
-                  }
-                >
-                  <option value="all">
-                    {isFR
-                      ? 'Toutes les fiches de poste'
-                      : 'All Job Descriptions'}
-                    {' '}({candidatesWithNotes.length})
-                  </option>
-
-                  {jobDescriptions.map(job => {
-
-                    const count =
-                      candidatesWithNotes.filter(candidate =>
-                        isCandidateInJob(
-                          candidate,
-                          job.id
-                        )
-                      ).length;
-
-                    return (
-                      <option
-                        key={job.id}
-                        value={job.id}
-                      >
-                        {job.title}
-                        {count > 0
-                          ? ` (${count})`
-                          : ''}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            )}
-
-            {hasActiveFilters && (
-              <button
-                type="button"
-                className="rn-reset"
-                onClick={resetFilters}
-              >
-                <RotateCcw size={13} />
-                {isFR ? 'Réinitialiser' : 'Reset'}
-              </button>
-            )}
-          </div>
-
-          {/* Quick job navigation */}
-
-          {jobDescriptions.length > 0 && (
-            <div className="rn-job-chips">
-
-              <button
-                type="button"
-                className={`rn-chip ${
-                  selectedJobId === 'all'
-                    ? 'rn-chip-active'
-                    : ''
-                }`}
-                onClick={() =>
-                  setSelectedJobId('all')
-                }
-              >
-                <Layers3 size={11} />
-
-                {isFR ? 'Toutes' : 'All'}
-
-                <span className="rn-chip-count">
-                  {totalNotes}
-                </span>
-              </button>
-
-              {jobDescriptions.map(job => {
-
-                const jobNotesCount =
-                  candidatesWithNotes
-                    .filter(candidate =>
-                      isCandidateInJob(
-                        candidate,
-                        job.id
-                      )
-                    )
-                    .reduce(
-                      (sum, candidate) =>
-                        sum + candidate.notes.length,
-                      0
-                    );
-
-                const active =
-                  selectedJobId === job.id;
-
-                return (
-                  <button
-                    key={job.id}
-                    type="button"
-                    className={`rn-chip ${
-                      active
-                        ? 'rn-chip-active'
-                        : ''
-                    }`}
-                    onClick={() =>
-                      setSelectedJobId(job.id)
-                    }
-                    title={job.title}
-                  >
-                    <FileText size={10} />
-
-                    <span>
-                      {job.title}
-                    </span>
-
-                    {jobNotesCount > 0 && (
-                      <span className="rn-chip-count">
-                        {jobNotesCount}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Active filter summary */}
 
           {hasActiveFilters && (
-            <div className="rn-filter-status">
-
-              <div className="rn-filter-status-copy">
-
-                <Filter
-                  size={11}
-                  style={{
-                    marginRight: 5,
-                    verticalAlign: '-1px',
-                  }}
-                />
-
-                {isFR
-                  ? 'Filtre actif : '
-                  : 'Active filter: '}
-
-                {selectedJobId !== 'all' && (
-                  <strong>
-                    {
-                      jobDescriptions.find(
-                        job =>
-                          job.id === selectedJobId
-                      )?.title
-                    }
-                  </strong>
-                )}
-
-                {filterText && (
-                  <>
-                    {' '}
-                    <strong>
-                      “{filterText}”
-                    </strong>
-                  </>
-                )}
-
-                {' '}•{' '}
-
-                <strong>
-                  {totalFilteredNotes}
-                </strong>{' '}
-                {isFR
-                  ? 'notes affichées'
-                  : 'notes shown'}
+            <div className="rn-stat">
+              <div className="rn-stat-value">
+                {filteredCandidates.length}
               </div>
 
-              <button
-                type="button"
-                className="rn-filter-reset"
-                onClick={resetFilters}
-              >
-                <RotateCcw size={11} />
-                {isFR ? 'Effacer' : 'Clear'}
-              </button>
+              <div className="rn-stat-label">
+                {isFR ? 'Résultats' : 'Results'}
+              </div>
             </div>
           )}
+
         </div>
-      )}
 
-      {/* ======================================================
-          EMPTY — NO NOTES
-      ====================================================== */}
+      </div>
 
-      {candidatesWithNotes.length === 0 && (
+      {/* ========================================================
+          TOOLBAR
+      ======================================================== */}
+
+      <div className="rn-toolbar">
+
+        <div className="rn-search">
+
+          <Search
+            className="rn-search-icon"
+            size={15}
+          />
+
+          <input
+            className="rn-search-input"
+            type="text"
+            value={filterText}
+            onChange={e => setFilterText(e.target.value)}
+            placeholder={
+              isFR
+                ? 'Rechercher dans les notes...'
+                : 'Search within notes...'
+            }
+          />
+
+          {filterText && (
+            <button
+              type="button"
+              className="rn-search-clear"
+              onClick={() => setFilterText('')}
+              aria-label={
+                isFR
+                  ? 'Effacer la recherche'
+                  : 'Clear search'
+              }
+            >
+              <X size={12} />
+            </button>
+          )}
+
+        </div>
+
+        <div className="rn-job-select-wrap">
+
+          <Briefcase
+            className="rn-job-icon"
+            size={13}
+          />
+
+          <select
+            className="rn-job-select"
+            value={selectedJobId}
+            onChange={e => setSelectedJobId(e.target.value)}
+          >
+            <option value="all">
+              {isFR
+                ? 'Tous les postes'
+                : 'All roles'}
+            </option>
+
+            {jobDescriptions.map(job => (
+              <option
+                key={job.id}
+                value={job.id}
+              >
+                {job.title}
+              </option>
+            ))}
+          </select>
+
+        </div>
+
+        {hasActiveFilters && (
+          <>
+            <button
+              type="button"
+              className="rn-reset-btn"
+              onClick={resetFilters}
+            >
+              <RotateCcw size={11} />
+
+              {isFR
+                ? 'Réinitialiser'
+                : 'Reset'}
+            </button>
+
+            <div className="rn-filter-status">
+              <span className="rn-filter-dot" />
+
+              {totalFilteredNotes}{' '}
+              {isFR
+                ? 'notes trouvées'
+                : 'notes found'}
+            </div>
+          </>
+        )}
+
+      </div>
+
+      {/* ========================================================
+          CONTENT
+      ======================================================== */}
+
+      {filteredCandidates.length === 0 ? (
+
         <div className="rn-empty">
 
           <div className="rn-empty-icon">
-            <NotebookPen size={22} />
+            {hasActiveFilters ? (
+              <Filter size={19} />
+            ) : (
+              <NotebookPen size={19} />
+            )}
           </div>
 
-          <div className="rn-empty-title rn-display">
-            {isFR
-              ? 'Aucune note enregistrée'
-              : 'No notes yet'}
-          </div>
-
-          <div className="rn-empty-description">
-            {isFR
-              ? 'Ouvrez un profil candidat et ajoutez une note interne. Elle apparaîtra automatiquement dans cet espace.'
-              : 'Open a candidate profile and add an internal note. It will automatically appear in this workspace.'}
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================
-          EMPTY — FILTERED
-      ====================================================== */}
-
-      {candidatesWithNotes.length > 0 &&
-        filteredCandidates.length === 0 && (
-          <div className="rn-empty">
-
-            <div className="rn-empty-icon">
-              <Filter size={21} />
-            </div>
-
-            <div className="rn-empty-title rn-display">
-              {isFR
+          <h3 className="rn-empty-title">
+            {hasActiveFilters
+              ? isFR
                 ? 'Aucun résultat'
-                : 'Nothing matches'}
-            </div>
+                : 'No results'
+              : isFR
+                ? 'Aucune note pour le moment'
+                : 'No notes yet'}
+          </h3>
 
-            <div className="rn-empty-description">
-              {isFR
-                ? 'Aucune note ne correspond aux filtres actuels.'
-                : 'No candidate notes match the current filters or search.'}
-            </div>
+          <p className="rn-empty-text">
+            {hasActiveFilters
+              ? isFR
+                ? 'Essayez de modifier votre recherche ou de réinitialiser les filtres.'
+                : 'Try changing your search or resetting the filters.'
+              : isFR
+                ? 'Les notes ajoutées aux profils candidats apparaîtront ici.'
+                : 'Notes added to candidate profiles will appear here.'}
+          </p>
 
+          {hasActiveFilters && (
             <button
               type="button"
-              className="rn-empty-action"
+              className="rn-reset-btn"
               onClick={resetFilters}
+              style={{
+                marginTop: 16,
+              }}
             >
-              <RotateCcw size={12} />
+              <RotateCcw size={11} />
 
               {isFR
                 ? 'Réinitialiser les filtres'
                 : 'Reset filters'}
             </button>
-          </div>
-        )}
+          )}
 
-      {/* ======================================================
-          CANDIDATE NOTE LANES
-      ====================================================== */}
+        </div>
 
-      {filteredCandidates.length > 0 && (
-        <div className="rn-list">
+      ) : (
 
-          {filteredCandidates.map(candidate => {
+        <>
 
-            const initials = getInitials(
-              candidate.fullName
-            );
+          <div className="rn-grid">
 
-            const notes =
-              candidate.displayNotes;
+            {paginatedCandidates.map(candidate => {
 
-            const latestNote = notes[0];
+              const notes = candidate.displayNotes || [];
 
-            const remainingNotes =
-              notes.slice(1);
+              const isScrollable =
+                notes.length > NOTES_SCROLL_AFTER;
 
-            const isExpanded =
-              expandedCandidates.has(candidate.id);
+              const visibleNotes = notes;
 
-            const isPartiallyFiltered =
-              cleanFilter &&
-              notes.length < candidate.notes.length;
+              const isPartiallyFiltered =
+                cleanFilter &&
+                notes.length <
+                candidate.notes.length;
 
-            return (
-              <div
-                key={candidate.id}
-                className={`rn-candidate ${
-                  isExpanded
-                    ? 'rn-candidate-expanded'
-                    : ''
-                }`}
-              >
+              const initials =
+                getInitials(
+                  candidate.fullName
+                );
 
-                {/* ==================================================
-                    MAIN CANDIDATE LANE
-                ================================================== */}
+              return (
+                <div
+                  key={candidate.id}
+                  className="rn-candidate"
+                >
 
-                <div className="rn-candidate-top">
+                  {/* ==================================================
+                      CANDIDATE HEADER
+                  ================================================== */}
 
-                  {/* Candidate identity */}
-
-                  <div className="rn-candidate-identity">
-
-                    <div className="rn-candidate-accent" />
+                  <div className="rn-candidate-head">
 
                     <img
                       className="rn-avatar"
@@ -1788,14 +1602,16 @@ export function RecruiterNotesView({
 
                     <div
                       className="rn-avatar-fallback"
-                      style={{ display: 'none' }}
+                      style={{
+                        display: 'none',
+                      }}
                     >
                       {initials}
                     </div>
 
                     <div className="rn-candidate-copy">
 
-                      <div className="rn-candidate-name rn-display">
+                      <div className="rn-candidate-name">
                         {candidate.fullName}
                       </div>
 
@@ -1808,184 +1624,109 @@ export function RecruiterNotesView({
                             : 'Candidate')}
                       </div>
 
-                      <div className="rn-candidate-meta">
+                    </div>
 
-                        <span className="rn-note-count">
-                          <NotebookPen size={9} />
+                    {/* No duplicate note-count badge here */}
+                    <div className="rn-candidate-head-meta">
 
-                          {notes.length}
+                      {isPartiallyFiltered && (
+                        <span className="rn-match-count">
+                          {notes.length}/
+                          {candidate.notes.length}
                         </span>
-
-                        {isPartiallyFiltered && (
-                          <span className="rn-match-count">
-                            {notes.length}/
-                            {candidate.notes.length}
-                          </span>
-                        )}
-
-                      </div>
+                      )}
 
                     </div>
+
                   </div>
 
-                  {/* Latest note */}
+                  {/* ==================================================
+                      NOTES LIST
+                  ================================================== */}
 
-                  <div className="rn-featured">
+                  <div className="rn-notes">
 
-                    <div className="rn-featured-label">
+                    <div
+                      className={`rn-notes-list ${isScrollable
+                          ? 'rn-notes-list-scrollable'
+                          : ''
+                        }`}
+                    >
 
-                      <span className="rn-latest-label">
-                        <Sparkles size={10} />
-
-                        {isFR
-                          ? 'Dernière note'
-                          : 'Latest note'}
-                      </span>
-
-                      <span className="rn-latest-time">
-                        <Clock size={10} />
-
-                        {formatNoteTimestamp(
-                          latestNote,
-                          isFR
-                        )}
-                      </span>
-                    </div>
-
-                    <div className="rn-featured-text">
-                      {latestNote.text}
-                    </div>
-
-                    <div className="rn-featured-footer">
-
-                      <span className="rn-note-index">
-                        01 / {String(notes.length).padStart(
-                          2,
-                          '0'
-                        )}
-                      </span>
-
-                      <button
-                        type="button"
-                        className="rn-profile-btn"
-                        onClick={() =>
-                          onViewCandidate(candidate)
-                        }
-                      >
-                        {isFR
-                          ? 'Voir profil'
-                          : 'View profile'}
-
-                        <ArrowUpRight size={11} />
-                      </button>
-
-                    </div>
-                  </div>
-                </div>
-
-                {/* ==================================================
-                    EXPAND / COLLAPSE
-                ================================================== */}
-
-                {remainingNotes.length > 0 && (
-                  <>
-                    <div className="rn-expand-row">
-
-                      <button
-                        type="button"
-                        className="rn-expand-btn"
-                        onClick={() =>
-                          toggleCandidate(
-                            candidate.id
-                          )
-                        }
-                      >
-                        {isExpanded
-                          ? (
-                            <>
-                              {isFR
-                                ? 'Masquer l’historique'
-                                : 'Hide note history'}
-
-                              <ChevronRight
-                                size={12}
-                                style={{
-                                  transform:
-                                    'rotate(-90deg)',
+                      {addingNoteCandidateId === candidate.id && (
+                        <div className="rn-note-item rn-note-item-latest">
+                          <div className="rn-note-item-spine" />
+                          <div className="rn-note-item-body">
+                            <div className="rn-note-item-head">
+                              <span className="rn-note-item-time">
+                                <Clock size={9} />
+                                {isFR ? 'Maintenant' : 'Now'}
+                              </span>
+                              <button
+                                type="button"
+                                className="rn-note-item-delete"
+                                onClick={() => {
+                                  setNewNoteText('');
+                                  setAddingNoteCandidateId(null);
                                 }}
-                              />
-                            </>
-                          )
-                          : (
-                            <>
-                              {isFR
-                                ? `Voir ${remainingNotes.length} autre${remainingNotes.length > 1 ? 's' : ''} note${remainingNotes.length > 1 ? 's' : ''}`
-                                : `View ${remainingNotes.length} more note${remainingNotes.length > 1 ? 's' : ''}`}
-
-                              <ChevronRight size={12} />
-                            </>
-                          )}
-                      </button>
-                    </div>
-
-                    {/* ==================================================
-                        NOTE TIMELINE
-                    ================================================== */}
-
-                    {isExpanded && (
-                      <div className="rn-expanded">
-
-                        <div className="rn-expanded-header">
-
-                          <div className="rn-expanded-title">
-                            <Clock size={11} />
-
-                            {isFR
-                              ? 'Historique des notes'
-                              : 'Note history'}
-                          </div>
-
-                          <button
-                            type="button"
-                            className="rn-collapse"
-                            onClick={() =>
-                              toggleCandidate(
-                                candidate.id
-                              )
-                            }
-                          >
-                            {isFR
-                              ? 'Réduire'
-                              : 'Collapse'}
-                          </button>
-
-                        </div>
-
-                        <div className="rn-timeline">
-
-                          {remainingNotes.map(
-                            (note, noteIndex) => (
-                              <div
-                                key={note.id}
-                                className="rn-note"
+                                title={isFR ? 'Annuler' : 'Cancel'}
                               >
+                                <X size={11} />
+                              </button>
+                            </div>
+                            <textarea
+                              className="rn-new-note-textarea"
+                              rows={3}
+                              value={newNoteText}
+                              onChange={e => setNewNoteText(e.target.value)}
+                              placeholder={isFR ? 'Écrire une note...' : 'Write a note...'}
+                              autoFocus
+                            />
+                            <div className="rn-new-note-actions">
+                              <button
+                                type="button"
+                                className="rn-new-note-done"
+                                disabled={!newNoteText.trim()}
+                                onClick={() => handleCompleteNote(candidate.id)}
+                              >
+                                {isFR ? 'Terminé' : 'Done'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
-                                <div className="rn-note-time">
-                                  <Clock size={10} />
+                      {visibleNotes.map(
+                        (note, noteIndex) => (
+
+                          <div
+                            key={note.id}
+                            className={`rn-note-item ${noteIndex === 0 && addingNoteCandidateId !== candidate.id
+                                ? 'rn-note-item-latest'
+                                : ''
+                              }`}
+                          >
+
+                            <div className="rn-note-item-spine" />
+
+                            <div className="rn-note-item-body">
+
+                              <div className="rn-note-item-head">
+
+                                <span className="rn-note-item-time">
+
+                                  <Clock size={9} />
 
                                   {formatNoteTimestamp(
                                     note,
                                     isFR
                                   )}
-                                </div>
 
-                                <div className="rn-note-text">
-                                  {note.text}
-                                </div>
+                                </span>
 
                                 <button
                                   type="button"
-                                  className="rn-delete"
+                                  className="rn-note-item-delete"
                                   onClick={() =>
                                     onDeleteNote(
                                       candidate.id,
@@ -1998,24 +1739,160 @@ export function RecruiterNotesView({
                                       : 'Delete note'
                                   }
                                 >
-                                  <Trash2 size={12} />
+                                  <Trash2 size={11} />
                                 </button>
 
                               </div>
-                            )
-                          )}
 
-                        </div>
+                              <div className="rn-note-item-text">
+                                {note.text}
+                              </div>
+
+                            </div>
+
+                          </div>
+
+                        )
+                      )}
+
+                    </div>
+
+                    {/* ==================================================
+                        FOOTER
+                        SINGLE NOTE COUNT LOCATION
+                    ================================================== */}
+
+                    <div className="rn-notes-footer">
+
+                      <span className="rn-note-index">
+                        {String(
+                          notes.length
+                        ).padStart(2, '0')}{' '}
+                        {isFR
+                          ? 'note(s) au total'
+                          : 'total note(s)'}
+                      </span>
+
+                      <div className="rn-footer-actions">
+                        {addingNoteCandidateId !== candidate.id && (
+                          <>
+                            <button
+                              type="button"
+                              className="rn-add-inline-btn"
+                              onClick={() => setAddingNoteCandidateId(candidate.id)}
+                            >
+                              <Plus size={11} />
+                              {isFR ? 'Ajouter' : 'Add'}
+                            </button>
+
+                            <button
+                              type="button"
+                              className="rn-profile-btn"
+                              onClick={() =>
+                                onViewCandidate(
+                                  candidate
+                                )
+                              }
+                            >
+
+                              {isFR
+                                ? 'Voir profil'
+                                : 'View profile'}
+
+                              <ArrowUpRight size={11} />
+
+                            </button>
+                          </>
+                        )}
                       </div>
-                    )}
-                  </>
+
+                    </div>
+
+                  </div>
+
+                </div>
+              );
+            })}
+
+          </div>
+
+          {/* ========================================================
+              PAGINATION
+          ======================================================== */}
+
+          {totalPages > 1 && (
+
+            <div className="rn-pagination">
+
+              <button
+                type="button"
+                className="rn-pagination-button"
+                onClick={() =>
+                  setPage(p =>
+                    Math.max(0, p - 1)
+                  )
+                }
+                disabled={page === 0}
+              >
+                <ChevronLeft size={13} />
+
+                {isFR
+                  ? 'Précédent'
+                  : 'Previous'}
+              </button>
+
+              <div className="rn-pagination-pages">
+
+                {Array.from(
+                  { length: totalPages },
+                  (_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`rn-pagination-page ${page === i
+                          ? 'rn-pagination-page-active'
+                          : ''
+                        }`}
+                      onClick={() =>
+                        setPage(i)
+                      }
+                    >
+                      {i + 1}
+                    </button>
+                  )
                 )}
 
               </div>
-            );
-          })}
-        </div>
+
+              <button
+                type="button"
+                className="rn-pagination-button"
+                onClick={() =>
+                  setPage(p =>
+                    Math.min(
+                      totalPages - 1,
+                      p + 1
+                    )
+                  )
+                }
+                disabled={
+                  page >= totalPages - 1
+                }
+              >
+                {isFR
+                  ? 'Suivant'
+                  : 'Next'}
+
+                <ChevronRight size={13} />
+              </button>
+
+            </div>
+
+          )}
+
+        </>
       )}
+
     </div>
   );
 }

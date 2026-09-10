@@ -1,12 +1,14 @@
 /**
  * CandidateCard
  *
- * Same visual language:
+ * Visual language:
  *   ink       #12151B
  *   paper     #F7F5F1
- *   coral     #E85D3D
- *   cyan      #0BA5C9
- *   slate     #8A8F98
+ *   coral     #E85D3D  → 90–100
+ *   cyan      #08AFCB  → 80–89
+ *   indigo    #5B5BD6  → 70–79
+ *   amber     #C58A22  → 60–69
+ *   slate     #8A8F98  → 0–59
  *
  * Design:
  *   - Candidate identity + score become one visual composition
@@ -14,16 +16,21 @@
  *   - Hover creates a compact command layer
  *   - Match explanation expands inline instead of flipping the card
  *   - Skills behave like a signal cluster
+ *   - Redesigned editorial card index at the top
  *   - Designed to remain compact when rendering thousands of candidates
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   MapPin,
   Briefcase,
   BookmarkCheck,
-  ChevronRight,
   ChevronDown,
   Edit2,
   Trash2,
@@ -32,7 +39,6 @@ import {
   Sparkles,
   Check,
   ArrowUpRight,
-  Zap,
 } from 'lucide-react';
 
 
@@ -61,33 +67,53 @@ function useFonts() {
 
 
 /* ──────────────────────────────────────────────────────────
-   Score
+   Score tiers
 ────────────────────────────────────────────────────────── */
 
 function scoreTier(score) {
-  if (score >= 90) {
+  const value = Number(score) || 0;
+
+  if (value >= 90) {
     return {
-      color: '#084C57',
-      soft: '#E1F2F3',
+      color: '#E85D3D',
+      soft: '#FCE9E4',
       label: 'hot lead',
       shortLabel: 'HOT',
     };
   }
 
-  if (score >= 80) {
+  if (value >= 80) {
     return {
-      color: '#0E7C8C',
-      soft: '#E1F2F3',
-      label: 'good match',
+      color: '#08AFCB',
+      soft: '#E4F7FB',
+      label: 'strong match',
+      shortLabel: 'STRONG',
+    };
+  }
+
+  if (value >= 70) {
+    return {
+      color: '#5B5BD6',
+      soft: '#ECECFC',
+      label: 'good fit',
       shortLabel: 'GOOD',
     };
   }
 
+  if (value >= 60) {
+    return {
+      color: '#C58A22',
+      soft: '#FBF2DE',
+      label: 'partial fit',
+      shortLabel: 'PARTIAL',
+    };
+  }
+
   return {
-    color: '#0A5C68',
-    soft: '#E1F2F3',
-    label: 'possible fit',
-    shortLabel: 'FIT',
+    color: '#8A8F98',
+    soft: '#EEF0F2',
+    label: 'low fit',
+    shortLabel: 'LOW',
   };
 }
 
@@ -97,12 +123,12 @@ function scoreTier(score) {
 ────────────────────────────────────────────────────────── */
 
 function avatarUrl(name, avatar) {
-  // Use actual avatar URL if available, otherwise generate initials-based avatar
   if (avatar) {
     return avatar;
   }
+
   return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-    name
+    name || 'Candidate'
   )}&backgroundColor=12151B&textColor=ffffff&fontWeight=600&fontSize=38`;
 }
 
@@ -112,36 +138,67 @@ function avatarUrl(name, avatar) {
 ────────────────────────────────────────────────────────── */
 
 function buildReasoning(candidate) {
-  const matchedSkills = candidate.matched_skills || [];
-  const missingSkills = candidate.missing_skills || [];
-  
-  const skillMatchCount = matchedSkills.length;
-  const totalRequired = matchedSkills.length + missingSkills.length;
-  
-  const expYears = candidate.experience_years || 0;
-  const minExp = candidate.min_experience_years || 0;
-  const expFits = expYears >= minExp;
-  
-  const locationScore = candidate.location_score || 0;
-  const locationFits = locationScore >= 80;
-  
+  const matchedSkills =
+    candidate.matched_skills || [];
+
+  const missingSkills =
+    candidate.missing_skills || [];
+
+  const skillMatchCount =
+    matchedSkills.length;
+
+  const totalRequired =
+    matchedSkills.length +
+    missingSkills.length;
+
+  const expYears =
+    candidate.experience_years || 0;
+
+  const minExp =
+    candidate.min_experience_years || 0;
+
+  const expFits =
+    expYears >= minExp;
+
+  const locationScore =
+    candidate.location_score || 0;
+
+  const locationFits =
+    locationScore >= 80;
+
   return [
     {
       label: 'Skills',
       value: `${skillMatchCount}/${totalRequired}`,
-      detail: matchedSkills.length > 0 ? matchedSkills.slice(0, 4).join(' · ') : 'No matched skills',
-      weight: Math.min(100, 70 + skillMatchCount * 6),
+      detail:
+        matchedSkills.length > 0
+          ? matchedSkills
+              .slice(0, 4)
+              .join(' · ')
+          : 'No matched skills',
+      weight: Math.min(
+        100,
+        70 + skillMatchCount * 6
+      ),
     },
+
     {
       label: 'Experience',
       value: `${expYears} yrs`,
-      detail: expFits ? `Fits ${minExp}+ yr requirement` : `Below ${minExp} yr requirement`,
+      detail: expFits
+        ? `Fits ${minExp}+ yr requirement`
+        : `Below ${minExp} yr requirement`,
       weight: expFits ? 100 : 50,
     },
+
     {
       label: 'Location',
-      value: locationFits ? 'Match' : 'Partial',
-      detail: candidate.location || 'Location not specified',
+      value: locationFits
+        ? 'Match'
+        : 'Partial',
+      detail:
+        candidate.location ||
+        'Location not specified',
       weight: locationScore,
     },
   ];
@@ -149,7 +206,7 @@ function buildReasoning(candidate) {
 
 
 /* ──────────────────────────────────────────────────────────
-   Score Signal
+   Match Signal
 ────────────────────────────────────────────────────────── */
 
 function MatchSignal({
@@ -158,17 +215,25 @@ function MatchSignal({
   expanded,
   onClick,
 }) {
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] =
+    useState(0);
 
   useEffect(() => {
-    const timeout = setTimeout(() => setProgress(score), 120);
+    const timeout = setTimeout(
+      () => setProgress(score),
+      120
+    );
 
-    return () => clearTimeout(timeout);
+    return () =>
+      clearTimeout(timeout);
   }, [score]);
 
   return (
     <button
-      className={`cc-signal ${expanded ? 'is-expanded' : ''}`}
+      type="button"
+      className={`cc-signal ${
+        expanded ? 'is-expanded' : ''
+      }`}
       onClick={onClick}
       aria-expanded={expanded}
       style={{
@@ -193,7 +258,9 @@ function MatchSignal({
 
       <div className="cc-signal-bottom">
         <span>
-          {expanded ? 'Hide reasoning' : 'Why this match'}
+          {expanded
+            ? 'Hide reasoning'
+            : 'Why this match'}
         </span>
 
         <ChevronDown
@@ -230,30 +297,47 @@ export function CandidateCard({
 }) {
   useFonts();
 
-  const [reasoningOpen, setReasoningOpen] = useState(false);
-  const [skillsExpanded, setSkillsExpanded] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const [justSaved, setJustSaved] = useState(false);
+  const [
+    reasoningOpen,
+    setReasoningOpen,
+  ] = useState(false);
 
-  const tier = scoreTier(candidate.matchScore);
+  const [
+    skillsExpanded,
+    setSkillsExpanded,
+  ] = useState(false);
+
+  const [
+    justSaved,
+    setJustSaved,
+  ] = useState(false);
+
+  const tier = scoreTier(
+    candidate.matchScore
+  );
 
   const reasoning = useMemo(
     () => buildReasoning(candidate),
     [candidate]
   );
 
-  const skills = candidate.skills || [];
+  const skills =
+    candidate.skills || [];
 
-  const visibleSkills = skillsExpanded
-    ? skills
-    : skills.slice(0, 5);
+  const visibleSkills =
+    skillsExpanded
+      ? skills
+      : skills.slice(0, 5);
 
   const hiddenSkills = Math.max(
     0,
-    skills.length - visibleSkills.length
+    skills.length -
+      visibleSkills.length
   );
 
-  const cardNumber = String(index + 1).padStart(2, '0');
+  const cardNumber = String(
+    index + 1
+  ).padStart(2, '0');
 
 
   function handleSave() {
@@ -273,14 +357,18 @@ export function CandidateCard({
     <div
       className={`cc-root ${
         selected ? 'is-selected' : ''
-      } ${reasoningOpen ? 'is-reasoning' : ''}`}
+      } ${
+        reasoningOpen
+          ? 'is-reasoning'
+          : ''
+      }`}
       style={{
         '--tier-color': tier.color,
         '--tier-soft': tier.soft,
-        '--entry-delay': `${Math.min(index, 20) * 35}ms`,
+        '--entry-delay': `${
+          Math.min(index, 20) * 35
+        }ms`,
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
 
       <style>{`
@@ -413,7 +501,7 @@ export function CandidateCard({
 
 
         /* ─────────────────────────────────────────────
-           Ambient signal
+           Ambient tier color
         ───────────────────────────────────────────── */
 
         .cc-ambient {
@@ -430,7 +518,9 @@ export function CandidateCard({
           background:
             var(--tier-soft);
 
-          opacity: .75;
+          opacity: .9;
+
+          pointer-events: none;
 
           transition:
             transform .4s ease,
@@ -444,53 +534,109 @@ export function CandidateCard({
 
 
         /* ─────────────────────────────────────────────
-           Header
+           TOP INDEX / COMMAND BAR
         ───────────────────────────────────────────── */
 
         .cc-header {
           position: relative;
-          z-index: 2;
+
+          z-index: 6;
+
+          min-height: 46px;
 
           display: flex;
           align-items: center;
           justify-content: space-between;
 
           padding:
-            13px
+            10px
             14px
-            0;
+            0
+            14px;
         }
 
+
+        /*
+         * Editorial candidate number.
+         *
+         * The number is intentionally not a badge.
+         * It acts like a catalog/index marker.
+         */
 
         .cc-index {
           display: flex;
           align-items: center;
+
           gap: 8px;
+
+          color:
+            var(--tier-color);
+
+          user-select: none;
+        }
+
+        .cc-index-number {
+          font-family:
+            'JetBrains Mono',
+            monospace;
+
+          font-size: 17px;
+          font-weight: 700;
+
+          line-height: 1;
+
+          letter-spacing: -.05em;
+
+          color:
+            var(--tier-color);
+
+          opacity: .95;
+        }
+
+        .cc-index-meta {
+          display: flex;
+          align-items: center;
+
+          gap: 7px;
 
           font-family:
             'JetBrains Mono',
             monospace;
 
-          font-size: 10px;
+          font-size: 7px;
           font-weight: 700;
 
+          letter-spacing: .08em;
+
           color: #9B9C9E;
+
+          text-transform: uppercase;
         }
 
         .cc-index-line {
-          width: 18px;
+          width: 28px;
           height: 1px;
 
-          background: #DAD7D0;
+          background:
+            var(--tier-color);
+
+          opacity: .65;
 
           transition:
             width .25s ease,
-            background .25s ease;
+            opacity .25s ease;
         }
 
         .cc-root:hover .cc-index-line {
-          width: 28px;
-          background: var(--tier-color);
+          width: 44px;
+          opacity: 1;
+        }
+
+        .cc-index-label {
+          color:
+            var(--tier-color);
+
+          opacity: .75;
         }
 
 
@@ -569,7 +715,7 @@ export function CandidateCard({
           gap: 13px;
 
           padding:
-            18px
+            10px
             16px
             14px;
         }
@@ -594,7 +740,7 @@ export function CandidateCard({
             1px solid
             var(--tier-color);
 
-          opacity: .28;
+          opacity: .35;
 
           transition:
             transform .3s ease,
@@ -603,7 +749,7 @@ export function CandidateCard({
 
         .cc-root:hover .cc-avatar-ring {
           transform: scale(1.08);
-          opacity: .55;
+          opacity: .65;
         }
 
         .cc-avatar {
@@ -644,7 +790,9 @@ export function CandidateCard({
 
           border-radius: 7px;
 
-          background: #12151B;
+          background:
+            var(--tier-color);
+
           color: #FFFFFF;
 
           font-family:
@@ -663,7 +811,9 @@ export function CandidateCard({
         }
 
         .cc-root:hover .cc-score-badge {
-          transform: translateY(-2px);
+          transform:
+            translateY(-2px)
+            scale(1.04);
         }
 
 
@@ -713,7 +863,8 @@ export function CandidateCard({
           font-size: 9px;
           font-weight: 700;
 
-          color: var(--tier-color);
+          color:
+            var(--tier-color);
 
           text-transform: uppercase;
           letter-spacing: .04em;
@@ -725,7 +876,8 @@ export function CandidateCard({
 
           border-radius: 50%;
 
-          background: var(--tier-color);
+          background:
+            var(--tier-color);
         }
 
 
@@ -773,6 +925,15 @@ export function CandidateCard({
             #EFEDE7;
         }
 
+        .cc-meta-item svg {
+          flex-shrink: 0;
+
+          color:
+            var(--tier-color);
+
+          opacity: .8;
+        }
+
         .cc-meta-item span {
           overflow: hidden;
           text-overflow: ellipsis;
@@ -815,7 +976,9 @@ export function CandidateCard({
             16px
             12px;
 
-          padding: 10px 11px;
+          padding:
+            10px
+            11px;
 
           border:
             1px solid
@@ -841,11 +1004,13 @@ export function CandidateCard({
           border-color:
             var(--tier-color);
 
-          transform: translateY(-1px);
+          transform:
+            translateY(-1px);
         }
 
         .cc-signal.is-expanded {
-          background: var(--tier-soft);
+          background:
+            var(--tier-soft);
 
           border-color:
             var(--tier-color);
@@ -874,6 +1039,11 @@ export function CandidateCard({
           letter-spacing: .06em;
 
           color: #63666E;
+        }
+
+        .cc-signal-label svg {
+          color:
+            var(--tier-color);
         }
 
         .cc-signal-score {
@@ -942,7 +1112,8 @@ export function CandidateCard({
         }
 
         .cc-signal-chevron.rotate {
-          transform: rotate(180deg);
+          transform:
+            rotate(180deg);
         }
 
 
@@ -1073,13 +1244,21 @@ export function CandidateCard({
         }
 
         .cc-skill.primary {
-          background: var(--tier-soft);
+          background:
+            var(--tier-soft);
 
           border-color:
             color-mix(
               in srgb,
-              var(--tier-color) 20%,
+              var(--tier-color) 25%,
               #E4E1D9
+            );
+
+          color:
+            color-mix(
+              in srgb,
+              var(--tier-color) 75%,
+              #12151B
             );
         }
 
@@ -1099,6 +1278,10 @@ export function CandidateCard({
           font-weight: 700;
 
           cursor: pointer;
+        }
+
+        .cc-more:hover {
+          text-decoration: underline;
         }
 
 
@@ -1154,7 +1337,8 @@ export function CandidateCard({
 
           cursor: pointer;
 
-          transition: color .15s ease;
+          transition:
+            color .15s ease;
         }
 
         .cc-shortlist:hover {
@@ -1240,7 +1424,8 @@ export function CandidateCard({
             4px
             0;
 
-          background: #12151B;
+          background:
+            var(--tier-color);
 
           opacity: 0;
 
@@ -1304,15 +1489,16 @@ export function CandidateCard({
         }
 
         .cc-checkbox.checked {
-          background: #12151B;
+          background:
+            var(--tier-color);
 
           border-color:
-            #12151B;
+            var(--tier-color);
         }
 
 
         /* ─────────────────────────────────────────────
-           Small responsive adjustment
+           Responsive
         ───────────────────────────────────────────── */
 
         @media (max-width: 500px) {
@@ -1321,10 +1507,14 @@ export function CandidateCard({
           }
 
           .cc-identity {
-            padding-top: 15px;
+            padding-top: 10px;
           }
 
           .cc-name {
+            font-size: 15px;
+          }
+
+          .cc-index-number {
             font-size: 15px;
           }
         }
@@ -1337,19 +1527,31 @@ export function CandidateCard({
         {/* ambient color field */}
         <div className="cc-ambient" />
 
+
         {/* selected marker */}
         <div className="cc-select" />
 
 
         {/* ─────────────────────────────────────────────
-            HEADER
+            HEADER / INDEX
         ───────────────────────────────────────────── */}
 
         <div className="cc-header">
 
           <div className="cc-index">
-            <span>{cardNumber}</span>
+
+            <span className="cc-index-number">
+              {cardNumber}
+            </span>
+
             <span className="cc-index-line" />
+
+            <span className="cc-index-meta">
+              <span className="cc-index-label">
+                CANDIDATE
+              </span>
+            </span>
+
           </div>
 
 
@@ -1368,16 +1570,22 @@ export function CandidateCard({
             )}
 
             <button
+              type="button"
               className="cc-action"
-              onClick={() => onEdit(candidate)}
+              onClick={() =>
+                onEdit(candidate)
+              }
               title="Edit candidate"
             >
               <Edit2 size={12} />
             </button>
 
             <button
+              type="button"
               className="cc-action danger"
-              onClick={() => onDelete(candidate.id)}
+              onClick={() =>
+                onDelete(candidate.id)
+              }
               title="Remove candidate"
             >
               <Trash2 size={12} />
@@ -1400,7 +1608,10 @@ export function CandidateCard({
 
             <img
               className="cc-avatar"
-              src={avatarUrl(candidate.fullName, candidate.avatarUrl)}
+              src={avatarUrl(
+                candidate.fullName,
+                candidate.avatarUrl
+              )}
               alt={candidate.fullName}
             />
 
@@ -1430,7 +1641,8 @@ export function CandidateCard({
               <span
                 className="cc-tier-dot"
                 style={{
-                  background: tier.color,
+                  background:
+                    tier.color,
                 }}
               />
 
@@ -1449,20 +1661,25 @@ export function CandidateCard({
         <div className="cc-meta">
 
           <div className="cc-meta-item">
+
             <MapPin size={11} />
 
             <span>
               {candidate.location}
             </span>
+
           </div>
 
 
           <div className="cc-meta-item">
+
             <Briefcase size={11} />
 
             <span>
-              {candidate.experienceYears} yrs experience
+              {candidate.experienceYears} yrs
+              experience
             </span>
+
           </div>
 
         </div>
@@ -1486,7 +1703,9 @@ export function CandidateCard({
           color={tier.color}
           expanded={reasoningOpen}
           onClick={() =>
-            setReasoningOpen(value => !value)
+            setReasoningOpen(
+              value => !value
+            )
           }
         />
 
@@ -1498,7 +1717,7 @@ export function CandidateCard({
         {reasoningOpen && (
           <div className="cc-reasoning">
 
-            {reasoning.map((reason) => (
+            {reasoning.map(reason => (
               <div
                 className="cc-reason"
                 key={reason.label}
@@ -1533,25 +1752,33 @@ export function CandidateCard({
 
         <div className="cc-skills">
 
-          {visibleSkills.map((skill, i) => (
-            <span
-              key={skill}
-              className={`cc-skill ${
-                i === 0 ? 'primary' : ''
-              }`}
-              style={{
-                animationDelay: `${i * 25}ms`,
-              }}
-            >
-              {skill}
-            </span>
-          ))}
+          {visibleSkills.map(
+            (skill, i) => (
+              <span
+                key={skill}
+                className={`cc-skill ${
+                  i === 0
+                    ? 'primary'
+                    : ''
+                }`}
+                style={{
+                  animationDelay:
+                    `${i * 25}ms`,
+                }}
+              >
+                {skill}
+              </span>
+            )
+          )}
 
 
           {hiddenSkills > 0 && (
             <button
+              type="button"
               className="cc-more"
-              onClick={() => setSkillsExpanded(true)}
+              onClick={() =>
+                setSkillsExpanded(true)
+              }
             >
               +{hiddenSkills}
             </button>
@@ -1572,8 +1799,11 @@ export function CandidateCard({
           {selectedJobId ? (
 
             <button
+              type="button"
               className={`cc-shortlist ${
-                isSavedForJob ? 'active' : ''
+                isSavedForJob
+                  ? 'active'
+                  : ''
               }`}
               onClick={handleSave}
             >
@@ -1585,11 +1815,17 @@ export function CandidateCard({
                     : ''
                 }
               >
+
                 {isSavedForJob ? (
-                  <BookmarkCheck size={14} />
+                  <BookmarkCheck
+                    size={14}
+                  />
                 ) : (
-                  <Bookmark size={14} />
+                  <Bookmark
+                    size={14}
+                  />
                 )}
+
               </span>
 
               {isSavedForJob
@@ -1614,27 +1850,39 @@ export function CandidateCard({
 
 
           <button
+            type="button"
             className="cc-view"
-            onClick={(event) =>
-              onViewDetails(candidate, event)
+            onClick={event =>
+              onViewDetails(
+                candidate,
+                event
+              )
             }
           >
             Profile
 
             <ArrowUpRight size={12} />
+
           </button>
 
         </div>
 
 
-        {/* selection checkbox */}
+        {/* ─────────────────────────────────────────────
+            SELECTION CHECKBOX
+        ───────────────────────────────────────────── */}
 
         <button
+          type="button"
           className={`cc-checkbox ${
-            selected ? 'checked' : ''
+            selected
+              ? 'checked'
+              : ''
           }`}
           onClick={() =>
-            onToggleSelect(candidate.id)
+            onToggleSelect(
+              candidate.id
+            )
           }
           aria-label={
             selected
@@ -1642,6 +1890,7 @@ export function CandidateCard({
               : 'Select candidate'
           }
         >
+
           {selected && (
             <Check
               size={11}
@@ -1649,6 +1898,7 @@ export function CandidateCard({
               strokeWidth={3}
             />
           )}
+
         </button>
 
       </div>

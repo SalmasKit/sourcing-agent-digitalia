@@ -58,7 +58,6 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
   const TABS = [
     { id: 'dashboard', icon: LayoutDashboard, label: t('dashboard') || 'Dashboard' },
     { id: 'sourcing', icon: Users, label: t('sourcingHub') },
-    { id: 'shortlist', icon: BookmarkCheck, label: t('shortlists'), badge: shortlistCount, pulse: shortlistPulse },
     { id: 'pipeline', icon: Kanban, label: 'Pipeline' },
     { id: 'notes', icon: NotebookPen, label: 'Notes', badge: notesCount, pulse: notesPulse },
   ];

@@ -8,7 +8,6 @@ import { CandidateCard } from './components/CandidateCard';
 import CandidateDetailPanel from './components/CandidateDetailPanel';
 import { EditCandidateModal } from './components/EditCandidateModal';
 import { JobDescriptionModal } from './components/JobDescriptionModal';
-import { ShortlistPanel } from './components/ShortlistPanel';
 import { KanbanPipeline } from './components/KanbanPipeline';
 import { DashboardView } from './components/DashboardView';
 import { RecruiterNotesView } from './components/RecruiterNotesView';
@@ -168,7 +167,7 @@ function DashboardContent() {
 
   // Track last search so the refresh button can re-run it
   const [lastSearch, setLastSearch] = useState(null);
-  const [searchMode, setSearchMode] = useState('source'); // 'source' | 'pool'
+  const [searchMode, setSearchMode] = useState('ai'); // 'ai' | 'pool'
 
   // Incremented on every new result set — forces grid children to remount
   // so cardEntrance animations replay on each search.
@@ -279,13 +278,20 @@ function DashboardContent() {
       const activeJob = jobDescriptions.find(j => j.id === activeJobId);
       const jobLabel = activeJob ? activeJob.title : (query || 'General Search');
 
-      // Record to search history
+      // Record to search history with more details for rerun
       const now = new Date();
       const timeStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       const modeLabel = filters?.searchMode === 'pool' ? (lang === 'FR' ? '(vivier)' : '(pool)') : '';
       setSearchHistory(prev => [
         ...prev,
-        { query: `${modeLabel} ${query ? `[${jobLabel}] ${query}` : `Sourcing for ${jobLabel}`}`.trim(), date: timeStr, resultsCount: results.length }
+        { 
+          query: `${modeLabel} ${query ? `[${jobLabel}] ${query}` : `Sourcing for ${jobLabel}`}`.trim(), 
+          date: timeStr, 
+          resultsCount: results.length,
+          originalQuery: query,
+          originalFilters: filters,
+          originalJobId: activeJobId
+        }
       ]);
 
       const successMsg = filters?.searchMode === 'pool'
@@ -315,7 +321,7 @@ function DashboardContent() {
     const activeJobId = selectedJobId || (jobDescriptions[0] ? jobDescriptions[0].id : null);
     if (!activeJobId) return;
 
-    if (newMode === 'source') {
+    if (newMode === 'ai') {
       const cachedSource = jobResultsCache[activeJobId];
       if (cachedSource && cachedSource.length > 0) {
         setCandidates(cachedSource);
@@ -481,8 +487,9 @@ function DashboardContent() {
       minute: '2-digit',
     });
     const timestamp = isFR ? `${datePart} à ${timePart}` : `${datePart} at ${timePart}`;
+    // Generate a unique ID using timestamp + random to prevent collisions
     const newNote = {
-      id: Date.now(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       text: noteText,
       time: timestamp,
       createdAt: now.toISOString(),
@@ -539,32 +546,21 @@ function DashboardContent() {
       return updated;
     });
 
-    // Also persist note into the jobResultsCache for the active job
-    setJobResultsCache(prev => {
-      const next = { ...prev };
-      const jobId = selectedJobId;
-      if (jobId && Array.isArray(next[jobId])) {
-        next[jobId] = next[jobId].map(c => {
-          if (c.id === candidateId) {
-            return { ...c, notes: [...(c.notes || []), newNote] };
-          }
-          return c;
-        });
-      }
-      return next;
-    });
-
     triggerToast(lang === 'FR' ? 'Note enregistrée.' : 'Note saved.');
   };
 
   const handleDeleteNote = (candidateId, noteId) => {
-    const removeNote = (c) =>
-      c.id === candidateId
-        ? { ...c, notes: (c.notes || []).filter(n => n.id !== noteId) }
-        : c;
+    const removeNote = (c) => {
+      if (c.id == candidateId) {
+        const filteredNotes = (c.notes || []).filter(n => n.id != noteId);
+        return { ...c, notes: filteredNotes };
+      }
+      return c;
+    };
 
     setCandidates(prev => prev.map(removeNote));
     setShortlist(prev => prev.map(removeNote));
+    
     setJobResultsCache(prev => {
       const next = { ...prev };
       Object.keys(next).forEach(jobId => {
@@ -574,11 +570,15 @@ function DashboardContent() {
       });
       return next;
     });
-    setSelectedCandidate(prev =>
-      prev && prev.id === candidateId
-        ? { ...prev, notes: (prev.notes || []).filter(n => n.id !== noteId) }
-        : prev
-    );
+
+    setSelectedCandidate(prev => {
+      if (!prev) return prev;
+      if (prev.id == candidateId) {
+        return { ...prev, notes: (prev.notes || []).filter(n => n.id != noteId) };
+      }
+      return prev;
+    });
+
     triggerToast(lang === 'FR' ? 'Note supprimée.' : 'Note deleted.');
   };
 
@@ -652,32 +652,36 @@ function DashboardContent() {
           />
         )}
 
-        {/* Tab 3: Job Projects & Saved Talent Pools View */}
-        {activeTab === 'shortlist' && (
-          <ShortlistPanel
-            jobDescriptions={jobDescriptions}
-            candidates={allKnownCandidates}
-            savedRoleCandidates={savedRoleCandidates}
-            onViewDetails={setSelectedCandidate}
-            onToggleSaveCandidateForJob={handleToggleSaveForJob}
-            onDeleteJob={handleDeleteJob}
-            onOpenJobModal={() => setIsJobModalOpen(true)}
-          />
-        )}
+      
 
-        {/* Tab 4: Dashboard Analytics View */}
+        {/* Tab 3: Dashboard Analytics View */}
         {activeTab === 'dashboard' && (
           <DashboardView
             user={user}
             jobDescriptions={jobDescriptions}
-            candidates={
-              selectedJobId && jobResultsCache[selectedJobId]
-                ? jobResultsCache[selectedJobId]
-                : candidates
-            }
+            candidates={allKnownCandidates}
             savedRoleCandidates={savedRoleCandidates}
             candidatePipelineStage={candidatePipelineStage}
-            searchHistory={searchHistory}
+            lang={lang}
+            onStageClick={(stage) => {
+              // When a stage is clicked, we could filter the view or navigate to pipeline
+              if (stage) {
+                setActiveTab('pipeline');
+              }
+            }}
+            onSelectJob={(jobId) => {
+              // When a job is selected, switch to sourcing tab and select that job
+              if (jobId) {
+                setActiveTab('sourcing');
+                handleSelectJob(jobId);
+              }
+            }}
+            onSelectCandidate={(candidate) => {
+              // When a candidate is selected, show their details
+              if (candidate) {
+                setSelectedCandidate(candidate);
+              }
+            }}
           />
         )}
 
@@ -692,6 +696,7 @@ function DashboardContent() {
               setSelectedCandidate(candidate);
             }}
             onDeleteNote={handleDeleteNote}
+            onAddNote={handleAddNote}
           />
         )}
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -6,19 +6,38 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   Edit3,
   GitCompare,
   Plus,
   RefreshCw,
   Search,
   Sparkles,
+  Trash2,
   Users,
 } from "lucide-react";
 
 import SearchConsole from "./SearchConsole";
 import AgentStatusWidget from "./AgentStatusWidget";
 import CandidateGridView from "./CandidateGridView";
+
+// Score band drives the accent color used on the shortlist's average
+// match badge in the workspace's Shortlisted tab.
+const getScoreBand = (score) => {
+  if (score >= 80) return "high";
+  if (score >= 60) return "mid";
+  return "low";
+};
+
+const getAvgScore = (list) => {
+  if (!list.length) return 0;
+
+  const total = list.reduce(
+    (sum, candidate) => sum + (Number(candidate.matchScore) || 0),
+    0
+  );
+
+  return Math.round(total / list.length);
+};
 
 const SourcingHubView = ({
   jobDescriptions = [],
@@ -28,7 +47,7 @@ const SourcingHubView = ({
   searchKey,
   searchMode = "ai",
   shortlist = [],
-  savedRoleCandidates = [],
+  savedRoleCandidates = {},
   isSearching = false,
   agentStep = 0,
   lastSearch,
@@ -42,43 +61,104 @@ const SourcingHubView = ({
 
   candidateGridProps = {},
 
-  // New optional callbacks.
-  // They won't break your existing parent if you don't provide them yet.
   onSelectJob,
   onEditDescription,
   onNewDescription,
+  onDeleteJob,
   onToggleSaveForJob,
   onViewDetails,
   onEdit,
   onDelete,
   onOpenComparator,
+
+  allCandidates = [],
 }) => {
   /*
    * The role opened in the sourcing workspace.
-   *
-   * We deliberately keep this local rather than making the entire view
-   * depend on selectedJobId. That lets the recruiter return to the role
-   * library without destroying the parent's current selection.
    */
   const [workspaceJobId, setWorkspaceJobId] = useState(null);
-  const [libraryPage, setLibraryPage] = useState(0);
-  const PAGE_SIZE = 5;
 
-  // Sort most-recent first: job IDs are timestamp-based (job-<timestamp>)
-  const sortedJobs = useMemo(() =>
-    [...jobDescriptions].sort((a, b) => {
-      const tA = Number(String(a.id).replace(/\D/g, '')) || 0;
-      const tB = Number(String(b.id).replace(/\D/g, '')) || 0;
+  /*
+   * Search/filter for the role library.
+   */
+  const [roleSearch, setRoleSearch] = useState("");
+
+  const [libraryPage, setLibraryPage] = useState(0);
+  const [workspaceTab, setWorkspaceTab] = useState("sourced");
+
+  // 6 role cards per page.
+  const PAGE_SIZE = 6;
+
+  /*
+   * Sort most-recent first and filter by the role-library search.
+   *
+   * Search checks:
+   * - title
+   * - description
+   * - prompt
+   * - seniority
+   * - location
+   * - experience
+   * - skills
+   * - technologies
+   * - tech stack
+   */
+  const sortedJobs = useMemo(() => {
+    const query = roleSearch.trim().toLowerCase();
+
+    const sorted = [...jobDescriptions].sort((a, b) => {
+      const tA = Number(String(a.id).replace(/\D/g, "")) || 0;
+      const tB = Number(String(b.id).replace(/\D/g, "")) || 0;
+
       return tB - tA;
-    }),
-    [jobDescriptions]
+    });
+
+    if (!query) {
+      return sorted;
+    }
+
+    return sorted.filter((job) => {
+      const skills =
+        job.skills ||
+        job.technologies ||
+        job.techStack ||
+        [];
+
+      const searchableText = [
+        job.title,
+        job.description,
+        job.prompt,
+        job.seniority,
+        job.location,
+        job.experience,
+        job.minExperience,
+        job.maxExperience,
+        job.status,
+        ...(Array.isArray(skills) ? skills : []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(query);
+    });
+  }, [jobDescriptions, roleSearch]);
+
+  const totalPages = Math.ceil(
+    sortedJobs.length / PAGE_SIZE
   );
-  const totalPages = Math.ceil(sortedJobs.length / PAGE_SIZE);
+
   const pagedJobs = sortedJobs.slice(
     libraryPage * PAGE_SIZE,
     libraryPage * PAGE_SIZE + PAGE_SIZE
   );
 
+  /*
+   * When the search changes, always return to page 1.
+   */
+  useEffect(() => {
+    setLibraryPage(0);
+  }, [roleSearch]);
 
   const activeJob = useMemo(() => {
     const id = workspaceJobId || selectedJobId;
@@ -86,15 +166,24 @@ const SourcingHubView = ({
     return jobDescriptions.find(
       (job) => String(job.id) === String(id)
     );
-  }, [jobDescriptions, workspaceJobId, selectedJobId]);
+  }, [
+    jobDescriptions,
+    workspaceJobId,
+    selectedJobId,
+  ]);
 
   const getJobCandidates = (jobId) => {
     if (!jobId) return [];
 
     const cached = jobResultsCache?.[jobId];
 
-    if (Array.isArray(cached)) return cached;
-    if (Array.isArray(cached?.candidates)) return cached.candidates;
+    if (Array.isArray(cached)) {
+      return cached;
+    }
+
+    if (Array.isArray(cached?.candidates)) {
+      return cached.candidates;
+    }
 
     if (
       String(jobId) === String(selectedJobId) &&
@@ -110,8 +199,80 @@ const SourcingHubView = ({
     ? getJobCandidates(activeJob.id)
     : [];
 
+  /*
+   * Build an index across every candidate source available.
+   */
+  const candidateIndex = useMemo(() => {
+    const index = new Map();
+
+    const indexList = (list) => {
+      if (!Array.isArray(list)) return;
+
+      list.forEach((candidate) => {
+        if (
+          candidate &&
+          candidate.id != null
+        ) {
+          index.set(
+            String(candidate.id),
+            candidate
+          );
+        }
+      });
+    };
+
+    indexList(candidates);
+    indexList(allCandidates);
+
+    Object.values(jobResultsCache || {}).forEach(
+      (cached) => {
+        if (Array.isArray(cached)) {
+          indexList(cached);
+        } else if (
+          Array.isArray(cached?.candidates)
+        ) {
+          indexList(cached.candidates);
+        }
+      }
+    );
+
+    return index;
+  }, [
+    candidates,
+    allCandidates,
+    jobResultsCache,
+  ]);
+
+  const shortlistedCandidates = useMemo(() => {
+    const savedIds = activeJob
+      ? savedRoleCandidates?.[activeJob.id] || []
+      : [];
+
+    return savedIds
+      .map((id) =>
+        candidateIndex.get(String(id))
+      )
+      .filter(Boolean);
+  }, [
+    activeJob,
+    savedRoleCandidates,
+    candidateIndex,
+  ]);
+
+  const visibleCandidates =
+    workspaceTab === "shortlisted"
+      ? shortlistedCandidates
+      : displayCandidates;
+
+  const avgShortlistScore = useMemo(
+    () =>
+      getAvgScore(shortlistedCandidates),
+    [shortlistedCandidates]
+  );
+
   const openRole = (job) => {
     setWorkspaceJobId(job.id);
+    setWorkspaceTab("sourced");
 
     if (onSelectJob) {
       onSelectJob(job);
@@ -121,6 +282,41 @@ const SourcingHubView = ({
   const closeWorkspace = () => {
     setWorkspaceJobId(null);
   };
+
+  /*
+   * If the role currently open in the workspace gets deleted,
+   * fall back to the library.
+   */
+  useEffect(() => {
+    if (
+      workspaceJobId &&
+      !jobDescriptions.some(
+        (job) =>
+          String(job.id) ===
+          String(workspaceJobId)
+      )
+    ) {
+      setWorkspaceJobId(null);
+    }
+  }, [
+    jobDescriptions,
+    workspaceJobId,
+  ]);
+
+  /*
+   * Keep pagination valid when roles are deleted or
+   * filtered.
+   */
+  useEffect(() => {
+    if (totalPages === 0) {
+      setLibraryPage(0);
+      return;
+    }
+
+    setLibraryPage((page) =>
+      Math.min(page, totalPages - 1)
+    );
+  }, [totalPages]);
 
   const handleRefresh = () => {
     if (onRefresh) {
@@ -132,7 +328,8 @@ const SourcingHubView = ({
       onSearch(
         lastSearch.query,
         lastSearch.filters,
-        activeJob?.id || lastSearch.jobId
+        activeJob?.id ||
+          lastSearch.jobId
       );
 
       return;
@@ -140,8 +337,13 @@ const SourcingHubView = ({
 
     if (activeJob && onSearch) {
       onSearch(
-        activeJob.description || activeJob.prompt || "",
-        { maxResults: activeJob.maxResults || 10 },
+        activeJob.description ||
+          activeJob.prompt ||
+          "",
+        {
+          maxResults:
+            activeJob.maxResults || 10,
+        },
         activeJob.id
       );
     }
@@ -157,117 +359,248 @@ const SourcingHubView = ({
 
         <header className="sourcing-page-header">
           <div>
-            <div className="sourcing-eyebrow">
-              <Sparkles size={13} />
-              SOURCING
-            </div>
-
             <h1>Your hiring roles</h1>
 
             <p>
-              Manage role descriptions and the sourcing activity connected
-              to each one.
+              Manage role descriptions and the
+              sourcing activity connected to each
+              one.
             </p>
+          </div>
+
+          <div className="role-library-header-actions">
+            <div className="role-search-box">
+              <Search size={15} />
+
+              <input
+                type="text"
+                value={roleSearch}
+                onChange={(event) =>
+                  setRoleSearch(
+                    event.target.value
+                  )
+                }
+                placeholder="Search roles..."
+                aria-label="Search job descriptions"
+              />
+
+              {roleSearch && (
+                <button
+                  type="button"
+                  className="role-search-clear"
+                  onClick={() =>
+                    setRoleSearch("")
+                  }
+                  aria-label="Clear role search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            {onNewDescription && (
+              <button
+                className="sourcing-primary-button"
+                onClick={onNewDescription}
+              >
+                <Plus size={16} />
+                New description
+              </button>
+            )}
           </div>
         </header>
 
         <LibrarySummary
           jobs={jobDescriptions}
-          getJobCandidates={getJobCandidates}
+          getJobCandidates={
+            getJobCandidates
+          }
           selectedJobId={selectedJobId}
           isSearching={isSearching}
-          onNewDescription={onNewDescription}
         />
 
         <section className="role-library">
-          <div className="role-library-header">
-            <div>
-              <span>Role</span>
-            </div>
-
-            <span>Candidates</span>
-            <span>Status</span>
-            <span />
-          </div>
-
           {sortedJobs.length > 0 ? (
             <>
-              {pagedJobs.map((job) => {
-                const jobCandidates = getJobCandidates(job.id);
+              <div className="role-card-grid">
+                {pagedJobs.map(
+                  (job, index) => {
+                    const jobCandidates =
+                      getJobCandidates(
+                        job.id
+                      );
 
-                const isCurrent =
-                  String(job.id) === String(selectedJobId);
+                    const isCurrent =
+                      String(job.id) ===
+                      String(selectedJobId);
 
-                const jobIsSearching =
-                  isCurrent && isSearching;
+                    const jobIsSearching =
+                      isCurrent &&
+                      isSearching;
 
-                return (
-                  <RoleRow
-                    key={job.id}
-                    job={job}
-                    candidateCount={jobCandidates.length}
-                    isSearching={jobIsSearching}
-                    isSelected={isCurrent}
-                    onOpen={() => openRole(job)}
-                    onEdit={
-                      onEditDescription
-                        ? () => onEditDescription(job)
-                        : undefined
-                    }
-                  />
-                );
-              })}
+                    const isLoneTrailingCard =
+                      index ===
+                        pagedJobs.length - 1 &&
+                      pagedJobs.length % 2 !== 0;
+
+                    return (
+                      <RoleCard
+                        key={job.id}
+                        job={job}
+                        candidateCount={
+                          jobCandidates.length
+                        }
+                        isSearching={
+                          jobIsSearching
+                        }
+                        isSelected={
+                          isCurrent
+                        }
+                        isSpanning={
+                          isLoneTrailingCard
+                        }
+                        onOpen={() =>
+                          openRole(job)
+                        }
+                        onEdit={
+                          onEditDescription
+                            ? () =>
+                                onEditDescription(
+                                  job
+                                )
+                            : undefined
+                        }
+                        onDeleteJob={
+                          onDeleteJob
+                        }
+                      />
+                    );
+                  }
+                )}
+              </div>
 
               {totalPages > 1 && (
-                <div className="role-library-pagination">
-                  <span className="pagination-info">
-                    Page {libraryPage + 1} of {totalPages}
-                  </span>
-                  <div className="pagination-controls">
-                    <button
-                      className="pagination-btn"
-                      disabled={libraryPage === 0}
-                      onClick={() => setLibraryPage(p => p - 1)}
-                    >
-                      <ChevronLeft size={15} />
-                    </button>
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <button
-                        key={i}
-                        className={`pagination-btn pagination-num${libraryPage === i ? ' active' : ''}`}
-                        onClick={() => setLibraryPage(i)}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
-                    <button
-                      className="pagination-btn"
-                      disabled={libraryPage >= totalPages - 1}
-                      onClick={() => setLibraryPage(p => p + 1)}
-                    >
-                      <ChevronRight size={15} />
-                    </button>
+                <div className="role-pagination">
+                  <button
+                    onClick={() =>
+                      setLibraryPage(
+                        (page) =>
+                          Math.max(
+                            0,
+                            page - 1
+                          )
+                      )
+                    }
+                    disabled={
+                      libraryPage === 0
+                    }
+                    className="pagination-button"
+                  >
+                    <ChevronLeft size={14} />
+                    Previous
+                  </button>
+
+                  <div className="pagination-pages">
+                    {Array.from(
+                      {
+                        length: totalPages,
+                      },
+                      (_, index) => (
+                        <button
+                          key={index}
+                          onClick={() =>
+                            setLibraryPage(
+                              index
+                            )
+                          }
+                          className={`pagination-page ${
+                            libraryPage ===
+                            index
+                              ? "active"
+                              : ""
+                          }`}
+                        >
+                          {index + 1}
+                        </button>
+                      )
+                    )}
                   </div>
+
+                  <button
+                    onClick={() =>
+                      setLibraryPage(
+                        (page) =>
+                          Math.min(
+                            totalPages - 1,
+                            page + 1
+                          )
+                      )
+                    }
+                    disabled={
+                      libraryPage >=
+                      totalPages - 1
+                    }
+                    className="pagination-button"
+                  >
+                    Next
+                    <ChevronRight
+                      size={14}
+                    />
+                  </button>
                 </div>
               )}
             </>
+          ) : roleSearch ? (
+            <div className="role-library-empty">
+              <div className="role-library-empty-icon">
+                <Search size={22} />
+              </div>
+
+              <h3>
+                No roles found
+              </h3>
+
+              <p>
+                No job descriptions match{" "}
+                <strong>
+                  "{roleSearch}"
+                </strong>
+                .
+              </p>
+
+              <button
+                className="sourcing-secondary-button"
+                onClick={() =>
+                  setRoleSearch("")
+                }
+              >
+                Clear search
+              </button>
+            </div>
           ) : (
             <div className="role-library-empty">
               <div className="role-library-empty-icon">
-                <BriefcaseBusiness size={22} />
+                <BriefcaseBusiness
+                  size={22}
+                />
               </div>
 
-              <h3>No role descriptions yet</h3>
+              <h3>
+                No role descriptions yet
+              </h3>
 
               <p>
-                Create a description first, then sourcing activity and
+                Create a description first,
+                then sourcing activity and
                 candidates will appear here.
               </p>
 
               {onNewDescription && (
                 <button
                   className="sourcing-primary-button"
-                  onClick={onNewDescription}
+                  onClick={
+                    onNewDescription
+                  }
                 >
                   <Plus size={16} />
                   Create description
@@ -295,15 +628,17 @@ const SourcingHubView = ({
         All descriptions
       </button>
 
-      <section className="role-workspace-header">
-        <div className="role-workspace-main">
-          <div className="sourcing-eyebrow">
-            <BriefcaseBusiness size={13} />
-            ROLE DESCRIPTION
-          </div>
+      <section className="role-workspace-card">
+        <div className="role-workspace-icon">
+          <BriefcaseBusiness size={18} />
+        </div>
 
+        <div className="role-workspace-main">
           <div className="role-title-row">
-            <h1>{activeJob?.title || "Untitled role"}</h1>
+            <h1>
+              {activeJob?.title ||
+                "Untitled role"}
+            </h1>
 
             {activeJob?.status && (
               <span className="role-status-pill">
@@ -320,53 +655,139 @@ const SourcingHubView = ({
           {onEditDescription && (
             <button
               className="sourcing-secondary-button"
-              onClick={() => onEditDescription(activeJob)}
+              onClick={() =>
+                onEditDescription(
+                  activeJob
+                )
+              }
             >
               <Edit3 size={15} />
               Edit description
             </button>
           )}
+
+          {onDeleteJob &&
+            activeJob && (
+              <button
+                className="role-card-icon-button role-card-icon-button-danger"
+                onClick={(event) =>
+                  onDeleteJob(
+                    event,
+                    activeJob.id
+                  )
+                }
+                title="Delete description"
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
         </div>
       </section>
-
-      <div className="workspace-divider" />
 
       <SearchConsole
         onSearch={onSearch}
         isSearching={isSearching}
         selectedJob={activeJob}
         searchMode={searchMode}
-        onSearchModeChange={onSearchModeChange}
-        sourcedCandidateCount={displayCandidates.length}
+        onSearchModeChange={
+          onSearchModeChange
+        }
+        sourcedCandidateCount={
+          displayCandidates.length
+        }
       />
 
       <section className="candidate-workspace">
         <div className="candidate-workspace-top">
           <div className="candidate-heading">
             <div className="candidate-heading-icon">
-              <Users size={17} />
+              <Users size={16} />
             </div>
 
             <div>
               <div className="candidate-heading-line">
-                <h2>Candidate Profiles</h2>
+                <h2>
+                  Candidate profiles
+                </h2>
 
                 <span className="candidate-count">
-                  {displayCandidates.length}
+                  {
+                    visibleCandidates.length
+                  }
                 </span>
+
+                {workspaceTab ===
+                    "shortlisted" &&
+                  shortlistedCandidates.length >
+                    0 && (
+                    <span
+                      className={`avg-match-badge avg-match-${getScoreBand(
+                        avgShortlistScore
+                      )}`}
+                    >
+                      {avgShortlistScore}%
+                      {" "}avg match
+                    </span>
+                  )}
               </div>
 
               <p>
-                Profiles sourced for{" "}
+                {workspaceTab ===
+                "shortlisted"
+                  ? "Shortlisted for"
+                  : "Sourced for"}{" "}
                 <strong>
-                  {activeJob?.title || "this role"}
+                  {activeJob?.title ||
+                    "this role"}
                 </strong>
               </p>
             </div>
           </div>
 
+          <div className="candidate-view-tabs">
+            <button
+              type="button"
+              className={
+                workspaceTab === "sourced"
+                  ? "candidate-view-tab active"
+                  : "candidate-view-tab"
+              }
+              onClick={() =>
+                setWorkspaceTab("sourced")
+              }
+            >
+              Sourced
+              <span className="candidate-view-tab-count">
+                {displayCandidates.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={
+                workspaceTab ===
+                "shortlisted"
+                  ? "candidate-view-tab active"
+                  : "candidate-view-tab"
+              }
+              onClick={() =>
+                setWorkspaceTab(
+                  "shortlisted"
+                )
+              }
+            >
+              Shortlisted
+              <span className="candidate-view-tab-count">
+                {
+                  shortlistedCandidates.length
+                }
+              </span>
+            </button>
+          </div>
+
           <div className="candidate-actions">
-            {displayCandidates.length > 1 && (
+            {visibleCandidates.length >
+              1 && (
               <button
                 className="workspace-action-button"
                 onClick={onCompare}
@@ -376,50 +797,81 @@ const SourcingHubView = ({
               </button>
             )}
 
-            <button
-              className="workspace-action-button"
-              onClick={handleRefresh}
-              disabled={isSearching}
-            >
-              <RefreshCw
-                size={15}
-                className={isSearching ? "spin" : ""}
-              />
+            {workspaceTab ===
+              "sourced" && (
+              <button
+                className="workspace-action-button workspace-action-primary"
+                onClick={handleRefresh}
+                disabled={isSearching}
+              >
+                <RefreshCw
+                  size={15}
+                  className={
+                    isSearching
+                      ? "spin"
+                      : ""
+                  }
+                />
 
-              {isSearching ? "Searching" : "Refresh"}
-            </button>
+                {isSearching
+                  ? "Searching"
+                  : "Refresh"}
+              </button>
+            )}
           </div>
         </div>
 
         {isSearching && (
           <AgentStatusWidget
             currentStep={agentStep}
-            totalCandidatesFound={displayCandidates.length}
+            totalCandidatesFound={
+              displayCandidates.length
+            }
           />
         )}
 
         <div className="candidate-grid-area">
-          {displayCandidates.length > 0 ? (
+          {visibleCandidates.length >
+          0 ? (
             <CandidateGridView
-              candidates={displayCandidates}
+              candidates={
+                visibleCandidates
+              }
               shortlist={shortlist}
-              savedRoleCandidates={savedRoleCandidates}
-              selectedJobId={activeJob?.id}
+              savedRoleCandidates={
+                savedRoleCandidates
+              }
+              selectedJobId={
+                activeJob?.id
+              }
               searchKey={searchKey}
               lang={lang}
               t={t}
-              onToggleSaveForJob={onToggleSaveForJob}
-              onViewDetails={onViewDetails}
+              onToggleSaveForJob={
+                onToggleSaveForJob
+              }
+              onViewDetails={
+                onViewDetails
+              }
               onEdit={onEdit}
               onDelete={onDelete}
-              onOpenComparator={onOpenComparator}
+              onOpenComparator={
+                onOpenComparator
+              }
               {...candidateGridProps}
             />
           ) : !isSearching ? (
-            <EmptyCandidateState
-              activeJob={activeJob}
-              onSearch={onSearch}
-            />
+            workspaceTab ===
+            "shortlisted" ? (
+              <EmptyShortlistState
+                activeJob={activeJob}
+              />
+            ) : (
+              <EmptyCandidateState
+                activeJob={activeJob}
+                onSearch={onSearch}
+              />
+            )
           ) : null}
         </div>
       </section>
@@ -436,79 +888,81 @@ const LibrarySummary = ({
   getJobCandidates,
   selectedJobId,
   isSearching,
-  onNewDescription,
 }) => {
   const totalCandidates = jobs.reduce(
-    (sum, job) => sum + getJobCandidates(job.id).length,
+    (sum, job) =>
+      sum +
+      getJobCandidates(job.id).length,
     0
   );
 
   const sourcedRoles = jobs.filter(
-    (job) => getJobCandidates(job.id).length > 0
+    (job) =>
+      getJobCandidates(job.id).length >
+      0
   ).length;
 
   return (
     <div className="library-summary">
-      <div className="library-summary-items">
-        <SummaryItem
-          label="Descriptions"
-          value={jobs.length}
-          icon={<BriefcaseBusiness size={15} />}
-        />
+      <SummaryItem
+        label="Descriptions"
+        value={jobs.length}
+        icon={
+          <BriefcaseBusiness size={14} />
+        }
+      />
 
-        <SummaryDivider />
+      <SummaryDivider />
 
-        <SummaryItem
-          label="Sourced roles"
-          value={sourcedRoles}
-          icon={<Check size={15} />}
-        />
+      <SummaryItem
+        label="Sourced roles"
+        value={sourcedRoles}
+        icon={<Check size={14} />}
+      />
 
-        <SummaryDivider />
+      <SummaryDivider />
 
-        <SummaryItem
-          label="Candidates"
-          value={totalCandidates}
-          icon={<Users size={15} />}
-        />
+      <SummaryItem
+        label="Candidates"
+        value={totalCandidates}
+        icon={<Users size={14} />}
+      />
 
-      {isSearching && selectedJobId && (
-        <>
-          <SummaryDivider />
-
+      {isSearching &&
+        selectedJobId && (
           <div className="library-live-search">
             <span className="live-dot" />
 
             <div>
-              <strong>Search running</strong>
-              <span>Candidate sourcing is active</span>
+              <strong>
+                Search running
+              </strong>
+              <span>
+                Candidate sourcing is
+                active
+              </span>
             </div>
           </div>
-        </>
-      )}
-      </div>
-
-      {onNewDescription && (
-        <button
-          className="sourcing-primary-button"
-          onClick={onNewDescription}
-        >
-          <Plus size={16} />
-          New description
-        </button>
-      )}
+        )}
     </div>
   );
 };
 
-const SummaryItem = ({ label, value, icon }) => (
+const SummaryItem = ({
+  label,
+  value,
+  icon,
+}) => (
   <div className="summary-item">
-    <div className="summary-icon">{icon}</div>
+    <span className="summary-icon">
+      {icon}
+    </span>
 
-    <div>
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </div>
+    <strong>{value}</strong>
+
+    <span className="summary-label">
+      {label}
+    </span>
   </div>
 );
 
@@ -516,104 +970,139 @@ const SummaryDivider = () => (
   <div className="summary-divider" />
 );
 
-const RoleRow = ({
+const RoleCard = ({
   job,
   candidateCount,
   isSearching,
   isSelected,
+  isSpanning,
   onOpen,
   onEdit,
+  onDeleteJob,
 }) => {
   const meta = getRoleMeta(job);
 
   return (
     <article
-      className={`role-row ${
-        isSelected ? "role-row-selected" : ""
+      className={`role-card ${
+        isSelected
+          ? "role-card-selected"
+          : ""
+      } ${
+        isSpanning
+          ? "role-card-span"
+          : ""
       }`}
       onClick={onOpen}
     >
-      <div className="role-row-main">
-        <div className="role-row-accent" />
+      <div className="role-card-top">
+        <div className="role-card-title-block">
+          <h3>
+            {job.title ||
+              "Untitled role"}
+          </h3>
 
-        <div className="role-row-content">
-          <div className="role-row-title-line">
-            <h3>{job.title || "Untitled role"}</h3>
+          {isSelected && (
+            <span className="current-role-label">
+              Current
+            </span>
+          )}
+        </div>
 
-            {isSelected && (
-              <span className="current-role-label">
-                Current
-              </span>
-            )}
-          </div>
-
-          {meta.length > 0 && (
-            <div className="role-row-meta">
-              {meta.slice(0, 4).map((item, index) => (
-                <React.Fragment key={`${item}-${index}`}>
-                  {index > 0 && <span className="meta-dot">·</span>}
-                  <span>{item}</span>
-                </React.Fragment>
-              ))}
-            </div>
+        <div className="role-card-top-actions">
+          {onEdit && (
+            <button
+              className="role-card-icon-button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit();
+              }}
+              title="Edit description"
+            >
+              <Edit3 size={14} />
+            </button>
           )}
 
-          {job.description && (
-            <p>
-              {job.description.length > 155
-                ? `${job.description.slice(0, 155)}…`
-                : job.description}
-            </p>
+          {onDeleteJob && (
+            <button
+              className="role-card-icon-button role-card-icon-button-danger"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDeleteJob(
+                  event,
+                  job.id
+                );
+              }}
+              title="Delete description"
+            >
+              <Trash2 size={14} />
+            </button>
           )}
         </div>
       </div>
 
-      <div className="role-candidate-stat">
-        <strong>{candidateCount}</strong>
-        <span>candidates</span>
-      </div>
+      {meta.length > 0 && (
+        <div className="role-card-tags">
+          {meta
+            .slice(0, 4)
+            .map((item, index) => (
+              <span
+                className="role-tag"
+                key={`${item}-${index}`}
+              >
+                {item}
+              </span>
+            ))}
+        </div>
+      )}
 
-      <div className="role-search-status">
-        {isSearching ? (
-          <>
-            <span className="status-orb status-orb-live" />
-            <div>
-              <strong>Searching</strong>
-              <span>Finding profiles</span>
-            </div>
-          </>
-        ) : candidateCount > 0 ? (
-          <>
-            <span className="status-orb" />
-            <div>
-              <strong>Search ready</strong>
-              <span>Results available</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <span className="status-orb status-orb-neutral" />
-            <div>
-              <strong>Not sourced</strong>
-              <span>Ready to search</span>
-            </div>
-          </>
-        )}
-      </div>
+      {job.description && (
+        <p className="role-card-description">
+          {job.description.length >
+          140
+            ? `${job.description.slice(
+                0,
+                140
+              )}…`
+            : job.description}
+        </p>
+      )}
 
-      <div className="role-row-actions">
-        {onEdit && (
-          <button
-            className="role-row-icon-button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit();
-            }}
-            title="Edit description"
-          >
-            <Edit3 size={15} />
-          </button>
-        )}
+      <div className="role-card-footer">
+        <div className="role-card-stat">
+          <strong>
+            {candidateCount}
+          </strong>
+
+          <span>
+            candidates
+          </span>
+        </div>
+
+        <div className="role-card-status">
+          {isSearching ? (
+            <>
+              <span className="status-orb status-orb-live" />
+              <span>
+                Searching
+              </span>
+            </>
+          ) : candidateCount > 0 ? (
+            <>
+              <span className="status-orb" />
+              <span>
+                Ready
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="status-orb status-orb-neutral" />
+              <span>
+                Not sourced
+              </span>
+            </>
+          )}
+        </div>
 
         <button
           className="role-open-button"
@@ -623,7 +1112,7 @@ const RoleRow = ({
           }}
         >
           Open
-          <ArrowRight size={14} />
+          <ArrowRight size={13} />
         </button>
       </div>
     </article>
@@ -637,16 +1126,22 @@ const RoleRow = ({
 const RoleMeta = ({ job }) => {
   const meta = getRoleMeta(job);
 
-  if (!meta.length) return null;
+  if (!meta.length) {
+    return null;
+  }
 
   return (
     <div className="workspace-role-meta">
-      {meta.slice(0, 6).map((item, index) => (
-        <React.Fragment key={`${item}-${index}`}>
-          {index > 0 && <span>·</span>}
-          <span>{item}</span>
-        </React.Fragment>
-      ))}
+      {meta
+        .slice(0, 6)
+        .map((item, index) => (
+          <span
+            className="role-tag"
+            key={`${item}-${index}`}
+          >
+            {item}
+          </span>
+        ))}
     </div>
   );
 };
@@ -654,10 +1149,18 @@ const RoleMeta = ({ job }) => {
 const getRoleMeta = (job = {}) => {
   const items = [];
 
-  if (job.seniority) items.push(job.seniority);
-  if (job.location) items.push(job.location);
+  if (job.seniority) {
+    items.push(job.seniority);
+  }
 
-  if (job.minExperience || job.experience) {
+  if (job.location) {
+    items.push(job.location);
+  }
+
+  if (
+    job.minExperience ||
+    job.experience
+  ) {
     items.push(
       job.experience ||
         `${job.minExperience}+ years`
@@ -681,21 +1184,57 @@ const getRoleMeta = (job = {}) => {
 /*                                EMPTY STATE                                 */
 /* -------------------------------------------------------------------------- */
 
-const EmptyCandidateState = ({ activeJob, onSearch }) => (
+const EmptyShortlistState = ({
+  activeJob,
+}) => (
   <div className="candidate-empty">
     <div className="empty-search-visual">
       <div className="empty-circle empty-circle-one" />
       <div className="empty-circle empty-circle-two" />
 
-      <Search size={23} />
+      <Users size={22} />
     </div>
 
-    <h3>No candidates sourced yet</h3>
+    <h3>
+      No candidates shortlisted yet
+    </h3>
+
+    <p>
+      Save candidates from the{" "}
+      <strong>Sourced</strong> tab for{" "}
+      <strong>
+        {activeJob?.title ||
+          "this role"}
+      </strong>{" "}
+      to build a talent pool here.
+    </p>
+  </div>
+);
+
+const EmptyCandidateState = ({
+  activeJob,
+  onSearch,
+}) => (
+  <div className="candidate-empty">
+    <div className="empty-search-visual">
+      <div className="empty-circle empty-circle-one" />
+      <div className="empty-circle empty-circle-two" />
+
+      <Search size={22} />
+    </div>
+
+    <h3>
+      No candidates sourced yet
+    </h3>
 
     <p>
       Run sourcing using the{" "}
-      <strong>{activeJob?.title || "role"}</strong>{" "}
-      description, or add a refinement first.
+      <strong>
+        {activeJob?.title ||
+          "role"}
+      </strong>{" "}
+      description, or add a refinement
+      first.
     </p>
 
     <button
@@ -705,7 +1244,11 @@ const EmptyCandidateState = ({ activeJob, onSearch }) => (
           activeJob?.description ||
             activeJob?.prompt ||
             "",
-          { maxResults: activeJob?.maxResults || 10 },
+          {
+            maxResults:
+              activeJob?.maxResults ||
+              10,
+          },
           activeJob?.id
         )
       }
@@ -738,49 +1281,121 @@ const styles = `
   font-family: Inter, sans-serif;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Page header                                                                */
+/* -------------------------------------------------------------------------- */
+
 .sourcing-page-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 32px;
-  margin-bottom: 27px;
-}
-
-.sourcing-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 9px;
-  color: var(--cyan-dark);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .12em;
-}
-
-.sourcing-page-header h1,
-.role-workspace-header h1 {
-  margin: 0;
-  font-family: "Space Grotesk", sans-serif;
-  letter-spacing: -.04em;
+  align-items: flex-end;
+  gap: 24px;
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--border);
 }
 
 .sourcing-page-header h1 {
-  font-size: 31px;
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 26px;
+  letter-spacing: -.03em;
 }
 
-.sourcing-page-header > div > p {
-  max-width: 620px;
-  margin: 7px 0 0;
+.sourcing-page-header p {
+  max-width: 520px;
+  margin: 6px 0 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.6;
 }
 
+/* Header actions */
+
+.role-library-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+/* Role search */
+
+.role-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 220px;
+  height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: #8A8D92;
+  transition:
+    border-color .16s ease,
+    box-shadow .16s ease,
+    background .16s ease;
+}
+
+.role-search-box:hover {
+  border-color: #D8D4CA;
+}
+
+.role-search-box:focus-within {
+  border-color: #B9DDE4;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+
+.role-search-box input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: Inter, sans-serif;
+  font-size: 11.5px;
+}
+
+.role-search-box input::placeholder {
+  color: #9A9CA1;
+}
+
+.role-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--paper);
+  color: #777A81;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background .15s ease,
+    color .15s ease;
+}
+
+.role-search-clear:hover {
+  background: var(--cyan-soft);
+  color: var(--cyan-dark);
+}
+
+/* Buttons */
+
 .sourcing-primary-button,
 .sourcing-secondary-button,
 .workspace-action-button,
 .role-open-button,
-.role-row-icon-button,
+.role-card-icon-button,
 .back-to-library {
   font: inherit;
   cursor: pointer;
@@ -788,198 +1403,186 @@ const styles = `
 
 .sourcing-primary-button {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 38px;
-  padding: 0 15px;
-  border: 1px solid #15191F;
-  border-radius: 9px;
-  background: #15191F;
+  min-height: 40px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ink);
   color: white;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   transition: .18s ease;
 }
 
 .sourcing-primary-button:hover {
-  transform: translateY(-1px);
-  background: #252A32;
+  background: var(--cyan-dark);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Stat rail                                                                  */
+/* -------------------------------------------------------------------------- */
 
 .library-summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 22px;
-  min-height: 70px;
-  padding: 0 22px;
-  margin-bottom: 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #F7F5F1;
+  margin-bottom: 22px;
 }
 
-.library-summary-items {
+.summary-item {
   display: flex;
-  align-items: center;
-  gap: 22px;
-}
-
-.summary-item,
-.library-live-search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: baseline;
+  gap: 7px;
 }
 
 .summary-icon {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 29px;
-  height: 29px;
-  border: 1px solid #D8EEF3;
-  border-radius: 8px;
-  background: var(--cyan-soft);
   color: var(--cyan-dark);
-}
-
-.summary-item > div:last-child,
-.library-live-search > div {
-  display: flex;
-  flex-direction: column;
+  transform: translateY(1px);
 }
 
 .summary-item strong {
   font-family: "Space Grotesk", sans-serif;
-  font-size: 15px;
+  font-size: 19px;
+  letter-spacing: -.02em;
 }
 
-.summary-item span,
-.library-live-search span {
-  margin-top: 1px;
+.summary-label {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11.5px;
 }
 
 .summary-divider {
   width: 1px;
-  height: 30px;
+  height: 18px;
   background: var(--border);
 }
 
 .library-live-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--cyan-soft);
+}
+
+.library-live-search > div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
 }
 
 .library-live-search strong {
+  color: var(--cyan-dark);
   font-size: 11px;
 }
 
+.library-live-search span {
+  color: var(--cyan-dark);
+  font-size: 9.5px;
+  opacity: .8;
+}
+
 .live-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--cyan);
-  box-shadow: 0 0 0 5px rgba(11,165,201,.10);
+  box-shadow: 0 0 0 4px rgba(11,165,201,.15);
   animation: sourcingPulse 1.7s infinite;
 }
 
-/* Library */
+/* -------------------------------------------------------------------------- */
+/* Role card grid                                                             */
+/* -------------------------------------------------------------------------- */
 
-.role-library {
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  background: var(--surface);
-}
-
-.role-library-header,
-.role-row {
+.role-card-grid {
   display: grid;
-  grid-template-columns: minmax(330px, 1fr) 105px 145px 130px;
-  align-items: center;
-}
-
-.role-library-header {
-  min-height: 38px;
-  padding: 0 17px;
-  border-bottom: 1px solid var(--border);
-  background: #F7F5F1;
-  color: #8A8D93;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .09em;
-  text-transform: uppercase;
-}
-
-.role-row {
-  position: relative;
-  min-height: 108px;
-  padding: 0 17px;
-  border-bottom: 1px solid #ECE9E3;
-  cursor: pointer;
-  transition:
-    background .18s ease,
-    transform .18s ease;
-}
-
-.role-row:last-child {
-  border-bottom: 0;
-}
-
-.role-row:hover {
-  z-index: 2;
-  background: #FBFDFC;
-}
-
-.role-row:hover .role-row-accent {
-  transform: scaleY(1);
-}
-
-.role-row-selected {
-  background: #FBFDFD;
-}
-
-.role-row-main {
-  display: flex;
+  grid-template-columns: repeat(2, 1fr);
   align-items: stretch;
-  min-width: 0;
-  height: 100%;
+  gap: 14px;
 }
 
-.role-row-accent {
-  width: 3px;
-  margin: 22px 13px 22px -17px;
-  border-radius: 99px;
-  background: var(--cyan);
-  transform: scaleY(.18);
-  transform-origin: center;
-  transition: transform .2s ease;
-}
-
-.role-row-selected .role-row-accent {
-  transform: scaleY(.7);
-}
-
-.role-row-content {
-  align-self: center;
-  min-width: 0;
-  padding: 14px 0;
-}
-
-.role-row-title-line {
+.role-card {
   display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 18px 18px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color .16s ease,
+    transform .16s ease,
+    box-shadow .16s ease;
+}
+
+.role-card:focus,
+.role-card:focus-visible,
+.role-open-button:focus,
+.role-card-icon-button:focus {
+  outline: none;
+}
+
+.role-card:focus-visible {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+
+.role-open-button:focus-visible,
+.role-card-icon-button:focus-visible {
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+
+.role-card-span {
+  grid-column: 1 / -1;
+}
+
+.role-card-span .role-card-description {
+  max-width: 640px;
+}
+
+.role-card:hover {
+  transform: translateY(-2px);
+  border-color: #C9E8EE;
+  box-shadow: 0 8px 20px rgba(18,21,27,.05);
+}
+
+.role-card-selected {
+  border-color: var(--cyan);
+  background: #FBFEFE;
+}
+
+.role-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.role-card-title-block {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
-.role-row-title-line h3 {
+.role-card-title-block h3 {
   overflow: hidden;
   margin: 0;
   font-family: "Space Grotesk", sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 650;
   letter-spacing: -.02em;
   text-overflow: ellipsis;
@@ -987,87 +1590,122 @@ const styles = `
 }
 
 .current-role-label {
-  padding: 2px 6px;
-  border: 1px solid #CDEAF0;
+  flex-shrink: 0;
+  padding: 2px 7px;
   border-radius: 999px;
+  background: var(--cyan-soft);
   color: var(--cyan-dark);
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
-  text-transform: uppercase;
 }
 
-.role-row-meta {
+.role-card-top-actions {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 5px;
-  color: #71757D;
-  font-size: 10px;
+  flex-shrink: 0;
 }
 
-.meta-dot {
-  color: #C2BEB7;
-}
-
-.role-row-content p {
-  overflow: hidden;
-  max-width: 670px;
-  margin: 8px 20px 0 0;
-  color: #777A81;
-  font-size: 10px;
-  line-height: 1.55;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.role-candidate-stat {
-  display: flex;
-  flex-direction: column;
-}
-
-.role-candidate-stat strong {
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 17px;
-  letter-spacing: -.03em;
-}
-
-.role-candidate-stat span {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 9px;
-}
-
-.role-search-status {
+.role-card-icon-button {
   display: flex;
   align-items: center;
-  gap: 9px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  color: #696D74;
 }
 
-.role-search-status div {
+.role-card-icon-button:hover {
+  border-color: #C9E8EE;
+  color: var(--cyan-dark);
+}
+
+.role-card-icon-button-danger:hover {
+  border-color: #F3C9C4;
+  background: #FBEAE9;
+  color: #B3261E;
+}
+
+.role-card-tags,
+.workspace-role-meta {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.role-search-status strong {
+.role-card-tags {
+  margin-top: 10px;
+}
+
+.role-tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: #575B62;
   font-size: 10px;
+  font-weight: 500;
 }
 
-.role-search-status div span {
-  margin-top: 3px;
+.role-card-description {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  margin: 10px 0 0;
+  color: #777A81;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.role-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid #ECE9E3;
+}
+
+.role-card-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.role-card-stat strong {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 15px;
+  letter-spacing: -.02em;
+}
+
+.role-card-stat span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 9.5px;
+}
+
+.role-card-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
 }
 
 .status-orb {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--cyan);
 }
 
 .status-orb-live {
-  box-shadow: 0 0 0 5px rgba(11,165,201,.10);
+  box-shadow: 0 0 0 4px rgba(11,165,201,.15);
   animation: sourcingPulse 1.7s infinite;
 }
 
@@ -1075,148 +1713,177 @@ const styles = `
   background: #B9B8B4;
 }
 
-.role-row-actions {
+.role-open-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 6px 11px;
+  border: none;
+  border-radius: 8px;
+  background: var(--cyan-soft);
+  color: var(--cyan-dark);
+  font-size: 10.5px;
+  font-weight: 700;
+  transition: background .15s ease;
+}
+
+.role-open-button:hover {
+  background: #D9F1F6;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pagination                                                                 */
+/* -------------------------------------------------------------------------- */
+
+.role-pagination {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  margin-top: 10px;
+}
+
+.pagination-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: var(--ink);
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background .15s ease,
+    border-color .15s ease;
+}
+
+.pagination-button:hover:not(:disabled) {
+  background: var(--paper);
+  border-color: #D8D4CA;
+}
+
+.pagination-button:disabled {
+  background: var(--paper);
+  color: #9B9C9E;
+  cursor: not-allowed;
+}
+
+.pagination-pages {
+  display: flex;
   gap: 6px;
 }
 
-.role-row-icon-button {
+.pagination-page {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: white;
-  color: #696D74;
-}
-
-.role-open-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid #D2EEF4;
-  border-radius: 8px;
-  background: var(--cyan-soft);
-  color: var(--cyan-dark);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.role-row-icon-button:hover,
-.role-open-button:hover {
-  transform: translateY(-1px);
-}
-
-/* Pagination */
-
-.role-library-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 11px 17px;
-  border-top: 1px solid var(--border);
-  background: #F7F5F1;
-}
-
-.pagination-info {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.pagination-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 29px;
-  height: 29px;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: white;
+  background: #FFFFFF;
   color: var(--ink);
-  font-size: 11px;
+  font-family: Inter, sans-serif;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: .15s ease;
+  transition:
+    background .15s ease,
+    border-color .15s ease,
+    color .15s ease;
 }
 
-.pagination-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
+.pagination-page:hover:not(.active) {
+  background: var(--paper);
+  border-color: #D8D4CA;
 }
 
-.pagination-btn:not(:disabled):hover {
-  border-color: var(--cyan-dark);
-  color: var(--cyan-dark);
+.pagination-page.active {
+  border-color: #0E7C8C;
+  background: #0E7C8C;
+  color: #FFFFFF;
 }
 
-.pagination-btn.pagination-num.active {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: white;
-}
-
-/* Workspace */
+/* -------------------------------------------------------------------------- */
+/* Workspace                                                                  */
+/* -------------------------------------------------------------------------- */
 
 .back-to-library {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 0;
-  margin-bottom: 19px;
+  margin-bottom: 18px;
   border: 0;
   background: transparent;
   color: #696D74;
-  font-size: 11px;
+  font-size: 11.5px;
+  font-weight: 500;
 }
 
 .back-to-library:hover {
   color: var(--cyan-dark);
 }
 
-.role-workspace-header {
+.role-workspace-card {
   display: flex;
-  justify-content: space-between;
-  gap: 35px;
-  padding-bottom: 22px;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 22px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.role-workspace-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background: var(--cyan-soft);
+  color: var(--cyan-dark);
 }
 
 .role-workspace-main {
-  max-width: 850px;
+  flex: 1;
+  min-width: 0;
 }
 
 .role-title-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 11px;
 }
 
-.role-workspace-header h1 {
-  font-size: 28px;
+.role-workspace-main h1 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 21px;
+  letter-spacing: -.03em;
 }
 
 .role-status-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
+  padding: 4px 9px;
   border-radius: 999px;
+  background: var(--paper);
   color: #656970;
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 600;
 }
 
@@ -1228,46 +1895,28 @@ const styles = `
 }
 
 .workspace-role-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 7px;
-  margin-top: 8px;
-  color: #656970;
-  font-size: 10px;
-}
-
-.workspace-role-meta > span:nth-child(even) {
-  color: #BDB9B2;
-}
-
-.role-description-preview {
-  display: -webkit-box;
-  overflow: hidden;
-  max-width: 770px;
-  margin: 12px 0 0;
-  color: #70747B;
-  font-size: 11px;
-  line-height: 1.65;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  margin-top: 10px;
 }
 
 .role-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 
 .sourcing-secondary-button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  height: 35px;
-  padding: 0 11px;
+  min-height: 36px;
+  padding: 0 13px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: white;
   color: #4C5057;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -1276,40 +1925,37 @@ const styles = `
   color: var(--cyan-dark);
 }
 
-.workspace-divider {
-  height: 1px;
-  margin-bottom: 14px;
-  background: var(--border);
-}
-
-/* Candidate workspace */
+/* -------------------------------------------------------------------------- */
+/* Candidate workspace                                                        */
+/* -------------------------------------------------------------------------- */
 
 .candidate-workspace {
-  margin-top: 16px;
-  border-top: 1px solid var(--border);
+  margin-top: 18px;
 }
 
 .candidate-workspace-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 72px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  padding: 16px 0;
 }
 
 .candidate-heading {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
 }
 
 .candidate-heading-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid #D6EDF2;
-  border-radius: 9px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 10px;
   background: var(--cyan-soft);
   color: var(--cyan-dark);
 }
@@ -1330,7 +1976,7 @@ const styles = `
 .candidate-heading p {
   margin: 3px 0 0;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 10.5px;
 }
 
 .candidate-heading p strong {
@@ -1339,19 +1985,95 @@ const styles = `
 }
 
 .candidate-count {
-  min-width: 23px;
-  padding: 2px 7px;
+  min-width: 20px;
+  padding: 1px 7px;
   border-radius: 999px;
-  background: #F0F1EF;
+  background: var(--paper);
   color: #575B62;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   text-align: center;
 }
 
+.avg-match-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.avg-match-high {
+  background: #E3F5EC;
+  color: #278F5E;
+}
+
+.avg-match-mid {
+  background: #FBF0DC;
+  color: #C98A1E;
+}
+
+.avg-match-low {
+  background: #FBEAE9;
+  color: #B3261E;
+}
+
+.candidate-view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 11px;
+  background: var(--paper);
+}
+
+.candidate-view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #575B62;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background .15s ease,
+    color .15s ease;
+}
+
+.candidate-view-tab:hover {
+  color: var(--cyan-dark);
+}
+
+.candidate-view-tab.active {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(18,21,27,.06);
+}
+
+.candidate-view-tab-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--border);
+  color: #575B62;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.candidate-view-tab.active .candidate-view-tab-count {
+  background: var(--cyan-soft);
+  color: var(--cyan-dark);
+}
+
 .candidate-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 11px;
+  background: var(--paper);
 }
 
 .workspace-action-button {
@@ -1359,30 +2081,40 @@ const styles = `
   align-items: center;
   gap: 6px;
   height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
+  padding: 0 11px;
+  border: none;
   border-radius: 8px;
-  background: white;
+  background: transparent;
   color: #575B62;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
+  transition:
+    background .15s ease,
+    color .15s ease;
 }
 
 .workspace-action-button:hover:not(:disabled) {
-  border-color: #CBE5EB;
+  background: white;
   color: var(--cyan-dark);
+}
+
+.workspace-action-primary {
+  background: white;
+  box-shadow: 0 1px 2px rgba(18,21,27,.06);
 }
 
 .workspace-action-button:disabled {
   cursor: default;
-  opacity: .65;
+  opacity: .6;
 }
 
 .candidate-grid-area {
-  padding-top: 3px;
+  padding-top: 4px;
 }
 
-/* Empty */
+/* -------------------------------------------------------------------------- */
+/* Empty states                                                               */
+/* -------------------------------------------------------------------------- */
 
 .candidate-empty,
 .role-library-empty {
@@ -1396,7 +2128,7 @@ const styles = `
 .candidate-empty {
   min-height: 300px;
   border: 1px dashed #DCD9D2;
-  border-radius: 12px;
+  border-radius: 14px;
   background: #FBFAF8;
 }
 
@@ -1412,7 +2144,7 @@ const styles = `
   max-width: 410px;
   margin: 7px 0 15px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 10.5px;
   line-height: 1.6;
 }
 
@@ -1421,10 +2153,10 @@ const styles = `
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 61px;
-  height: 61px;
+  width: 60px;
+  height: 60px;
   border: 1px solid #D7EDF2;
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--cyan-soft);
   color: var(--cyan-dark);
 }
@@ -1436,71 +2168,64 @@ const styles = `
 }
 
 .empty-circle-one {
-  width: 82px;
-  height: 82px;
+  width: 80px;
+  height: 80px;
 }
 
 .empty-circle-two {
-  width: 104px;
-  height: 104px;
+  width: 100px;
+  height: 100px;
 }
 
 .role-library-empty {
   min-height: 320px;
+  border: 1px dashed #DCD9D2;
+  border-radius: 16px;
+  background: #FBFAF8;
 }
 
 .role-library-empty-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 47px;
-  height: 47px;
-  border: 1px solid #D7EDF2;
-  border-radius: 13px;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
   background: var(--cyan-soft);
   color: var(--cyan-dark);
 }
 
-/* animation */
+/* -------------------------------------------------------------------------- */
+/* Animation                                                                  */
+/* -------------------------------------------------------------------------- */
 
 @keyframes sourcingPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .42; }
+  0%, 100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .42;
+  }
 }
 
 @keyframes sourcingSpin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spin {
   animation: sourcingSpin 1s linear infinite;
 }
 
-/* Responsive */
+/* -------------------------------------------------------------------------- */
+/* Responsive                                                                 */
+/* -------------------------------------------------------------------------- */
 
 @media (max-width: 900px) {
-  .role-library-header {
-    display: none;
-  }
-
-  .role-row {
-    grid-template-columns: 1fr auto;
-    gap: 14px;
-    padding: 18px;
-  }
-
-  .role-row-main {
-    grid-column: 1 / -1;
-  }
-
-  .role-candidate-stat,
-  .role-search-status {
-    padding-left: 0;
-  }
-
-  .role-row-actions {
-    grid-column: 2;
-    grid-row: 2;
+  .role-card-grid {
+    grid-template-columns: 1fr;
   }
 
   .library-summary {
@@ -1510,10 +2235,24 @@ const styles = `
 
 @media (max-width: 650px) {
   .sourcing-page-header,
-  .role-workspace-header,
+  .role-workspace-card,
   .candidate-workspace-top {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .role-library-header-actions {
+    width: 100%;
+  }
+
+  .role-search-box {
+    flex: 1;
+    width: auto;
+  }
+
+  .role-library-header-actions
+  .sourcing-primary-button {
+    flex-shrink: 0;
   }
 
   .candidate-workspace-top {
@@ -1525,18 +2264,28 @@ const styles = `
     align-self: flex-start;
   }
 
-  .role-row {
-    grid-template-columns: 1fr;
+  .candidate-view-tabs {
+    width: 100%;
+    order: 3;
   }
 
-  .role-row-actions {
-    grid-column: 1;
-    grid-row: auto;
-    justify-content: flex-start;
+  .candidate-view-tab {
+    flex: 1;
+    justify-content: center;
   }
 
-  .role-search-status {
-    display: none;
+  .role-card-footer {
+    flex-wrap: wrap;
+  }
+
+  .role-pagination {
+    gap: 8px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .pagination-button {
+    padding: 0 9px;
   }
 }
 `;

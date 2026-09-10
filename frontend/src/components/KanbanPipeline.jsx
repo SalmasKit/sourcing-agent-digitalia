@@ -11,7 +11,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Kanban,
   Users,
   Eye,
   CheckCircle2,
@@ -40,10 +39,30 @@ function getAvatarUrl(name) {
 export const STAGES = [
   { id: 'new', labelFR: 'Nouveau', labelEN: 'New', icon: Users },
   { id: 'contacted', labelFR: 'Contacté', labelEN: 'Contacted', icon: Mail },
-  { id: 'interview', labelFR: 'Entretien', labelEN: 'Interview', icon: Calendar },
-  { id: 'offer', labelFR: 'Offre Proposée', labelEN: 'Offer Extended', icon: Award },
-  { id: 'hired', labelFR: 'Recruté', labelEN: 'Hired', icon: CheckCircle2 },
-  { id: 'rejected', labelFR: 'Refusé / Archivé', labelEN: 'Refused / Archived', icon: XCircle },
+  {
+    id: 'interview',
+    labelFR: 'Entretien',
+    labelEN: 'Interview',
+    icon: Calendar,
+  },
+  {
+    id: 'offer',
+    labelFR: 'Offre Proposée',
+    labelEN: 'Offer Extended',
+    icon: Award,
+  },
+  {
+    id: 'hired',
+    labelFR: 'Recruté',
+    labelEN: 'Hired',
+    icon: CheckCircle2,
+  },
+  {
+    id: 'rejected',
+    labelFR: 'Refusé / Archivé',
+    labelEN: 'Refused / Archived',
+    icon: XCircle,
+  },
 ];
 
 const COPY = {
@@ -78,7 +97,7 @@ function useFonts() {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href =
-      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap';
+      'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap';
 
     document.head.appendChild(link);
   }, []);
@@ -153,19 +172,24 @@ export function KanbanPipeline({
   }
 
   function handleStagePageChange(stageId, newPage) {
-    setStagePages(prev => ({
+    setStagePages((prev) => ({
       ...prev,
-      [stageId]: newPage
+      [stageId]: newPage,
     }));
   }
 
   function getPaginatedStageCandidates(stageCandidates, stageId) {
     const currentPage = stagePages[stageId] || 0;
-    const totalPages = Math.ceil(stageCandidates.length / CARDS_PER_PAGE);
-    const validPage = Math.min(currentPage, totalPages - 1);
-    
+    const totalPages = Math.ceil(
+      stageCandidates.length / CARDS_PER_PAGE
+    );
+    const validPage = Math.min(
+      currentPage,
+      totalPages - 1
+    );
+
     if (totalPages <= 1) return stageCandidates;
-    
+
     return stageCandidates.slice(
       validPage * CARDS_PER_PAGE,
       validPage * CARDS_PER_PAGE + CARDS_PER_PAGE
@@ -226,36 +250,36 @@ export function KanbanPipeline({
             border-color: #D8DEE5;
           }
           50% {
-            border-color: #0E7C8C;
+            border-color: #0BA5C9;
           }
         }
 
         .kb-root {
-          --cyan: #0E7C8C;
-          --cyan-soft: #E1F2F3;
-          --cyan-light: #8CCDD3;
+          --cyan: #0BA5C9;
+          --cyan-dark: #087F9B;
+          --cyan-soft: #EAF9FC;
+          --cyan-light: #9EDDEC;
 
           --ink: #12151B;
           --ink-2: #3A414B;
-          --muted: #8A929C;
+          --muted: #6C7078;
 
-          --paper: #FBFAF7;
+          --paper: #F7F5F1;
           --surface: #FFFFFF;
 
-          --line: #E4E1D9;
-          --line-soft: #EFEDE7;
+          --line: #E5E2DB;
+          --line-soft: #ECE9E3;
 
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: Inter, sans-serif;
           color: var(--ink);
-          background: var(--paper);
+          background: transparent;
 
-          max-width: 1220px;
-          margin: 0 auto;
-          padding: 24px;
+          width: 100%;
 
           display: flex;
           flex-direction: column;
           gap: 16px;
+
           box-sizing: border-box;
         }
 
@@ -265,57 +289,51 @@ export function KanbanPipeline({
 
         .kb-header {
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          gap: 16px;
+          align-items: flex-start;
+          gap: 32px;
 
-          padding: 4px 0 10px;
+          padding: 0;
+          margin-bottom: 11px;
 
           flex-wrap: wrap;
         }
 
         .kb-header-left {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-        }
-
-        .kb-header-icon {
-          width: 34px;
-          height: 34px;
-
-          border-radius: 9px;
-
-          background: var(--cyan-soft);
-          color: var(--cyan);
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          flex-shrink: 0;
+          display: block;
+          min-width: 0;
+          flex: 1 1 auto;
         }
 
         .kb-header-title {
-          font-family: 'Space Grotesk', sans-serif;
-          font-size: 17px;
-          line-height: 1.1;
-          font-weight: 700;
           margin: 0;
-          letter-spacing: -0.02em;
+
+          font-family: "Space Grotesk", sans-serif;
+          font-size: 26px;
+          letter-spacing: -.03em;
+
+          color: var(--ink);
         }
 
         .kb-header-sub {
-          font-size: 11px;
+          max-width: 620px;
+
+          margin: 7px 0 0;
+
           color: var(--muted);
-          margin-top: 4px;
+          font-size: 13px;
+          line-height: 1.6;
         }
 
         .kb-header-right {
           display: flex;
           align-items: center;
           gap: 8px;
+
           flex-wrap: wrap;
+          flex-shrink: 0;
+
+          padding-top: 25px;
         }
 
         .kb-search {
@@ -338,7 +356,7 @@ export function KanbanPipeline({
 
         .kb-search:focus-within {
           border-color: var(--cyan-light);
-          box-shadow: 0 0 0 3px rgba(14,124,140,.08);
+          box-shadow: 0 0 0 3px var(--cyan-soft);
         }
 
         .kb-search input {
@@ -412,7 +430,7 @@ export function KanbanPipeline({
 
           height: 1px;
 
-          background: #DDE1E5;
+          background: var(--line);
 
           pointer-events: none;
         }
@@ -458,7 +476,7 @@ export function KanbanPipeline({
         }
 
         .kb-stage-item:hover .kb-stage-name {
-          color: var(--cyan);
+          color: var(--cyan-dark);
         }
 
         .kb-stage-item.active .kb-stage-dot {
@@ -467,7 +485,7 @@ export function KanbanPipeline({
         }
 
         .kb-stage-count {
-          font-family: 'JetBrains Mono', monospace;
+          font-family: Inter, sans-serif;
           font-size: 8px;
           font-weight: 700;
           color: var(--surface);
@@ -501,7 +519,7 @@ export function KanbanPipeline({
           border-top: 1px solid var(--line);
           border-bottom: 1px solid var(--line);
 
-          background: var(--surface);
+          background: transparent;
         }
 
         .kb-board::-webkit-scrollbar {
@@ -520,7 +538,7 @@ export function KanbanPipeline({
         .kb-col {
           position: relative;
 
-          background: #F7F7F4;
+          background: transparent;
 
           border-right: 1px solid var(--line);
 
@@ -548,7 +566,7 @@ export function KanbanPipeline({
         }
 
         .kb-col.over {
-          background: #F4FAFB;
+          background: var(--cyan-soft);
           border-color: var(--cyan-light);
 
           animation: kbPulse 1.2s ease-in-out infinite;
@@ -581,8 +599,10 @@ export function KanbanPipeline({
           align-items: center;
           gap: 6px;
 
-          font-size: 10.5px;
-          font-weight: 700;
+          font-family: "Space Grotesk", sans-serif;
+          font-size: 11.5px;
+          font-weight: 650;
+          letter-spacing: -.01em;
 
           color: var(--ink-2);
 
@@ -607,7 +627,7 @@ export function KanbanPipeline({
         }
 
         .kb-col-count {
-          font-family: 'JetBrains Mono', monospace;
+          font-family: Inter, sans-serif;
 
           font-size: 9px;
           font-weight: 700;
@@ -642,7 +662,7 @@ export function KanbanPipeline({
         }
 
         .kb-col-collapse-btn:hover {
-          color: var(--cyan);
+          color: var(--cyan-dark);
           background: var(--cyan-soft);
         }
 
@@ -650,8 +670,10 @@ export function KanbanPipeline({
           writing-mode: vertical-rl;
           transform: rotate(180deg);
 
-          font-size: 10px;
-          font-weight: 700;
+          font-family: "Space Grotesk", sans-serif;
+          font-size: 10.5px;
+          font-weight: 650;
+          letter-spacing: -.01em;
 
           color: #727982;
 
@@ -739,8 +761,10 @@ export function KanbanPipeline({
         }
 
         .kb-name {
+          font-family: "Space Grotesk", sans-serif;
           font-size: 11.5px;
-          font-weight: 700;
+          font-weight: 650;
+          letter-spacing: -.01em;
 
           color: var(--ink);
 
@@ -762,15 +786,13 @@ export function KanbanPipeline({
           margin-top: 1px;
         }
 
-        /* Simple score — no pill/background */
-
         .kb-score {
-          font-family: 'JetBrains Mono', monospace;
+          font-family: Inter, sans-serif;
 
           font-size: 9px;
           font-weight: 700;
 
-          color: var(--cyan);
+          color: var(--cyan-dark);
 
           flex-shrink: 0;
 
@@ -789,9 +811,9 @@ export function KanbanPipeline({
 
           color: #737A83;
 
-          background: #F4F4F1;
+          background: var(--paper);
 
-          border: 1px solid #E7E5DF;
+          border: 1px solid var(--line-soft);
 
           padding: 2px 5px;
 
@@ -828,7 +850,7 @@ export function KanbanPipeline({
         }
 
         .kb-action-btn:hover {
-          color: var(--cyan);
+          color: var(--cyan-dark);
         }
 
         /* ------------------------------------------------
@@ -856,16 +878,19 @@ export function KanbanPipeline({
         ------------------------------------------------ */
 
         @media (max-width: 760px) {
-          .kb-root {
-            padding: 16px;
-          }
-
           .kb-header {
             align-items: flex-start;
+            gap: 18px;
+            margin-bottom: 0;
+          }
+
+          .kb-header-title {
+            font-size: 22px;
           }
 
           .kb-header-right {
             width: 100%;
+            padding-top: 0;
           }
 
           .kb-search {
@@ -891,19 +916,13 @@ export function KanbanPipeline({
 
       <div className="kb-header">
         <div className="kb-header-left">
-          <div className="kb-header-icon">
-            <Kanban size={17} />
-          </div>
+          <h1 className="kb-header-title">
+            {t.title}
+          </h1>
 
-          <div>
-            <h2 className="kb-header-title">
-              {t.title}
-            </h2>
-
-            <div className="kb-header-sub">
-              {t.sub}
-            </div>
-          </div>
+          <p className="kb-header-sub">
+            {t.sub}
+          </p>
         </div>
 
         <div className="kb-header-right">
@@ -1101,261 +1120,440 @@ export function KanbanPipeline({
                 </div>
               ) : (
                 (() => {
-                  const paginatedCandidates = getPaginatedStageCandidates(stageCandidates, stage.id);
-                  const totalPages = Math.ceil(stageCandidates.length / CARDS_PER_PAGE);
-                  const currentPage = stagePages[stage.id] || 0;
+                  const paginatedCandidates =
+                    getPaginatedStageCandidates(
+                      stageCandidates,
+                      stage.id
+                    );
+
+                  const totalPages = Math.ceil(
+                    stageCandidates.length /
+                      CARDS_PER_PAGE
+                  );
+
+                  const currentPage =
+                    stagePages[stage.id] || 0;
 
                   return (
                     <>
-                      {paginatedCandidates.map((candidate) => {
-                        const skills = Array.isArray(
-                          candidate.skills
-                        )
-                          ? candidate.skills
-                          : (
-                              candidate.skills || ''
+                      {paginatedCandidates.map(
+                        (candidate) => {
+                          const skills =
+                            Array.isArray(
+                              candidate.skills
                             )
-                              .split(',')
-                              .map((skill) =>
-                                skill.trim()
-                              )
-                              .filter(Boolean);
+                              ? candidate.skills
+                              : (
+                                  candidate.skills ||
+                                  ''
+                                )
+                                  .split(',')
+                                  .map((skill) =>
+                                    skill.trim()
+                                  )
+                                  .filter(Boolean);
 
-                        return (
-                    <div
-                      key={candidate.id}
-                      draggable
-                      onDragStart={(e) =>
-                        handleDragStart(
-                          e,
-                          candidate.id
-                        )
-                      }
-                      onDragEnd={() =>
-                        setDraggedId(null)
-                      }
-                      className={`kb-card${
-                        draggedId === candidate.id
-                          ? ' dragging'
-                          : ''
-                      }`}
-                    >
-                      <div
-                        className="kb-card-top"
-                        onClick={() =>
-                          onViewDetails(candidate)
-                        }
-                      >
-                        <div className="kb-person">
-                          <img
-                            className="kb-avatar"
-                            src={getAvatarUrl(
-                              candidate.fullName
-                            )}
-                            alt={
-                              candidate.fullName
-                            }
-                          />
-
-                          <div className="kb-person-info">
+                          return (
                             <div
-                              className="kb-name"
-                              title={
-                                candidate.fullName
+                              key={candidate.id}
+                              draggable
+                              onDragStart={(e) =>
+                                handleDragStart(
+                                  e,
+                                  candidate.id
+                                )
                               }
-                            >
-                              {candidate.fullName}
-                            </div>
-
-                            <div
-                              className="kb-headline"
-                              title={
-                                candidate.headline
+                              onDragEnd={() =>
+                                setDraggedId(null)
                               }
+                              className={`kb-card${
+                                draggedId ===
+                                candidate.id
+                                  ? ' dragging'
+                                  : ''
+                              }`}
                             >
-                              {candidate.headline}
-                            </div>
-                          </div>
-                        </div>
-
-                        {candidate.matchScore != null && (
-                          <span className="kb-score">
-                            {candidate.matchScore}%
-                          </span>
-                        )}
-                      </div>
-
-                      {skills.length > 0 && (
-                        <div className="kb-skills">
-                          {skills
-                            .slice(0, 2)
-                            .map((skill, i) => (
-                              <span
-                                className="kb-skill"
-                                key={i}
+                              <div
+                                className="kb-card-top"
+                                onClick={() =>
+                                  onViewDetails(
+                                    candidate
+                                  )
+                                }
                               >
-                                {skill}
-                              </span>
-                            ))}
+                                <div className="kb-person">
+                                  <img
+                                    className="kb-avatar"
+                                    src={getAvatarUrl(
+                                      candidate.fullName
+                                    )}
+                                    alt={
+                                      candidate.fullName
+                                    }
+                                  />
 
-                          {skills.length > 2 && (
-                            <span className="kb-skill">
-                              +{skills.length - 2}
-                            </span>
-                          )}
-                        </div>
+                                  <div className="kb-person-info">
+                                    <div
+                                      className="kb-name"
+                                      title={
+                                        candidate.fullName
+                                      }
+                                    >
+                                      {
+                                        candidate.fullName
+                                      }
+                                    </div>
+
+                                    <div
+                                      className="kb-headline"
+                                      title={
+                                        candidate.headline
+                                      }
+                                    >
+                                      {
+                                        candidate.headline
+                                      }
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {candidate.matchScore !=
+                                  null && (
+                                  <span className="kb-score">
+                                    {
+                                      candidate.matchScore
+                                    }
+                                    %
+                                  </span>
+                                )}
+                              </div>
+
+                              {skills.length > 0 && (
+                                <div className="kb-skills">
+                                  {skills
+                                    .slice(0, 2)
+                                    .map(
+                                      (skill, i) => (
+                                        <span
+                                          className="kb-skill"
+                                          key={i}
+                                        >
+                                          {skill}
+                                        </span>
+                                      )
+                                    )}
+
+                                  {skills.length > 2 && (
+                                    <span className="kb-skill">
+                                      +
+                                      {skills.length -
+                                        2}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="kb-card-foot">
+                                <button
+                                  type="button"
+                                  draggable={false}
+                                  onMouseDown={(e) =>
+                                    e.stopPropagation()
+                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onViewDetails(
+                                      candidate
+                                    );
+                                  }}
+                                  className="kb-action-btn"
+                                >
+                                  <Eye size={11} />
+
+                                  <span>
+                                    {t.viewProfile}
+                                  </span>
+                                </button>
+
+                                {stage.id !==
+                                  'hired' &&
+                                  stage.id !==
+                                    'rejected' && (
+                                    <button
+                                      type="button"
+                                      draggable={false}
+                                      onMouseDown={(e) =>
+                                        e.stopPropagation()
+                                      }
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+
+                                        const order = [
+                                          'new',
+                                          'contacted',
+                                          'interview',
+                                          'offer',
+                                          'hired',
+                                        ];
+
+                                        const idx =
+                                          order.indexOf(
+                                            stage.id
+                                          );
+
+                                        if (
+                                          idx !== -1 &&
+                                          idx <
+                                            order.length -
+                                              1
+                                        ) {
+                                          onUpdateStage(
+                                            candidate.id,
+                                            order[
+                                              idx + 1
+                                            ]
+                                          );
+                                        }
+                                      }}
+                                      className="kb-action-btn"
+                                    >
+                                      <span>
+                                        {t.advanceNext}
+                                      </span>
+
+                                      <ChevronRight
+                                        size={11}
+                                      />
+                                    </button>
+                                  )}
+                              </div>
+                            </div>
+                          );
+                        }
                       )}
 
-                      <div className="kb-card-foot">
-                        <button
-                          type="button"
-                          draggable={false}
-                          onMouseDown={(e) =>
-                            e.stopPropagation()
-                          }
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onViewDetails(candidate);
+                      {/* Pagination Controls for Stage */}
+
+                      {totalPages > 1 && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            padding: '12px 8px',
+                            marginTop: '8px',
                           }}
-                          className="kb-action-btn"
                         >
-                          <Eye size={11} />
-                          <span>
-                            {t.viewProfile}
-                          </span>
-                        </button>
-
-                        {stage.id !== 'hired' &&
-                          stage.id !== 'rejected' && (
-                            <button
-                              type="button"
-                              draggable={false}
-                              onMouseDown={(e) =>
-                                e.stopPropagation()
+                          <button
+                            onClick={() =>
+                              handleStagePageChange(
+                                stage.id,
+                                Math.max(
+                                  0,
+                                  currentPage - 1
+                                )
+                              )
+                            }
+                            disabled={
+                              currentPage === 0
+                            }
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '6px 10px',
+                              border:
+                                '1px solid #E4E1D9',
+                              borderRadius: 6,
+                              background:
+                                currentPage === 0
+                                  ? '#F7F5F1'
+                                  : '#FFFFFF',
+                              color:
+                                currentPage === 0
+                                  ? '#9B9C9E'
+                                  : '#12151B',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor:
+                                currentPage === 0
+                                  ? 'not-allowed'
+                                  : 'pointer',
+                              transition:
+                                'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (
+                                currentPage !== 0
+                              ) {
+                                e.target.style.background =
+                                  '#F7F5F1';
+                                e.target.style.borderColor =
+                                  '#D8D4CA';
                               }
-                              onClick={(e) => {
-                                e.stopPropagation();
+                            }}
+                            onMouseLeave={(e) => {
+                              if (
+                                currentPage !== 0
+                              ) {
+                                e.target.style.background =
+                                  '#FFFFFF';
+                                e.target.style.borderColor =
+                                  '#E4E1D9';
+                              }
+                            }}
+                          >
+                            <ChevronLeft size={12} />
+                          </button>
 
-                                const order = [
-                                  'new',
-                                  'contacted',
-                                  'interview',
-                                  'offer',
-                                  'hired',
-                                ];
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 4,
+                            }}
+                          >
+                            {Array.from(
+                              {
+                                length: totalPages,
+                              },
+                              (_, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() =>
+                                    handleStagePageChange(
+                                      stage.id,
+                                      i
+                                    )
+                                  }
+                                  style={{
+                                    display: 'flex',
+                                    alignItems:
+                                      'center',
+                                    justifyContent:
+                                      'center',
+                                    width: 28,
+                                    height: 28,
+                                    border:
+                                      currentPage ===
+                                      i
+                                        ? '1px solid #0E7C8C'
+                                        : '1px solid #E4E1D9',
+                                    borderRadius: 6,
+                                    background:
+                                      currentPage ===
+                                      i
+                                        ? '#0E7C8C'
+                                        : '#FFFFFF',
+                                    color:
+                                      currentPage ===
+                                      i
+                                        ? '#FFFFFF'
+                                        : '#12151B',
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition:
+                                      'all 0.15s ease',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (
+                                      currentPage !==
+                                      i
+                                    ) {
+                                      e.target.style.background =
+                                        '#F7F5F1';
+                                      e.target.style.borderColor =
+                                        '#D8D4CA';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (
+                                      currentPage !==
+                                      i
+                                    ) {
+                                      e.target.style.background =
+                                        '#FFFFFF';
+                                      e.target.style.borderColor =
+                                        '#E4E1D9';
+                                    }
+                                  }}
+                                >
+                                  {i + 1}
+                                </button>
+                              )
+                            )}
+                          </div>
 
-                                const idx =
-                                  order.indexOf(
-                                    stage.id
-                                  );
-
-                                if (
-                                  idx !== -1 &&
-                                  idx <
-                                    order.length - 1
-                                ) {
-                                  onUpdateStage(
-                                    candidate.id,
-                                    order[idx + 1]
-                                  );
-                                }
-                              }}
-                              className="kb-action-btn"
-                            >
-                              <span>
-                                {t.advanceNext}
-                              </span>
-
-                              <ChevronRight
-                                size={11}
-                              />
-                            </button>
-                          )}
-                      </div>
-                    </div>
-                      );
-                    })}
-
-                {/* Pagination Controls for Stage */}
-                {totalPages > 1 && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    padding: '8px 4px',
-                    marginTop: '4px',
-                  }}>
-                    <button
-                      onClick={() => handleStagePageChange(stage.id, Math.max(0, currentPage - 1))}
-                      disabled={currentPage === 0}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 24,
-                        height: 24,
-                        border: '1px solid #D8D4CA',
-                        borderRadius: 6,
-                        background: currentPage === 0 ? '#F7F5F1' : '#FFFFFF',
-                        color: currentPage === 0 ? '#9B9C9E' : '#12151B',
-                        cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (currentPage !== 0) {
-                          e.target.style.background = '#F7F5F1';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (currentPage !== 0) {
-                          e.target.style.background = '#FFFFFF';
-                        }
-                      }}
-                    >
-                      <ChevronLeft size={12} />
-                    </button>
-
-                    <span style={{
-                      fontSize: '9px',
-                      fontWeight: 600,
-                      color: '#737A83',
-                      fontFamily: "'JetBrains Mono', monospace",
-                    }}>
-                      {currentPage + 1}/{totalPages}
-                    </span>
-
-                    <button
-                      onClick={() => handleStagePageChange(stage.id, Math.min(totalPages - 1, currentPage + 1))}
-                      disabled={currentPage >= totalPages - 1}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 24,
-                        height: 24,
-                        border: '1px solid #D8D4CA',
-                        borderRadius: 6,
-                        background: currentPage >= totalPages - 1 ? '#F7F5F1' : '#FFFFFF',
-                        color: currentPage >= totalPages - 1 ? '#9B9C9E' : '#12151B',
-                        cursor: currentPage >= totalPages - 1 ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (currentPage < totalPages - 1) {
-                          e.target.style.background = '#F7F5F1';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (currentPage < totalPages - 1) {
-                          e.target.style.background = '#FFFFFF';
-                        }
-                      }}
-                    >
-                      <ChevronRight size={12} />
-                    </button>
-                  </div>
-                )}
+                          <button
+                            onClick={() =>
+                              handleStagePageChange(
+                                stage.id,
+                                Math.min(
+                                  totalPages - 1,
+                                  currentPage + 1
+                                )
+                              )
+                            }
+                            disabled={
+                              currentPage >=
+                              totalPages - 1
+                            }
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '6px 10px',
+                              border:
+                                '1px solid #E4E1D9',
+                              borderRadius: 6,
+                              background:
+                                currentPage >=
+                                totalPages - 1
+                                  ? '#F7F5F1'
+                                  : '#FFFFFF',
+                              color:
+                                currentPage >=
+                                totalPages - 1
+                                  ? '#9B9C9E'
+                                  : '#12151B',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor:
+                                currentPage >=
+                                totalPages - 1
+                                  ? 'not-allowed'
+                                  : 'pointer',
+                              transition:
+                                'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (
+                                currentPage <
+                                totalPages - 1
+                              ) {
+                                e.target.style.background =
+                                  '#F7F5F1';
+                                e.target.style.borderColor =
+                                  '#D8D4CA';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (
+                                currentPage <
+                                totalPages - 1
+                              ) {
+                                e.target.style.background =
+                                  '#FFFFFF';
+                                e.target.style.borderColor =
+                                  '#E4E1D9';
+                              }
+                            }}
+                          >
+                            <ChevronRight size={12} />
+                          </button>
+                        </div>
+                      )}
                     </>
                   );
                 })()

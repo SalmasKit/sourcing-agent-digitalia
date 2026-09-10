@@ -4,7 +4,6 @@ export const en = {
   appSubtitle: 'Autonomous Technical Sourcing Platform',
   agentVersion: 'AGENT v1.0',
   sourcingHub: 'Sourcing',
-  shortlists: 'Projects',
   dashboard: 'Dashboard',
   apiConnected: 'API Connected',
   mockModeActive: 'Mock Mode Active',
@@ -63,16 +62,6 @@ export const en = {
   addToShortlist: 'Save to Role',
   compare: 'Compare',
 
-  // Shortlist Panel
-  shortlistTitle: 'Bookmarked Shortlists & Talent Pool',
-  shortlistDesc: 'Review and export candidates shortlisted by your technical recruitment team.',
-  exportCsv: 'Export CSV Report',
-  noShortlistedYet: 'No Shortlisted Candidates Yet',
-  noShortlistedDesc: 'Click the "Shortlist" button on any candidate card in the Sourcing Hub to bookmark profiles.',
-  candidate: 'Candidate',
-  locationExp: 'Location & Exp',
-  topSkills: 'Top Skills',
-  actions: 'Actions',
 
   // Directory
   talentProfiles: 'Candidate Talent Profiles',

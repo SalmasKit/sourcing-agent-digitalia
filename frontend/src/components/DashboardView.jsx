@@ -17,6 +17,12 @@
  *  - Job rows are selectable.
  *  - Search history can be rerun.
  *  - Score distribution segments are clickable.
+ *
+ * Layout fix:
+ *  - "Highest matches" and "Match distribution" panels now stretch to
+ *    equal height via CSS grid + flex, so the empty state in the
+ *    candidates panel matches the score-distribution panel's height
+ *    instead of collapsing to a small fixed box.
  */
 
 import React, {
@@ -37,7 +43,6 @@ import {
   ArrowUpRight,
   ChevronRight,
   SlidersHorizontal,
-  Activity,
   Target,
   BriefcaseBusiness,
   Check,
@@ -58,11 +63,12 @@ const COPY = {
   EN: {
     eyebrow: 'RECRUITING OVERVIEW',
     welcome: (n) => `Good to see you, ${n}`,
-    workspaceNote: 'Your hiring workspace',
-    matchQuality: 'Average match',
-    activeJDs: 'Active roles',
-    sourced: 'Candidates',
-    shortlisted: 'Shortlisted',
+    workspaceNote:
+      'Your hiring workspace — aggregate insights across all roles',
+    matchQuality: 'Average match across all roles',
+    activeJDs: 'Total roles',
+    sourced: 'Total candidates',
+    shortlisted: 'Total shortlisted',
 
     pipeline: 'Pipeline',
     allStages: 'All stages',
@@ -71,25 +77,19 @@ const COPY = {
 
     leaderboard: 'Highest matches',
     noCandidates: 'No candidates sourced yet',
-    viewAll: 'View all',
 
     scoreDist: 'Match distribution',
-    scoreHint: 'Click a range to focus',
+    scoreHint: 'Overview of candidate match scores',
 
     activity: 'Workspace activity',
     jobsTab: 'Roles',
-    searchesTab: 'Searches',
 
     noJDs: 'No job descriptions yet',
-    noSearches: 'No searches yet',
 
     saved: 'shortlisted',
     results: 'results',
 
-    rerun: 'Rerun search',
-
     agent: 'AI sourcing',
-    searches: 'searches',
     avgMatch: 'avg match',
     inPipeline: 'in pipeline',
     profiles: 'profiles',
@@ -101,7 +101,7 @@ const COPY = {
       new: 'New',
       contacted: 'Contacted',
       interview: 'Interview',
-      offer: 'Offer',
+      offer: 'Offer Extended',
       hired: 'Hired',
     },
 
@@ -116,11 +116,12 @@ const COPY = {
   FR: {
     eyebrow: 'VUE DU RECRUTEMENT',
     welcome: (n) => `Ravi de vous revoir, ${n}`,
-    workspaceNote: 'Votre espace de recrutement',
-    matchQuality: 'Score moyen',
-    activeJDs: 'Postes actifs',
-    sourced: 'Candidats',
-    shortlisted: 'Shortlist',
+    workspaceNote:
+      'Votre espace de recrutement — vue globale de tous les postes',
+    matchQuality: 'Score moyen tous postes confondus',
+    activeJDs: 'Total des postes',
+    sourced: 'Total candidats',
+    shortlisted: 'Total shortlistés',
 
     pipeline: 'Pipeline',
     allStages: 'Toutes les étapes',
@@ -129,25 +130,19 @@ const COPY = {
 
     leaderboard: 'Meilleures correspondances',
     noCandidates: 'Aucun candidat sourcé',
-    viewAll: 'Voir tout',
 
     scoreDist: 'Distribution des scores',
-    scoreHint: 'Cliquez sur une plage pour filtrer',
+    scoreHint: 'Aperçu des scores de correspondance',
 
     activity: 'Activité',
     jobsTab: 'Postes',
-    searchesTab: 'Recherches',
 
     noJDs: 'Aucune fiche de poste',
-    noSearches: 'Aucune recherche',
 
     saved: 'shortlistés',
     results: 'résultats',
 
-    rerun: 'Relancer',
-
     agent: 'Sourcing IA',
-    searches: 'recherches',
     avgMatch: 'score moyen',
     inPipeline: 'pipeline',
     profiles: 'profils',
@@ -159,7 +154,7 @@ const COPY = {
       new: 'Nouveau',
       contacted: 'Contacté',
       interview: 'Entretien',
-      offer: 'Offre',
+      offer: 'Offre Proposée',
       hired: 'Recruté',
     },
 
@@ -321,13 +316,11 @@ export function DashboardView({
   candidates = [],
   savedRoleCandidates = {},
   candidatePipelineStage = {},
-  searchHistory = [],
 
   lang: langProp = null,
 
   onStageClick = null,
   onSelectJob = null,
-  onRerunSearch = null,
   onSelectCandidate = null,
 }) {
   useFonts();
@@ -347,8 +340,9 @@ export function DashboardView({
   const [selectedRange, setSelectedRange] =
     useState(null);
 
-  const [activityTab, setActivityTab] =
-    useState(0);
+  const [candidatePage, setCandidatePage] = useState(0);
+
+  const CANDIDATE_PAGE_SIZE = 3;
 
   /* -------------------------------------------------------
      Stats
@@ -364,27 +358,32 @@ export function DashboardView({
 
     const totalCandidates = candidates.length;
 
-    const uniqueSavedCount =
-      new Set(
-        Object.values(savedRoleCandidates).flat()
-      ).size;
+    /*
+     * IMPORTANT:
+     * Pipeline membership must come from savedRoleCandidates,
+     * not from every candidate in the global candidates array.
+     *
+     * A candidate is in the pipeline when they appear in at least
+     * one role's saved candidate list.
+     */
 
-    const avgScore =
-      totalCandidates > 0
-        ? Math.round(
-            candidates.reduce(
-              (sum, candidate) =>
-                sum + (candidate.matchScore || 0),
-              0
-            ) / totalCandidates
-          )
-        : 0;
-
-    const ranked = [...candidates].sort(
-      (a, b) =>
-        (b.matchScore || 0) -
-        (a.matchScore || 0)
+    const pipelineCandidateIds = new Set(
+      Object.values(savedRoleCandidates)
+        .flat()
+        .filter(Boolean)
     );
+
+    const pipelineCandidates = candidates.filter(
+      (candidate) =>
+        pipelineCandidateIds.has(candidate.id)
+    );
+
+    /*
+     * Keep this EXACTLY aligned with KanbanPipeline.
+     */
+
+    const getCandidateStage = (candidate) =>
+      candidatePipelineStage[candidate.id] || 'new';
 
     const stages = [
       'new',
@@ -393,19 +392,39 @@ export function DashboardView({
       'offer',
       'hired',
     ].reduce((acc, key) => {
-      acc[key] = candidates.filter(
+      acc[key] = pipelineCandidates.filter(
         (candidate) =>
-          candidatePipelineStage[candidate.id] === key
+          getCandidateStage(candidate) === key
       ).length;
 
       return acc;
     }, {});
 
     const totalInPipeline =
-      Object.values(stages).reduce(
-        (a, b) => a + b,
-        0
-      );
+      stages.new +
+      stages.contacted +
+      stages.interview +
+      stages.offer +
+      stages.hired;
+
+    const uniqueSavedCount = totalInPipeline;
+
+    const avgScore =
+      totalCandidates > 0
+        ? Math.round(
+          candidates.reduce(
+            (sum, candidate) =>
+              sum + (candidate.matchScore || 0),
+            0
+          ) / totalCandidates
+        )
+        : 0;
+
+    const ranked = [...candidates].sort(
+      (a, b) =>
+        (b.matchScore || 0) -
+        (a.matchScore || 0)
+    );
 
     const scoreDist = [
       {
@@ -504,7 +523,9 @@ export function DashboardView({
     useCountUp(stats.totalCandidates);
 
   const shortlistedCount =
-    useCountUp(stats.uniqueSavedCount);
+    useCountUp(
+      stats.uniqueSavedCount
+    );
 
   /* -------------------------------------------------------
      Filtered candidates
@@ -516,7 +537,7 @@ export function DashboardView({
     if (focusedStage) {
       result = result.filter(
         (candidate) =>
-          candidatePipelineStage[candidate.id] ===
+          (candidatePipelineStage[candidate.id] || 'new') ===
           focusedStage
       );
     }
@@ -549,8 +570,43 @@ export function DashboardView({
     candidatePipelineStage,
   ]);
 
-  const recentSearches =
-    [...searchHistory].reverse().slice(0, 5);
+  // When no stage filter is active, use ranked candidates by match score
+  const displayCandidates = useMemo(() => {
+    return focusedStage
+      ? filteredCandidates
+      : stats.ranked;
+  }, [
+    focusedStage,
+    filteredCandidates,
+    stats.ranked,
+  ]);
+
+  // Reset to page 0 when filters change
+  useEffect(() => {
+    setCandidatePage(0);
+  }, [focusedStage]);
+
+  // Pagination for candidates - show top 3 matches per page
+  const totalCandidatePages = Math.ceil(
+    displayCandidates.length /
+    CANDIDATE_PAGE_SIZE
+  );
+
+  const paginatedCandidates = useMemo(() => {
+    const start =
+      candidatePage * CANDIDATE_PAGE_SIZE;
+
+    const end =
+      start + CANDIDATE_PAGE_SIZE;
+
+    return displayCandidates.slice(
+      start,
+      end
+    );
+  }, [
+    displayCandidates,
+    candidatePage,
+  ]);
 
   /* -------------------------------------------------------
      Handlers
@@ -574,9 +630,8 @@ export function DashboardView({
   }
 
   function handleRangeClick(key) {
-    setSelectedRange((current) =>
-      current === key ? null : key
-    );
+    // Disabled - match distribution is no longer clickable
+    return;
   }
 
   function clearFilters() {
@@ -727,7 +782,9 @@ export function DashboardView({
           padding: 25px 27px;
 
           display: grid;
-          grid-template-columns: minmax(260px, 1.2fr) minmax(390px, 1fr);
+          grid-template-columns:
+            minmax(260px, 1.2fr)
+            minmax(390px, 1fr);
           gap: 28px;
 
           min-height: 188px;
@@ -871,7 +928,8 @@ export function DashboardView({
 
         .db3-stat-stack {
           display: grid;
-          grid-template-columns: repeat(3, minmax(80px, 1fr));
+          grid-template-columns:
+            repeat(3, minmax(80px, 1fr));
           min-width: 300px;
         }
 
@@ -1181,6 +1239,8 @@ export function DashboardView({
 
         /* -----------------------------------------------
            MAIN GRID
+           NOTE: align-items changed from "start" to "stretch"
+           so the two panels below share the same row height.
         ----------------------------------------------- */
 
         .db3-content-grid {
@@ -1192,7 +1252,7 @@ export function DashboardView({
 
           gap: 22px;
 
-          align-items: start;
+          align-items: stretch;
         }
 
         /* -----------------------------------------------
@@ -1206,6 +1266,13 @@ export function DashboardView({
           border-radius: 14px;
 
           overflow: hidden;
+
+          /* Panels stretch to fill their grid row and lay out
+             their content top-to-bottom so an empty state can
+             grow to fill remaining space. */
+          height: 100%;
+          display: flex;
+          flex-direction: column;
         }
 
         .db3-panel-head {
@@ -1220,6 +1287,8 @@ export function DashboardView({
 
           border-bottom:
             1px solid var(--border);
+
+          flex-shrink: 0;
         }
 
         .db3-panel-head-left {
@@ -1249,6 +1318,12 @@ export function DashboardView({
 
           font-size: 12px;
           font-weight: 700;
+        }
+
+        .db3-panel-subtitle {
+          font-size: 9px;
+          color: var(--muted);
+          margin-top: 2px;
         }
 
         .db3-panel-count {
@@ -1281,6 +1356,11 @@ export function DashboardView({
         .db3-candidate-list {
           display: flex;
           flex-direction: column;
+
+          /* Grow to fill the panel so the empty state can center
+             itself across the full remaining height. */
+          flex: 1;
+          min-height: 0;
         }
 
         .db3-candidate {
@@ -1405,7 +1485,21 @@ export function DashboardView({
           transform: translateX(2px);
         }
 
+        /* -----------------------------------------------
+           EMPTY STATE
+           NOTE: now flexes to fill the remaining panel
+           height and centers its content, instead of a
+           fixed small padding box, so it matches the
+           height of the score-distribution panel next to it.
+        ----------------------------------------------- */
+
         .db3-empty {
+          flex: 1;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
           padding: 35px 20px;
 
           text-align: center;
@@ -1425,6 +1519,10 @@ export function DashboardView({
 
         .db3-score-body {
           padding: 15px 17px 0;
+
+          flex: 1;
+          display: flex;
+          flex-direction: column;
         }
 
         .db3-score-note {
@@ -1912,7 +2010,6 @@ export function DashboardView({
           </div>
         </header>
 
-
         {/* ================================================
             HERO
         ================================================= */}
@@ -1934,26 +2031,24 @@ export function DashboardView({
 
             <div className="db3-hero-mini">
 
-              <div className="db3-mini">
-                <Activity size={11} />
-                <strong>
-                  {searchHistory.length || 0}
-                </strong>
-                {t.searches}
-              </div>
+              {/* FIXED:
+                  Search history metric removed because
+                  DashboardView no longer receives searchHistory.
+              */}
 
-              <div className="db3-mini">
+              {/* <div className="db3-mini">
                 <Target size={11} />
+
                 <strong>
                   {stats.totalInPipeline}
                 </strong>
+
                 {t.inPipeline}
-              </div>
+              </div> */}
 
             </div>
 
           </div>
-
 
           <div className="db3-hero-right">
 
@@ -1964,6 +2059,7 @@ export function DashboardView({
               />
 
               <div className="db3-match-copy">
+
                 <div className="db3-match-label">
                   {t.matchQuality}
                 </div>
@@ -1972,22 +2068,23 @@ export function DashboardView({
                   {stats.avgScore >= 80
                     ? 'Strong pipeline'
                     : stats.avgScore >= 60
-                    ? 'Healthy pipeline'
-                    : 'Build your pipeline'}
+                      ? 'Healthy pipeline'
+                      : 'Build your pipeline'}
                 </div>
 
                 <div className="db3-match-sub">
                   Based on sourced candidate
                   match scores.
                 </div>
+
               </div>
 
             </div>
 
-
             <div className="db3-stat-stack">
 
               <div className="db3-stat">
+
                 <div className="db3-stat-icon">
                   <FileText size={12} />
                 </div>
@@ -1999,10 +2096,11 @@ export function DashboardView({
                 <div className="db3-stat-label">
                   {t.activeJDs}
                 </div>
+
               </div>
 
-
               <div className="db3-stat">
+
                 <div className="db3-stat-icon">
                   <Users size={12} />
                 </div>
@@ -2014,10 +2112,11 @@ export function DashboardView({
                 <div className="db3-stat-label">
                   {t.sourced}
                 </div>
+
               </div>
 
-
               <div className="db3-stat">
+
                 <div className="db3-stat-icon">
                   <BookmarkCheck size={12} />
                 </div>
@@ -2029,6 +2128,7 @@ export function DashboardView({
                 <div className="db3-stat-label">
                   {t.shortlisted}
                 </div>
+
               </div>
 
             </div>
@@ -2036,7 +2136,6 @@ export function DashboardView({
           </div>
 
         </section>
-
 
         {/* ================================================
             ACTIVE FILTER CONTEXT
@@ -2058,6 +2157,7 @@ export function DashboardView({
 
               {focusedStage && (
                 <span className="db3-filter-pill">
+
                   {t.stages[focusedStage]}
 
                   <button
@@ -2070,11 +2170,13 @@ export function DashboardView({
                   >
                     <X size={10} />
                   </button>
+
                 </span>
               )}
 
               {selectedRange && (
                 <span className="db3-filter-pill">
+
                   {
                     stats.scoreDist.find(
                       (item) =>
@@ -2092,6 +2194,7 @@ export function DashboardView({
                   >
                     <X size={10} />
                   </button>
+
                 </span>
               )}
 
@@ -2106,7 +2209,6 @@ export function DashboardView({
 
           </div>
         )}
-
 
         {/* ================================================
             PIPELINE
@@ -2123,12 +2225,11 @@ export function DashboardView({
 
             <div className="db3-section-note">
               {hasFilters
-                ? `${filteredCandidates.length} ${t.candidates}`
-                : t.allStages}
+                ? `${displayCandidates.length} ${t.candidates}`
+                : `${stats.totalInPipeline} ${t.inPipeline} (${candidates.length - stats.totalInPipeline} not in pipeline)`}
             </div>
 
           </div>
-
 
           <div className="db3-pipeline">
 
@@ -2191,7 +2292,6 @@ export function DashboardView({
 
         </section>
 
-
         {/* ================================================
             CANDIDATES + SCORE DISTRIBUTION
         ================================================= */}
@@ -2213,34 +2313,25 @@ export function DashboardView({
                 </div>
 
                 <div>
+
                   <div className="db3-panel-title">
                     {t.leaderboard}
                   </div>
 
                   <div className="db3-panel-count">
-                    {filteredCandidates.length}{' '}
+                    {displayCandidates.length}{' '}
                     {t.candidates}
                   </div>
+
                 </div>
 
               </div>
 
-              <button
-                className="db3-view-all"
-                onClick={() =>
-                  onStageClick?.(focusedStage)
-                }
-              >
-                {t.viewAll}
-                <ArrowUpRight size={11} />
-              </button>
-
             </div>
-
 
             <div className="db3-candidate-list">
 
-              {filteredCandidates.length === 0 ? (
+              {displayCandidates.length === 0 ? (
 
                 <div className="db3-empty">
                   {t.noCandidates}
@@ -2248,72 +2339,77 @@ export function DashboardView({
 
               ) : (
 
-                filteredCandidates
-                  .slice(0, 8)
-                  .map((candidate, index) => (
+                paginatedCandidates.map(
+                  (candidate, index) => {
 
-                    <div
-                      key={candidate.id}
-                      className="db3-candidate"
-                      onClick={() =>
-                        onSelectCandidate?.(
-                          candidate
-                        )
-                      }
-                    >
+                    const globalIndex =
+                      candidatePage *
+                      CANDIDATE_PAGE_SIZE +
+                      index;
 
-                      <div className="db3-rank">
-                        #{index + 1}
-                      </div>
-
-                      <img
-                        className="db3-avatar"
-                        src={getAvatarUrl(
-                          candidate.fullName
-                        )}
-                        alt={
-                          candidate.fullName
+                    return (
+                      <div
+                        key={candidate.id}
+                        className="db3-candidate"
+                        onClick={() =>
+                          onSelectCandidate?.(
+                            candidate
+                          )
                         }
-                      />
+                      >
 
-                      <div className="db3-candidate-main">
-
-                        <div className="db3-candidate-name">
-                          {candidate.fullName}
+                        <div className="db3-rank">
+                          #{globalIndex + 1}
                         </div>
 
-                        <div className="db3-candidate-headline">
-                          {candidate.headline ||
-                            'Candidate profile'}
+                        <img
+                          className="db3-avatar"
+                          src={getAvatarUrl(
+                            candidate.fullName
+                          )}
+                          alt={
+                            candidate.fullName
+                          }
+                        />
+
+                        <div className="db3-candidate-main">
+
+                          <div className="db3-candidate-name">
+                            {candidate.fullName}
+                          </div>
+
+                          <div className="db3-candidate-headline">
+                            {candidate.headline ||
+                              'Candidate profile'}
+                          </div>
+
                         </div>
 
+                        <div className="db3-candidate-role">
+                          {candidate.currentRole ||
+                            candidate.location ||
+                            'Profile'}
+                        </div>
+
+                        <span className="db3-candidate-score">
+                          {candidate.matchScore || 0}%
+                        </span>
+
+                        <ChevronRight
+                          className="db3-candidate-arrow"
+                          size={13}
+                        />
+
                       </div>
-
-                      <div className="db3-candidate-role">
-                        {candidate.currentRole ||
-                          candidate.location ||
-                          'Profile'}
-                      </div>
-
-                      <span className="db3-candidate-score">
-                        {candidate.matchScore || 0}%
-                      </span>
-
-                      <ChevronRight
-                        className="db3-candidate-arrow"
-                        size={13}
-                      />
-
-                    </div>
-
-                  ))
+                    );
+                  }
+                )
 
               )}
 
             </div>
 
           </section>
-
 
           {/* -----------------------------------------------
               SCORE DISTRIBUTION
@@ -2329,21 +2425,27 @@ export function DashboardView({
                   <Target size={12} />
                 </div>
 
-                <div className="db3-panel-title">
-                  {t.scoreDist}
+                <div>
+
+                  <div className="db3-panel-title">
+                    {t.scoreDist}
+                  </div>
+
+                  <div className="db3-panel-subtitle">
+                    {stats.totalCandidates} candidates across all roles
+                  </div>
+
                 </div>
 
               </div>
 
             </div>
 
-
             <div className="db3-score-body">
 
               <div className="db3-score-note">
                 {t.scoreHint}
               </div>
-
 
               <div className="db3-score-bars">
 
@@ -2353,8 +2455,8 @@ export function DashboardView({
                     const percentage =
                       stats.totalCandidates > 0
                         ? (item.value /
-                            stats.totalCandidates) *
-                          100
+                          stats.totalCandidates) *
+                        100
                         : 0;
 
                     const active =
@@ -2389,6 +2491,7 @@ export function DashboardView({
                         </span>
 
                         <div className="db3-score-track">
+
                           <div
                             className="db3-score-fill"
                             style={{
@@ -2397,6 +2500,7 @@ export function DashboardView({
                                 `${index * 70}ms`,
                             }}
                           />
+
                         </div>
 
                         <span className="db3-score-value">
@@ -2416,199 +2520,112 @@ export function DashboardView({
 
         </div>
 
-
         {/* ================================================
             ACTIVITY
         ================================================= */}
 
         <section className="db3-panel db3-activity">
 
-          <div className="db3-activity-tabs">
+          {jobDescriptions.length === 0 ? (
 
-            <button
-              className={[
-                'db3-tab',
-                activityTab === 0
-                  ? 'active'
-                  : '',
-              ].join(' ')}
-              onClick={() =>
-                setActivityTab(0)
-              }
-            >
-              {t.jobsTab}
-            </button>
+            <div className="db3-empty">
+              {t.noJDs}
+            </div>
 
-            <button
-              className={[
-                'db3-tab',
-                activityTab === 1
-                  ? 'active'
-                  : '',
-              ].join(' ')}
-              onClick={() =>
-                setActivityTab(1)
-              }
-            >
-              {t.searchesTab}
-            </button>
+          ) : (
 
-          </div>
+            [...jobDescriptions]
+              .sort((a, b) => {
+                const tA = Number(String(a.id).replace(/\D/g, '')) || 0;
+                const tB = Number(String(b.id).replace(/\D/g, '')) || 0;
+                return tB - tA;
+              })
+              .slice(0, 4)
+              .map((job) => {
 
+                const savedCount =
+                  (
+                    savedRoleCandidates[
+                    job.id
+                    ] || []
+                  ).length;
 
-          {/* ---------------------------------------------
-              JOBS
-          ---------------------------------------------- */}
+                const isSelected =
+                  selectedJobId === job.id;
 
-          {activityTab === 0 && (
+                const jobStatus =
+                  job.status || 'active';
 
-            jobDescriptions.length === 0 ? (
+                const isArchived =
+                  jobStatus === 'archived';
 
-              <div className="db3-empty">
-                {t.noJDs}
-              </div>
-
-            ) : (
-
-              jobDescriptions
-                .slice(0, 6)
-                .map((job) => {
-
-                  const savedCount =
-                    (
-                      savedRoleCandidates[
-                        job.id
-                      ] || []
-                    ).length;
-
-                  const isSelected =
-                    selectedJobId === job.id;
-
-                  return (
-                    <div
-                      key={job.id}
-                      className="db3-role-row"
-                      style={
-                        isSelected
-                          ? {
-                              background:
-                                'var(--cyan-soft)',
-                            }
-                          : undefined
-                      }
-                      onClick={() =>
-                        handleSelectJob(
-                          job.id
-                        )
-                      }
-                    >
-
-                      <div className="db3-role-main">
-
-                        <div className="db3-role-title">
-                          {job.title}
-                        </div>
-
-                        <div className="db3-role-meta">
-                          {job.location ||
-                            'All locations'}
-                        </div>
-
-                      </div>
-
-                      <div className="db3-role-count">
-                        {savedCount}{' '}
-                        {t.saved}
-                      </div>
-
-                      <div className="db3-status">
-                        <span className="db3-status-dot" />
-                        Active
-                      </div>
-
-                      <ChevronRight
-                        className="db3-row-arrow"
-                        size={12}
-                      />
-
-                    </div>
-                  );
-                })
-
-            )
-
-          )}
-
-
-          {/* ---------------------------------------------
-              SEARCH HISTORY
-          ---------------------------------------------- */}
-
-          {activityTab === 1 && (
-
-            recentSearches.length === 0 ? (
-
-              <div className="db3-empty">
-                {t.noSearches}
-              </div>
-
-            ) : (
-
-              recentSearches.map(
-                (search, index) => (
-
+                return (
                   <div
-                    className="db3-search-row"
-                    key={index}
+                    key={job.id}
+                    className="db3-role-row"
+                    style={
+                      isSelected
+                        ? {
+                          background:
+                            'var(--cyan-soft)',
+                        }
+                        : undefined
+                    }
+                    onClick={() =>
+                      handleSelectJob(
+                        job.id
+                      )
+                    }
                   >
 
-                    <div className="db3-search-icon">
-                      <Search size={11} />
-                    </div>
+                    <div className="db3-role-main">
 
-                    <div>
-                      <div className="db3-search-query">
-                        {search.query ||
-                          'Candidate search'}
+                      <div className="db3-role-title">
+                        {job.title}
                       </div>
 
-                      <div className="db3-search-meta">
-                        {search.date || 'Recent'}{' '}
-                        ·{' '}
-                        {search.resultsCount ||
-                          0}{' '}
-                        {t.results}
+                      <div className="db3-role-meta">
+                        {job.location ||
+                          'All locations'}
                       </div>
+
                     </div>
 
-                    <span className="db3-status">
-                      <Check size={10} />
-                      Done
-                    </span>
+                    <div className="db3-role-count">
+                      {savedCount}{' '}
+                      {t.saved}
+                    </div>
 
-                    <button
-                      className="db3-rerun"
-                      title={t.rerun}
-                      onClick={() =>
-                        onRerunSearch?.(
-                          search
-                        )
-                      }
-                    >
-                      <RotateCw size={11} />
-                    </button>
+                    <div className="db3-status">
+
+                      <span
+                        className="db3-status-dot"
+                        style={{
+                          background:
+                            isArchived
+                              ? '#9B9C9E'
+                              : undefined,
+                        }}
+                      />
+
+                      {isArchived
+                        ? 'Archived'
+                        : 'Active'}
+
+                    </div>
+
+                    <ChevronRight
+                      className="db3-row-arrow"
+                      size={12}
+                    />
 
                   </div>
-
-                )
-              )
-
-            )
+                );
+              })
 
           )}
 
         </section>
-
 
         {/* ================================================
             AI PERFORMANCE
@@ -2623,6 +2640,7 @@ export function DashboardView({
             </div>
 
             <div>
+
               <div className="db3-ai-title">
                 {t.agent}
               </div>
@@ -2630,39 +2648,7 @@ export function DashboardView({
               <div className="db3-ai-sub">
                 Automated sourcing performance
               </div>
-            </div>
 
-          </div>
-
-
-          <div className="db3-ai-metrics">
-
-            <div className="db3-ai-metric">
-              <strong>
-                {searchHistory.length || 0}
-              </strong>
-              {t.searches}
-            </div>
-
-            <div className="db3-ai-metric">
-              <strong>
-                {stats.avgScore}%
-              </strong>
-              {t.avgMatch}
-            </div>
-
-            <div className="db3-ai-metric">
-              <strong>
-                {stats.totalInPipeline}
-              </strong>
-              {t.inPipeline}
-            </div>
-
-            <div className="db3-ai-metric">
-              <strong>
-                {stats.totalCandidates}
-              </strong>
-              {t.profiles}
             </div>
 
           </div>

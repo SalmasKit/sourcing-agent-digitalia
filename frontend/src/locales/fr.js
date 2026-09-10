@@ -4,7 +4,6 @@ export const fr = {
   appSubtitle: 'Plateforme Autonome de Sourcing Technique',
   agentVersion: 'AGENT v1.0',
   sourcingHub: 'Sourcing',
-  shortlists: 'Projets',
   dashboard: 'Tableau de Bord',
   apiConnected: 'API Connectée',
   mockModeActive: 'Mode Démo Actif',
@@ -62,17 +61,6 @@ export const fr = {
   inShortlist: 'Enregistré au poste',
   addToShortlist: 'Enregistrer au poste',
   compare: 'Comparer',
-
-  // Shortlist Panel
-  shortlistTitle: 'Sélections & Vivier de Talents',
-  shortlistDesc: 'Consultez et exportez les candidats sélectionnés par votre équipe de recrutement.',
-  exportCsv: 'Exporter Rapport CSV',
-  noShortlistedYet: 'Aucun Candidat Sélectionné',
-  noShortlistedDesc: 'Cliquez sur "Sélectionner" sur n\'importe quel profil pour l\'ajouter au vivier.',
-  candidate: 'Candidat',
-  locationExp: 'Lieu & Exp.',
-  topSkills: 'Compétences Clés',
-  actions: 'Actions',
 
   // Directory
   talentProfiles: 'Profils de Talents Candidats',

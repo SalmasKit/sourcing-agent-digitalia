@@ -103,14 +103,14 @@ const COPY = {
 
 const LOG_LINES = {
   EN: [
-    '$ agent.scan(source="linkedin, github")',
+    '$ agent.scan(source="linkedin")',
     '\u2192 candidates indexed: 1,842',
     '\u2192 filtering: React \u00b7 TypeScript \u00b7 5+ yrs',
     '\u2713 shortlist ready \u2014 34 matches, avg fit 91%',
     '\u2192 routing to: Senior Frontend Engineer',
   ],
   FR: [
-    '$ agent.scan(source="linkedin, github")',
+    '$ agent.scan(source="linkedin")',
     '\u2192 candidats index\u00e9s : 1 842',
     '\u2192 filtrage : React \u00b7 TypeScript \u00b7 5+ ans',
     '\u2713 shortlist pr\u00eate \u2014 34 correspondances, fit 91%',
@@ -224,7 +224,7 @@ export default function AuthPage() {
     setError('');
     setLoading(true);
     const demoEmail = sandboxRole === 'RECRUITER' ? 'recruiter@digitalia.io' : 'hr@digitalia.io';
-    const demoName  = sandboxRole === 'RECRUITER' ? 'Recruiter User' : 'HR Admin';
+    const demoName = sandboxRole === 'RECRUITER' ? 'Recruiter User' : 'HR Admin';
     try {
       await login(demoEmail, 'SecurePassword123!');
     } catch {
