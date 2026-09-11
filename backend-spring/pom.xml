@@ -279,6 +279,9 @@
 						<exclude>sun.*</exclude>
 						<exclude>jdk/**</exclude>
 						<exclude>jdk.*</exclude>
+						<exclude>**/dto/**</exclude>
+						<exclude>**/model/**</exclude>
+						<exclude>**/config/**</exclude>
 					</excludes>
 				</configuration>
 				<executions>
