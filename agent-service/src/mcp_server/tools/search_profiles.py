@@ -521,7 +521,7 @@ async def _serpapi_search(criteria: dict, limit: int = 10) -> list[dict]:
                     async with httpx.AsyncClient(timeout=8.0) as redirect_client:
                         link = await _resolve_linkedin_url_via_redirect(redirect_client, result)
                 if not link:
-                    logger.warning(f"Skipping result with no resolvable LinkedIn URL")
+                    logger.warning("Skipping result with no resolvable LinkedIn URL")
                     continue
                 if link in seen_urls:
                     continue
@@ -643,12 +643,6 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
     title = result.get("title", "")
     snippet = result.get("snippet", "")
     url = result.get("link", "")
-
-    # Try to extract email from snippet
-    email = ""
-    email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", snippet)
-    if email_match:
-        email = email_match.group(0)
 
     # Extract rich snippet extensions — LinkedIn puts: [location, role, company, school, ...]
     extensions = []

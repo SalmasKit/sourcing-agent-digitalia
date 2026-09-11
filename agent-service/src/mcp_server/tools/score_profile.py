@@ -182,8 +182,6 @@ async def score_profile(
 ) -> dict:
     """Score a single candidate profile against job criteria."""
     logger.info(f"[score_profile] Scoring profile: {profile.get('full_name')}, skills: {profile.get('skills')}, experience_years: {profile.get('experience_years')}")
-    start_time = time.time()
-    status = "success"
 
     job_text = _build_job_context(criteria)
     profile_text = _build_profile_context(profile)

@@ -1,8 +1,9 @@
 """
 Tests for search_profiles.py — MCP Tool for searching candidate profiles via SerpAPI + Groq AI enrichment.
 """
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import AsyncMock, patch
 
 from src.mcp_server.tools.search_profiles import _parse_json_from_llm
 

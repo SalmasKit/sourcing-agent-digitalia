@@ -1,8 +1,9 @@
 """
 Unit tests for db_pool module.
 """
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.mcp_server.tools.db_pool import close_pool, get_connection, get_pool
 

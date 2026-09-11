@@ -4,13 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
-  const [isLogin, setIsLogin]           = useState(true);
-  const [email, setEmail]               = useState('');
-  const [password, setPassword]         = useState('');
-  const [name, setName]                 = useState('');
-  const [role, setRole]                 = useState('RECRUITER');
-  const [loading, setLoading]           = useState(false);
-  const [error, setError]               = useState('');
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('RECRUITER');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [isForgotOpen, setIsForgotOpen] = useState(false);
 
   const { login, register } = useAuth();
@@ -49,7 +49,7 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     <>
       <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden animate-fadeIn">
-          
+
           {/* Header */}
           <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -70,17 +70,15 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
           <div className="flex border-b border-slate-200 bg-slate-50">
             <button
               onClick={() => { setIsLogin(true); setError(''); }}
-              className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-all ${
-                isLogin ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-900'
-              }`}
+              className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-all ${isLogin ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-900'
+                }`}
             >
               Sign In
             </button>
             <button
               onClick={() => { setIsLogin(false); setError(''); }}
-              className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-all ${
-                !isLogin ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-900'
-              }`}
+              className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-all ${!isLogin ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-900'
+                }`}
             >
               Create Account
             </button>
@@ -88,7 +86,7 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
 
           {/* Form Body */}
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            
+
             {error && (
               <div className="p-3 bg-rose-50 text-rose-700 rounded-lg text-xs font-medium border border-rose-200">
                 {error}
@@ -106,7 +104,7 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Salma Barrak"
+                      placeholder=""
                       className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-600"
                     />
                   </div>

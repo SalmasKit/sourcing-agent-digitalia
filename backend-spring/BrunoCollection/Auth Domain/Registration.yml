@@ -15,7 +15,7 @@ http:
       {
         "email": "recruiter.salma@digitalia.com",
         "password": "Password123!",
-        "fullName": "Salma Barrak",
+        "fullName": "Salma ",
         "role": "RECRUITER"
       }
   auth: inherit

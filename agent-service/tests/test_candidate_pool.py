@@ -1,10 +1,10 @@
 """
 Tests for candidate_pool.py — Persistent semantic talent pool tool.
 """
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import numpy as np
+import pytest
 
 
 class TestFailOrWarnPgvector:
@@ -45,7 +45,6 @@ class TestStoreCandidateEmbedding:
         mock_conn = AsyncMock()
         
         # Create a proper async context manager mock
-        from unittest.mock import MagicMock
         mock_context_manager = MagicMock()
         mock_context_manager.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_context_manager.__aexit__ = AsyncMock(return_value=None)
@@ -68,7 +67,6 @@ class TestStoreCandidateEmbedding:
         mock_conn = AsyncMock()
         
         # Create a proper async context manager mock
-        from unittest.mock import MagicMock
         mock_context_manager = MagicMock()
         mock_context_manager.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_context_manager.__aexit__ = AsyncMock(return_value=None)
@@ -139,7 +137,6 @@ class TestRerankPool:
         ]
         
         # Create a proper async context manager mock
-        from unittest.mock import MagicMock
         mock_context_manager = MagicMock()
         mock_context_manager.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_context_manager.__aexit__ = AsyncMock(return_value=None)
@@ -167,7 +164,6 @@ class TestRerankPool:
         ]
         
         # Create a proper async context manager mock
-        from unittest.mock import MagicMock
         mock_context_manager = MagicMock()
         mock_context_manager.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_context_manager.__aexit__ = AsyncMock(return_value=None)
@@ -209,7 +205,6 @@ class TestRerankPool:
         ]
         
         # Create a proper async context manager mock
-        from unittest.mock import MagicMock
         mock_context_manager = MagicMock()
         mock_context_manager.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_context_manager.__aexit__ = AsyncMock(return_value=None)
@@ -225,6 +220,7 @@ class TestRerankPool:
                 
                 from src.mcp_server.tools.candidate_pool import rerank_pool
                 result = await rerank_pool("software engineer", limit=3)
+                assert result is not None
                 
                 # Verify limit was passed to query
                 assert mock_conn.fetch.called
@@ -244,7 +240,6 @@ class TestAssertPgvectorAvailable:
         mock_conn.fetchval.return_value = True
         
         # Create a proper async context manager mock
-        from unittest.mock import MagicMock
         mock_context_manager = MagicMock()
         mock_context_manager.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_context_manager.__aexit__ = AsyncMock(return_value=None)
@@ -265,7 +260,6 @@ class TestAssertPgvectorAvailable:
         mock_conn.execute.side_effect = Exception("Extension not found")
         
         # Create a proper async context manager mock
-        from unittest.mock import MagicMock
         mock_context_manager = MagicMock()
         mock_context_manager.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_context_manager.__aexit__ = AsyncMock(return_value=None)
@@ -288,7 +282,6 @@ class TestAssertPgvectorAvailable:
         mock_conn.execute.side_effect = Exception("Extension not found")
         
         # Create a proper async context manager mock
-        from unittest.mock import MagicMock
         mock_context_manager = MagicMock()
         mock_context_manager.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_context_manager.__aexit__ = AsyncMock(return_value=None)

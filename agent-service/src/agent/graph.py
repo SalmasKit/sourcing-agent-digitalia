@@ -1,48 +1,25 @@
 import asyncio
-
 import json
-
 import logging
-
 import re
-
 import time
-
 from typing import Any, cast
 
-
-
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
 from langchain_groq import ChatGroq
-
 from langgraph.graph import END, StateGraph
-
 from langgraph.graph.state import CompiledStateGraph
 
-
-
 from src.agent.groq_circuit_breaker import get_groq_circuit_breaker
-
 from src.agent.prompts import CRITERIA_EXTRACTION_SYSTEM, CRITERIA_EXTRACTION_USER
-
 from src.agent.state import SourcingState
-
 from src.config import get_settings
-
 from src.mcp_server.tools.candidate_pool import store_candidate_pool_batch
-
 from src.mcp_server.tools.dedup import filter_and_record_duplicates
-
 from src.mcp_server.tools.enrich_profile import enrich_candidate
-
 from src.mcp_server.tools.score_profile import score_profiles_batch
-
 from src.mcp_server.tools.search_profiles import _ai_enrich_profile, search_profiles
-
 from src.metrics import search_duration
-
-
 
 logger = logging.getLogger(__name__)
 
@@ -711,7 +688,7 @@ async def score_node(state: SourcingState) -> SourcingState:
 
             "scored_profiles": profiles,
 
-            "messages": state["messages"] + [AIMessage(content=f"Scoring skipped due to rate limit. Using baseline scores.")],
+            "messages": state["messages"] + [AIMessage(content="Scoring skipped due to rate limit. Using baseline scores.")],
 
         }
 

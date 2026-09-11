@@ -1,7 +1,6 @@
 """
 Unit tests for weighted skill scoring logic.
 """
-import pytest
 
 from src.mcp_server.tools.score_profile import _baseline_skill_check, _compute_skill_score
 
