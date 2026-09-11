@@ -1,6 +1,6 @@
 export const fr = {
   // Navbar
-  appTitle: 'DIGITALIA',
+  appTitle: 'TARGETALENT',
   appSubtitle: 'Plateforme Autonome de Sourcing Technique',
   agentVersion: 'AGENT v1.0',
   sourcingHub: 'Sourcing',

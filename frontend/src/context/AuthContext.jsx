@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { loginApi, registerApi, logoutApi, storage } from '../services/api';
+import { loginApi, registerApi, logoutApi, acceptInviteApi, storage } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -58,22 +58,70 @@ export const AuthProvider = ({ children }) => {
       storage.setSession(data.token, data.refreshToken ?? '', data.user);
       return true;
     }
-    // If backend returned user object without token, auto-login or set user
     if (data?.user) {
       return login(email, password);
     }
     return false;
   };
 
+  // ── Accept Invitation ────────────────────────────────────────────────────
+  const acceptInvitation = async (inviteToken, fullName, password) => {
+    const data = await acceptInviteApi(inviteToken, fullName, password);
+    if (data?.token && data?.user) {
+      setToken(data.token);
+      setUser(data.user);
+      storage.setSession(data.token, data.refreshToken ?? '', data.user);
+      return true;
+    }
+    return false;
+  };
+
+  // ── Has Privilege Helper ─────────────────────────────────────────────────
+  const hasPrivilege = useCallback((privilegeName) => {
+    if (!user) return false;
+    if (user.role === 'HR_ADMIN' || user.role === 'SUPER_ADMIN') return true;
+    if (!user.privileges) return false;
+    if (Array.isArray(user.privileges)) {
+      return user.privileges.includes(privilegeName);
+    }
+    if (typeof user.privileges === 'string') {
+      return user.privileges.split(',').map(s => s.trim()).includes(privilegeName);
+    }
+    return false;
+  }, [user]);
+
+  // ── Update Current User In-Memory & Storage ──────────────────────────────
+  const updateUser = useCallback((updatedUserData) => {
+    setUser(prev => {
+      const merged = { ...prev, ...updatedUserData };
+      const currentToken = storage.getAccessToken();
+      const currentRefresh = storage.getRefreshToken() || '';
+      if (currentToken) {
+        storage.setSession(currentToken, currentRefresh, merged);
+      }
+      return merged;
+    });
+  }, []);
+
   // ── Logout — invalidates token server-side ───────────────────────────────
   const logout = async () => {
-    await logoutApi(); // calls POST /auth/logout + clears localStorage
+    await logoutApi();
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      loading,
+      login,
+      register,
+      acceptInvitation,
+      hasPrivilege,
+      updateUser,
+      logout
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -86,4 +134,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

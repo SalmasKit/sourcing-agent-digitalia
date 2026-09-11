@@ -11,7 +11,7 @@ from src.mcp_server.tools.score_profile import score_profile
 from src.mcp_server.tools.search_profiles import search_profiles
 
 logger = logging.getLogger(__name__)
-mcp = FastMCP("Digitalia Sourcing Agent MCP")
+mcp = FastMCP("Targetalent Sourcing Agent MCP")
 
 
 @mcp.tool()

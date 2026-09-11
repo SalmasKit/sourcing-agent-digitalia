@@ -1,5 +1,5 @@
 """
-security.py — JWT verification dependency for the Digitalia agent-service.
+security.py — JWT verification dependency for the Targetalent agent-service.
 
 Spring Boot signs access tokens with HS256 using the value of the JWT_SECRET
 environment variable. JJWT decodes the secret with Decoders.BASE64.decode()

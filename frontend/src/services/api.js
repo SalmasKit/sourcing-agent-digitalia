@@ -193,12 +193,18 @@ export const loginApi = async (email, password) => {
     // data.data = { accessToken, refreshToken, expiresIn, tokenType, user }
     const payload = data.data;
     const rawUser = payload?.user || {};
+    const defaultPrivileges = rawUser.role === 'HR_ADMIN'
+      ? ['create_roles', 'shortlist_candidates', 'manage_notes', 'source_candidates', 'export_data']
+      : (typeof rawUser.privileges === 'string' ? rawUser.privileges.split(',').map(s => s.trim()) : (rawUser.privileges || ['create_roles', 'shortlist_candidates', 'manage_notes', 'source_candidates', 'export_data']));
+
     const normalizedUser = {
       id: rawUser.id || 'usr-' + Date.now(),
       email: rawUser.email || email,
       name: rawUser.fullName || rawUser.name || email.split('@')[0],
       fullName: rawUser.fullName || rawUser.name || email.split('@')[0],
       role: rawUser.role || 'RECRUITER',
+      teamId: rawUser.teamId || 'digitalia_workspace',
+      privileges: defaultPrivileges,
     };
     if (payload?.accessToken) {
       storage.setSession(payload.accessToken, payload.refreshToken || '', normalizedUser);
@@ -210,17 +216,25 @@ export const loginApi = async (email, password) => {
     };
   } catch (error) {
     if (DEMO_MODE && email && password) {
-      // Demo-mode only: create a local session when the backend is unreachable.
-      // This code path is disabled in production (VITE_DEMO_MODE != 'true').
       console.warn('[DEMO_MODE] Backend login unavailable, falling back to local session:', error.message);
       const mockToken = 'mock_token_' + Date.now();
-      const detectedRole = email.toLowerCase().includes('admin') ? 'HR_ADMIN' : 'RECRUITER';
+      const detectedRole = (email.toLowerCase().includes('admin') || email.toLowerCase().includes('hr')) ? 'HR_ADMIN' : 'RECRUITER';
+      
+      // Look up if this user exists in mock team storage to keep privileges
+      const mockTeam = JSON.parse(localStorage.getItem('digitalia_mock_team_members') || '[]');
+      const existingMember = mockTeam.find(m => m.email.toLowerCase() === email.toLowerCase());
+      const role = existingMember?.role || detectedRole;
+      
       const mockUser = {
-        id: 'usr-' + Date.now(),
+        id: existingMember?.id || ('usr-' + Date.now()),
         email: email,
-        name: email.split('@')[0].replace('.', ' ').replace(/(^\w|\s\w)/g, m => m.toUpperCase()),
-        fullName: email.split('@')[0].replace('.', ' ').replace(/(^\w|\s\w)/g, m => m.toUpperCase()),
-        role: detectedRole,
+        name: existingMember?.fullName || email.split('@')[0].replace('.', ' ').replace(/(^\w|\s\w)/g, m => m.toUpperCase()),
+        fullName: existingMember?.fullName || email.split('@')[0].replace('.', ' ').replace(/(^\w|\s\w)/g, m => m.toUpperCase()),
+        role: role,
+        teamId: 'digitalia_workspace',
+        privileges: role === 'HR_ADMIN'
+          ? ['create_roles', 'shortlist_candidates', 'manage_notes', 'source_candidates', 'export_data']
+          : (existingMember?.privileges || ['create_roles', 'shortlist_candidates', 'manage_notes', 'source_candidates', 'export_data']),
       };
       storage.setSession(mockToken, 'mock_refresh', mockUser);
       return { token: mockToken, refreshToken: 'mock_refresh', user: mockUser };
@@ -235,6 +249,7 @@ export const registerApi = async (name, email, password, role = 'RECRUITER') => 
       fullName: name,
       email,
       password,
+      role,
     });
     const rawUser = data.data || {};
     const normalizedUser = {
@@ -563,4 +578,258 @@ export const draftOutreachApi = async (candidate, jobContext = {}, channel = 'li
   return response.data;
 };
 
+// ─────────────────────────────────────────────
+// Password & Invitation APIs
+// ─────────────────────────────────────────────
+
+export const changePasswordApi = async (currentPassword, newPassword) => {
+  try {
+    const { data } = await apiClient.post('/auth/change-password', {
+      currentPassword,
+      newPassword,
+    });
+    return data;
+  } catch (error) {
+    if (DEMO_MODE) {
+      console.log('[DEMO_MODE] Simulated password change successful');
+      return { success: true, message: 'Password updated' };
+    }
+    throw error;
+  }
+};
+
+export const forgotPasswordApi = async (email) => {
+  try {
+    const { data } = await apiClient.post('/auth/forgot-password', { email });
+    return data.data || data;
+  } catch (error) {
+    if (DEMO_MODE) {
+      const mockToken = 'mock_reset_' + Date.now();
+      console.log('[DEMO_MODE] Simulated password reset token:', mockToken);
+      return { message: 'Reset instructions generated', resetToken: mockToken };
+    }
+    throw error;
+  }
+};
+
+export const resetPasswordApi = async (token, newPassword) => {
+  try {
+    const { data } = await apiClient.post('/auth/reset-password', {
+      token,
+      newPassword,
+    });
+    return data;
+  } catch (error) {
+    if (DEMO_MODE) {
+      console.log('[DEMO_MODE] Simulated password reset completed with token:', token);
+      return { success: true, message: 'Password has been reset' };
+    }
+    throw error;
+  }
+};
+
+export const acceptInviteApi = async (token, fullName, password) => {
+  try {
+    const { data } = await apiClient.post('/auth/accept-invite', {
+      token,
+      fullName,
+      password,
+    });
+    const payload = data.data;
+    const rawUser = payload?.user || {};
+    const normalizedUser = {
+      id: rawUser.id || 'usr-' + Date.now(),
+      email: rawUser.email,
+      name: rawUser.fullName || fullName,
+      fullName: rawUser.fullName || fullName,
+      role: rawUser.role || 'RECRUITER',
+      teamId: rawUser.teamId || 'digitalia_workspace',
+      privileges: rawUser.privileges ? (typeof rawUser.privileges === 'string' ? rawUser.privileges.split(',') : rawUser.privileges) : ['shortlist_candidates', 'manage_notes', 'source_candidates'],
+    };
+    if (payload?.accessToken) {
+      storage.setSession(payload.accessToken, payload.refreshToken || '', normalizedUser);
+    }
+    return {
+      token: payload?.accessToken,
+      refreshToken: payload?.refreshToken,
+      user: normalizedUser,
+    };
+  } catch (error) {
+    if (DEMO_MODE) {
+      const mockToken = 'mock_token_' + Date.now();
+      const mockUser = {
+        id: 'usr-' + Date.now(),
+        email: 'recruiter_' + Date.now() + '@digitalia.io',
+        name: fullName,
+        fullName: fullName,
+        role: 'RECRUITER',
+        teamId: 'digitalia_workspace',
+        privileges: ['shortlist_candidates', 'manage_notes', 'source_candidates'],
+      };
+      storage.setSession(mockToken, 'mock_refresh', mockUser);
+      return { token: mockToken, refreshToken: 'mock_refresh', user: mockUser };
+    }
+    throw error;
+  }
+};
+
+// ─────────────────────────────────────────────
+// Team Management APIs (HR Admin)
+// ─────────────────────────────────────────────
+
+const DEFAULT_TEAM_MEMBERS = [];
+
+export const getTeamMembersApi = async () => {
+  try {
+    const { data } = await apiClient.get('/team/members');
+    return data.data || [];
+  } catch (error) {
+    const saved = localStorage.getItem('digitalia_mock_team_members');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [];
+  }
+};
+
+export const getPendingInvitationsApi = async () => {
+  try {
+    const { data } = await apiClient.get('/team/invitations');
+    return data.data || [];
+  } catch (error) {
+    const saved = localStorage.getItem('digitalia_mock_invitations');
+    return saved ? JSON.parse(saved) : [];
+  }
+};
+
+export const inviteRecruiterApi = async (email, fullName = '', privileges = ['shortlist_candidates', 'manage_notes', 'source_candidates'], role = 'RECRUITER') => {
+  try {
+    const { data } = await apiClient.post('/team/invite', {
+      email,
+      fullName,
+      role,
+      privileges,
+    });
+    return data.data;
+  } catch (error) {
+    // Mock invitation creation
+    const rawToken = 'inv_' + Math.random().toString(36).substring(2, 10);
+    const newInvitation = {
+      id: 'inv-' + Date.now(),
+      email,
+      fullName,
+      teamId: 'digitalia_workspace',
+      role: role || 'RECRUITER',
+      privileges,
+      token: rawToken,
+      status: 'PENDING',
+      expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    const saved = JSON.parse(localStorage.getItem('digitalia_mock_invitations') || '[]');
+    saved.unshift(newInvitation);
+    localStorage.setItem('digitalia_mock_invitations', JSON.stringify(saved));
+    return newInvitation;
+  }
+};
+
+export const cancelInvitationApi = async (invitationId) => {
+  try {
+    await apiClient.delete(`/team/invitations/${invitationId}`);
+    return true;
+  } catch (error) {
+    const saved = JSON.parse(localStorage.getItem('digitalia_mock_invitations') || '[]');
+    const updated = saved.filter(inv => inv.id !== invitationId);
+    localStorage.setItem('digitalia_mock_invitations', JSON.stringify(updated));
+    return true;
+  }
+};
+
+export const updateMemberPrivilegesApi = async (memberId, privileges) => {
+  try {
+    const { data } = await apiClient.put(`/team/members/${memberId}/privileges`, { privileges });
+    return data.data;
+  } catch (error) {
+    const saved = JSON.parse(localStorage.getItem('digitalia_mock_team_members') || JSON.stringify(DEFAULT_TEAM_MEMBERS));
+    const updated = saved.map(m => m.id === memberId ? { ...m, privileges } : m);
+    localStorage.setItem('digitalia_mock_team_members', JSON.stringify(updated));
+    return updated.find(m => m.id === memberId);
+  }
+};
+
+export const toggleMemberStatusApi = async (memberId) => {
+  try {
+    await apiClient.put(`/team/members/${memberId}/toggle-status`);
+    return true;
+  } catch (error) {
+    const saved = JSON.parse(localStorage.getItem('digitalia_mock_team_members') || JSON.stringify(DEFAULT_TEAM_MEMBERS));
+    const updated = saved.map(m => m.id === memberId ? { ...m, enabled: !m.enabled } : m);
+    localStorage.setItem('digitalia_mock_team_members', JSON.stringify(updated));
+    return true;
+  }
+};
+
+export const removeTeamMemberApi = async (memberId) => {
+  try {
+    await apiClient.delete(`/team/members/${memberId}`);
+    return true;
+  } catch (error) {
+    const saved = JSON.parse(localStorage.getItem('digitalia_mock_team_members') || JSON.stringify(DEFAULT_TEAM_MEMBERS));
+    const updated = saved.filter(m => m.id !== memberId);
+    localStorage.setItem('digitalia_mock_team_members', JSON.stringify(updated));
+    return true;
+  }
+};
+
+// ─────────────────────────────────────────────
+// Team Activity & Audit Logging APIs
+// ─────────────────────────────────────────────
+
+const DEFAULT_ACTIVITIES = [];
+
+export const getTeamActivitiesApi = async (limit = 30) => {
+  try {
+    const { data } = await apiClient.get(`/team/activities?limit=${limit}`);
+    return data.data || [];
+  } catch (error) {
+    const saved = localStorage.getItem('digitalia_shared_team_activities');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [];
+  }
+};
+
+export const logActivityApi = async (actionType, targetTitle, details = '', targetId = '') => {
+  try {
+    const { data } = await apiClient.post('/team/activities', {
+      actionType,
+      targetId,
+      targetTitle,
+      details,
+    });
+    return data.data;
+  } catch (error) {
+    // Fallback locally
+    const user = storage.getUser() || { fullName: 'Team Member', email: 'user@digitalia.io', role: 'RECRUITER' };
+    const newAct = {
+      id: 'act-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      teamId: 'digitalia_workspace',
+      actorName: user.fullName || user.name || 'Team Member',
+      actorEmail: user.email || 'user@digitalia.io',
+      actorRole: user.role || 'RECRUITER',
+      actionType,
+      targetId,
+      targetTitle,
+      details,
+      createdAt: new Date().toISOString(),
+    };
+    const current = JSON.parse(localStorage.getItem('digitalia_shared_team_activities') || JSON.stringify(DEFAULT_ACTIVITIES));
+    current.unshift(newAct);
+    localStorage.setItem('digitalia_shared_team_activities', JSON.stringify(current.slice(0, 100)));
+    return newAct;
+  }
+};
+
 export default apiClient;
+

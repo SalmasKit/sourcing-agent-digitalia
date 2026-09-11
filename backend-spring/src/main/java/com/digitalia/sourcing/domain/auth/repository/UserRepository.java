@@ -11,4 +11,7 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
+    java.util.List<User> findByTeamId(String teamId);
+    Optional<User> findByPasswordResetToken(String token);
+    long countByTeamId(String teamId);
 }

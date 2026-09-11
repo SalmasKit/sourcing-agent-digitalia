@@ -1,5 +1,6 @@
 package com.digitalia.sourcing.domain.auth.dto;
 
+import com.digitalia.sourcing.domain.auth.model.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -19,6 +20,11 @@ public record RegisterRequest(
     String password,
 
     @NotBlank(message = "Full name is required")
-    String fullName
-) {}
+    String fullName,
 
+    Role role
+) {
+    public RegisterRequest(String email, String password, String fullName) {
+        this(email, password, fullName, Role.RECRUITER);
+    }
+}

@@ -1,4 +1,4 @@
-# Digitalia Sourcing Agent — Python Service
+# Targetalent Sourcing Agent — Python Service
 
 Microservice d'IA de Sourcing basé sur **LangGraph**, **Groq (Llama 3.3 70B)**, **FastMCP** et **FastAPI**.
 

@@ -48,6 +48,7 @@ import {
   Check,
   X,
 } from 'lucide-react';
+import ActivityLogPanel from './ActivityLogPanel';
 
 function useLanguage() {
   return { lang: 'EN' };
@@ -318,6 +319,7 @@ export function DashboardView({
   candidatePipelineStage = {},
 
   lang: langProp = null,
+  activities = [],
 
   onStageClick = null,
   onSelectJob = null,
@@ -2626,6 +2628,13 @@ export function DashboardView({
           )}
 
         </section>
+
+        {/* ================================================
+            TEAM ACTIVITY & AUDIT LOG FEED
+        ================================================= */}
+        <div style={{ gridColumn: '1 / -1', marginTop: 12 }}>
+          <ActivityLogPanel activities={activities} />
+        </div>
 
         {/* ================================================
             AI PERFORMANCE

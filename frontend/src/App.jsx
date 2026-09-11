@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import { ConfirmDialogProvider, useConfirm } from './context/ConfirmDialogContext';
 import { Navbar } from './components/Navbar';
 import SearchConsole from './components/SearchConsole';
 import AgentStatusWidget from './components/AgentStatusWidget';
@@ -13,82 +14,86 @@ import { DashboardView } from './components/DashboardView';
 import { RecruiterNotesView } from './components/RecruiterNotesView';
 import { CandidateComparator } from './components/CandidateComparator';
 import SourcingHubView from './components/SourcingHubView';
+import TeamManagementView from './components/TeamManagementView';
 import { AuthModal } from './components/AuthModal';
 import AuthPage from './components/AuthPage';
-import { searchCandidatesApi, getInitialCandidates } from './services/api';
+import { searchCandidatesApi, getInitialCandidates, getTeamActivitiesApi, logActivityApi } from './services/api';
 import { getAvatarUrl } from './utils/avatar';
 import { Sparkles } from 'lucide-react';
 
-// Synchronously clear old localStorage mock keys before any state initialization
-if (typeof window !== 'undefined' && !localStorage.getItem('digitalia_tables_cleared_v4')) {
-  localStorage.removeItem('digitalia_job_descriptions');
-  localStorage.removeItem('digitalia_saved_role_candidates');
-  localStorage.removeItem('digitalia_job_results');
-  localStorage.removeItem('digitalia_shortlist');
-  localStorage.removeItem('digitalia_pipeline_stages');
-  localStorage.removeItem('digitalia_search_history');
-  localStorage.setItem('digitalia_tables_cleared_v4', 'true');
-}
-
-function getEmptyUserState() {
+function getEmptyWorkspaceState() {
   return {
     jobDescriptions: [],
     savedRoleCandidates: {},
     candidatePipelineStage: {},
     searchHistory: [],
-    jobResultsCache: {}
+    jobResultsCache: {},
+    shortlist: []
+  };
+}
+
+function loadInitialWorkspaceData(teamKey, userKey) {
+  // Try team key first, fallback to user key migration if available
+  const getVal = (suffix) => {
+    const teamVal = localStorage.getItem(`targetalent_team_${teamKey}_${suffix}`) || localStorage.getItem(`digitalia_team_${teamKey}_${suffix}`);
+    if (teamVal) {
+      try { return JSON.parse(teamVal); } catch (e) { }
+    }
+    const userVal = localStorage.getItem(`targetalent_user_${userKey}_${suffix}`) || localStorage.getItem(`digitalia_user_${userKey}_${suffix}`);
+    if (userVal) {
+      try { return JSON.parse(userVal); } catch (e) { }
+    }
+    return null;
+  };
+
+  return {
+    jobDescriptions: getVal('job_descriptions') || [],
+    savedRoleCandidates: getVal('saved_role_candidates') || {},
+    jobResultsCache: getVal('job_results') || {},
+    shortlist: getVal('shortlist') || [],
+    candidatePipelineStage: getVal('pipeline_stages') || {},
+    searchHistory: getVal('search_history') || [],
   };
 }
 
 function DashboardContent() {
   const { t, lang } = useLanguage();
-  const { user } = useAuth();
+  const { user, hasPrivilege } = useAuth();
+  const teamKey = user?.teamId || 'targetalent_workspace';
   const userKey = user?.email ? user.email.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'guest';
 
   const [activeTab, setActiveTab] = useState(() => {
-    const saved = localStorage.getItem(`digitalia_user_${userKey}_active_tab`);
+    const saved = localStorage.getItem(`digitalia_team_${teamKey}_active_tab`);
     return saved || 'dashboard';
   });
 
   useEffect(() => {
-    localStorage.setItem(`digitalia_user_${userKey}_active_tab`, activeTab);
-  }, [activeTab, userKey]);
+    localStorage.setItem(`digitalia_team_${teamKey}_active_tab`, activeTab);
+  }, [activeTab, teamKey]);
 
-  // Per-user job result cache: { [jobId]: [candidate, ...] }
+  // Shared Team Workspace Datasets
   const [jobResultsCache, setJobResultsCache] = useState(() => {
-    const saved = localStorage.getItem(`digitalia_user_${userKey}_job_results`);
-    if (saved) { try { return JSON.parse(saved); } catch (e) { } }
-    return getEmptyUserState().jobResultsCache;
+    return loadInitialWorkspaceData(teamKey, userKey).jobResultsCache;
   });
 
   const [jobDescriptions, setJobDescriptions] = useState(() => {
-    const saved = localStorage.getItem(`digitalia_user_${userKey}_job_descriptions`);
-    if (saved) { try { return JSON.parse(saved); } catch (e) { } }
-    return getEmptyUserState().jobDescriptions;
+    return loadInitialWorkspaceData(teamKey, userKey).jobDescriptions;
   });
 
   const [savedRoleCandidates, setSavedRoleCandidates] = useState(() => {
-    const saved = localStorage.getItem(`digitalia_user_${userKey}_saved_role_candidates`);
-    if (saved) { try { return JSON.parse(saved); } catch (e) { } }
-    return getEmptyUserState().savedRoleCandidates;
+    return loadInitialWorkspaceData(teamKey, userKey).savedRoleCandidates;
   });
 
   const [shortlist, setShortlist] = useState(() => {
-    const saved = localStorage.getItem(`digitalia_user_${userKey}_shortlist`);
-    if (saved) { try { return JSON.parse(saved); } catch (e) { } }
-    return [];
+    return loadInitialWorkspaceData(teamKey, userKey).shortlist;
   });
 
   const [candidatePipelineStage, setCandidatePipelineStage] = useState(() => {
-    const saved = localStorage.getItem(`digitalia_user_${userKey}_pipeline_stages`);
-    if (saved) { try { return JSON.parse(saved); } catch (e) { } }
-    return getEmptyUserState().candidatePipelineStage;
+    return loadInitialWorkspaceData(teamKey, userKey).candidatePipelineStage;
   });
 
   const [searchHistory, setSearchHistory] = useState(() => {
-    const saved = localStorage.getItem(`digitalia_user_${userKey}_search_history`);
-    if (saved) { try { return JSON.parse(saved); } catch (e) { } }
-    return getEmptyUserState().searchHistory;
+    return loadInitialWorkspaceData(teamKey, userKey).searchHistory;
   });
 
   const [candidates, setCandidates] = useState(() => {
@@ -96,237 +101,163 @@ function DashboardContent() {
     return (defaultJobId && jobResultsCache[defaultJobId]) || [];
   });
 
-  // Re-sync states whenever user switches accounts
+  const [teamActivities, setTeamActivities] = useState([]);
+
+  // Load team activity logs
   useEffect(() => {
-    const seed = getEmptyUserState();
+    getTeamActivitiesApi(50).then(data => {
+      if (Array.isArray(data)) setTeamActivities(data);
+    });
+  }, [teamKey]);
 
-    const savedJds = localStorage.getItem(`digitalia_user_${userKey}_job_descriptions`);
-    const jds = savedJds ? JSON.parse(savedJds) : seed.jobDescriptions;
-    setJobDescriptions(jds);
+  // Synchronize when switching workspace / accounts
+  useEffect(() => {
+    const data = loadInitialWorkspaceData(teamKey, userKey);
+    setJobDescriptions(data.jobDescriptions);
+    setSavedRoleCandidates(data.savedRoleCandidates);
+    setJobResultsCache(data.jobResultsCache);
+    setShortlist(data.shortlist);
+    setCandidatePipelineStage(data.candidatePipelineStage);
+    setSearchHistory(data.searchHistory);
 
-    const savedSavedRole = localStorage.getItem(`digitalia_user_${userKey}_saved_role_candidates`);
-    setSavedRoleCandidates(savedSavedRole ? JSON.parse(savedSavedRole) : seed.savedRoleCandidates);
-
-    const savedCache = localStorage.getItem(`digitalia_user_${userKey}_job_results`);
-    const cache = savedCache ? JSON.parse(savedCache) : seed.jobResultsCache;
-    setJobResultsCache(cache);
-
-    const savedStages = localStorage.getItem(`digitalia_user_${userKey}_pipeline_stages`);
-    setCandidatePipelineStage(savedStages ? JSON.parse(savedStages) : seed.candidatePipelineStage);
-
-    const savedHistory = localStorage.getItem(`digitalia_user_${userKey}_search_history`);
-    setSearchHistory(savedHistory ? JSON.parse(savedHistory) : seed.searchHistory);
-
-    const defaultJobId = jds[0]?.id;
-    setCandidates((defaultJobId && cache[defaultJobId]) || []);
+    const defaultJobId = data.jobDescriptions[0]?.id;
+    setCandidates((defaultJobId && data.jobResultsCache[defaultJobId]) || []);
     setSelectedJobId(defaultJobId || null);
-  }, [userKey]);
+  }, [teamKey]);
 
-  // Persist user-specific datasets to localStorage on change
+  // Persist shared team datasets to localStorage on change
   useEffect(() => {
-    localStorage.setItem(`digitalia_user_${userKey}_job_descriptions`, JSON.stringify(jobDescriptions));
-  }, [jobDescriptions, userKey]);
-
-  useEffect(() => {
-    localStorage.setItem(`digitalia_user_${userKey}_saved_role_candidates`, JSON.stringify(savedRoleCandidates));
-  }, [savedRoleCandidates, userKey]);
+    localStorage.setItem(`targetalent_team_${teamKey}_job_descriptions`, JSON.stringify(jobDescriptions));
+  }, [jobDescriptions, teamKey]);
 
   useEffect(() => {
-    localStorage.setItem(`digitalia_user_${userKey}_job_results`, JSON.stringify(jobResultsCache));
-  }, [jobResultsCache, userKey]);
+    localStorage.setItem(`targetalent_team_${teamKey}_saved_role_candidates`, JSON.stringify(savedRoleCandidates));
+  }, [savedRoleCandidates, teamKey]);
 
   useEffect(() => {
-    localStorage.setItem(`digitalia_user_${userKey}_pipeline_stages`, JSON.stringify(candidatePipelineStage));
-  }, [candidatePipelineStage, userKey]);
+    localStorage.setItem(`targetalent_team_${teamKey}_job_results`, JSON.stringify(jobResultsCache));
+  }, [jobResultsCache, teamKey]);
 
   useEffect(() => {
-    localStorage.setItem(`digitalia_user_${userKey}_search_history`, JSON.stringify(searchHistory));
-  }, [searchHistory, userKey]);
+    localStorage.setItem(`targetalent_team_${teamKey}_shortlist`, JSON.stringify(shortlist));
+  }, [shortlist, teamKey]);
 
-  const handleUpdateCandidateStage = (candidateId, newStage) => {
-    setCandidatePipelineStage(prev => ({
-      ...prev,
-      [candidateId]: newStage
-    }));
-    const stageNames = {
-      new: lang === 'FR' ? 'Nouveau' : 'New',
-      contacted: lang === 'FR' ? 'Contacté' : 'Contacted',
-      interview: lang === 'FR' ? 'Entretien' : 'Interview',
-      offer: lang === 'FR' ? 'Offre Proposée' : 'Offer Extended',
-      hired: lang === 'FR' ? 'Recruté' : 'Hired',
-      rejected: lang === 'FR' ? 'Refusé' : 'Rejected'
-    };
-    triggerToast(lang === 'FR'
-      ? `Candidat déplacé vers "${stageNames[newStage]}"`
-      : `Candidate moved to "${stageNames[newStage]}"`
-    );
-  };
+  useEffect(() => {
+    localStorage.setItem(`targetalent_team_${teamKey}_pipeline_stages`, JSON.stringify(candidatePipelineStage));
+  }, [candidatePipelineStage, teamKey]);
 
-  // Comparator state
-  const [isComparatorOpen, setIsComparatorOpen] = useState(false);
+  useEffect(() => {
+    localStorage.setItem(`targetalent_team_${teamKey}_search_history`, JSON.stringify(searchHistory));
+  }, [searchHistory, teamKey]);
 
-  // Track last search so the refresh button can re-run it
-  const [lastSearch, setLastSearch] = useState(null);
-  const [searchMode, setSearchMode] = useState('ai'); // 'ai' | 'pool'
-
-  // Incremented on every new result set — forces grid children to remount
-  // so cardEntrance animations replay on each search.
-  const [candidatesKey, setCandidatesKey] = useState(0);
-
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
-  const [selectedCardRect, setSelectedCardRect] = useState(null);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-
-  const handleViewDetails = (candidate, event) => {
-    setSelectedCandidate(candidate);
-    if (event?.currentTarget) {
-      const rect = event.currentTarget.getBoundingClientRect();
-      setSelectedCardRect({
-        left: rect.left,
-        width: rect.width,
-      });
-    } else {
-      setSelectedCardRect(null);
+  // Audit Logging Helper
+  const recordActivity = async (actionType, targetTitle, details = '', targetId = '') => {
+    try {
+      const newEntry = await logActivityApi(actionType, targetTitle, details, targetId);
+      if (newEntry) {
+        setTeamActivities(prev => [newEntry, ...prev.filter(a => a.id !== newEntry.id)].slice(0, 50));
+      }
+    } catch (e) {
+      console.warn('Could not record activity:', e);
     }
   };
-  const [toastMessage, setToastMessage] = useState(null);
-  const [isBackendOnline, setIsBackendOnline] = useState(true);
 
-  const [isSearching, setIsSearching] = useState(false);
-  const [agentStep, setAgentStep] = useState(1);
+  const [selectedJobId, setSelectedJobId] = useState(() => jobDescriptions[0]?.id || null);
 
-  // HR Edit/Add states
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editingCandidate, setEditingCandidate] = useState(null);
-
-  // Job Descriptions / Profession profiles
-  const [isJobModalOpen, setIsJobModalOpen] = useState(false);
-  const [editingJob, setEditingJob] = useState(null);
-  const [selectedJobId, setSelectedJobId] = useState(null);
-
-  // Gather ALL known candidate objects across current search state, shortlist, and per-job caches
+  // Derive all unique known candidates across cache and shortlist
   const allKnownCandidates = useMemo(() => {
     const map = new Map();
-    candidates.forEach(c => map.set(c.id, c));
-    shortlist.forEach(c => map.set(c.id, c));
-    Object.values(jobResultsCache).forEach(list => {
-      if (Array.isArray(list)) list.forEach(c => map.set(c.id, c));
-    });
+    candidates.forEach(c => { if (c?.id) map.set(c.id, c); });
+    Object.values(jobResultsCache).flat().forEach(c => { if (c?.id) map.set(c.id, c); });
+    shortlist.forEach(c => { if (c?.id) map.set(c.id, c); });
     return Array.from(map.values());
-  }, [candidates, shortlist, jobResultsCache]);
+  }, [candidates, jobResultsCache, shortlist]);
 
-  // Compute ONLY saved/shortlisted candidates for the Kanban pipeline
+  // Extract candidates that are in the pipeline for the Kanban view
   const pipelineCandidates = useMemo(() => {
-    if (!jobDescriptions || jobDescriptions.length === 0) {
-      return [];
-    }
+    const savedIds = new Set(Object.values(savedRoleCandidates).flat().filter(Boolean));
+    const list = allKnownCandidates.filter(c => savedIds.has(c.id));
+    return list;
+  }, [allKnownCandidates, savedRoleCandidates]);
 
-    const activeJobIds = new Set(jobDescriptions.map(j => j.id));
+  // Sourcing & Agent state
+  const [isSearching, setIsSearching] = useState(false);
+  const [agentStep, setAgentStep] = useState(0);
+  const [lastSearch, setLastSearch] = useState(null);
+  const [candidatesKey, setCandidatesKey] = useState(0);
+  const [searchMode, setSearchMode] = useState('live');
 
-    // Get candidate IDs saved under existing active jobs
-    const activeSavedIds = new Set();
-    Object.entries(savedRoleCandidates).forEach(([jId, candIds]) => {
-      if (activeJobIds.has(jId) && Array.isArray(candIds)) {
-        candIds.forEach(id => activeSavedIds.add(id));
-      }
-    });
+  // Candidate inspection & editing state
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [selectedCardRect, setSelectedCardRect] = useState(null);
+  const [editingCandidate, setEditingCandidate] = useState(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
-    shortlist.forEach(c => activeSavedIds.add(c.id));
+  // Job Description creation / editing state
+  const [isJobModalOpen, setIsJobModalOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState(null);
 
-    return allKnownCandidates.filter(c => activeSavedIds.has(c.id));
-  }, [allKnownCandidates, shortlist, savedRoleCandidates, jobDescriptions]);
+  // Comparator & Auth modals
+  const [isComparatorOpen, setIsComparatorOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
-
+  const { confirm, showAlert } = useConfirm();
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleSearch = async (query, filters, targetJobId) => {
+  const handleSearch = async (query, filters = {}) => {
+    if (!hasPrivilege('source_candidates')) {
+      triggerToast(lang === 'FR' ? 'Privilège requis : Recherche et Sourcing IA.' : 'Action restricted: Requires Sourcing & Search privilege.');
+      return;
+    }
+
     setIsSearching(true);
-    if (filters?.searchMode) {
-      setSearchMode(filters.searchMode);
-    }
-    // Save last search so the refresh button can re-run it
-    setLastSearch({ query, filters, targetJobId });
-    const activeJobId = targetJobId || selectedJobId || (jobDescriptions[0] ? jobDescriptions[0].id : 'general-search');
-    if (activeJobId && activeJobId !== selectedJobId) {
-      setSelectedJobId(activeJobId);
-    }
     setAgentStep(1);
 
-    // Simulate real-time agent pipeline progression
-    const t1 = setTimeout(() => setAgentStep(2), 300);
-    const t2 = setTimeout(() => setAgentStep(3), 600);
-    const t3 = setTimeout(() => setAgentStep(4), 900);
+    const stepTimer = setInterval(() => {
+      setAgentStep(prev => (prev < 4 ? prev + 1 : prev));
+    }, 450);
 
     try {
-      const results = await searchCandidatesApi(query, filters);
+      const results = await searchCandidatesApi(query, { ...filters, searchMode });
+      clearInterval(stepTimer);
+      setAgentStep(4);
       setCandidates(results);
-      setCandidatesKey(k => k + 1); // triggers stagger re-animation
+      setCandidatesKey(prev => prev + 1);
 
-      // Save results under this job's cache entry — keep pool results separate from sourced results
-      if (activeJobId) {
-        if (filters?.searchMode === 'pool') {
-          setJobResultsCache(prev => ({ ...prev, [`${activeJobId}:pool`]: results }));
-        } else {
-          setJobResultsCache(prev => ({ ...prev, [activeJobId]: results }));
-        }
+      // Cache results under selected job if active
+      if (selectedJobId) {
+        setJobResultsCache(prev => ({
+          ...prev,
+          [selectedJobId]: results
+        }));
       }
 
-      const activeJob = jobDescriptions.find(j => j.id === activeJobId);
-      const jobLabel = activeJob ? activeJob.title : (query || 'General Search');
+      setLastSearch({
+        query,
+        filters,
+        count: results.length,
+        timestamp: new Date().toLocaleTimeString(),
+      });
 
-      // Record to search history with more details for rerun
-      const now = new Date();
-      const timeStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      const modeLabel = filters?.searchMode === 'pool' ? (lang === 'FR' ? '(vivier)' : '(pool)') : '';
-      setSearchHistory(prev => [
-        ...prev,
-        { 
-          query: `${modeLabel} ${query ? `[${jobLabel}] ${query}` : `Sourcing for ${jobLabel}`}`.trim(), 
-          date: timeStr, 
-          resultsCount: results.length,
-          originalQuery: query,
-          originalFilters: filters,
-          originalJobId: activeJobId
-        }
-      ]);
-
-      const successMsg = filters?.searchMode === 'pool'
-        ? (lang === 'FR'
-          ? (results.length > 0
-            ? `${results.length} profil(s) trouvés dans votre vivier pour "${jobLabel}".`
-            : `Aucun candidat trouvé dans votre vivier. Revenez à "Sourcer" pour trouver de nouveaux profils.`)
-          : (results.length > 0
-            ? `Found ${results.length} profile(s) from your talent pool for "${jobLabel}".`
-            : `No candidates found in your talent pool. Switch back to "Source" to find new profiles.`))
-        : (lang === 'FR'
-          ? `L'agent IA a sourcé ${results.length} candidats pour "${jobLabel}".`
-          : `AI Agent sourced ${results.length} candidate profiles for "${jobLabel}".`);
-      triggerToast(successMsg);
+      // Record activity
+      recordActivity('SOURCE_SEARCH', query || 'Candidate Search', `Sourced ${results.length} candidate profiles.`);
     } catch (err) {
-      triggerToast(lang === 'FR' ? 'Recherche terminée.' : 'Search complete.');
+      clearInterval(stepTimer);
+      triggerToast(lang === 'FR' ? 'Erreur lors de la recherche.' : 'Search execution failed.');
     } finally {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
       setIsSearching(false);
     }
   };
 
-  const handleSearchModeChange = (newMode) => {
-    setSearchMode(newMode);
-    const activeJobId = selectedJobId || (jobDescriptions[0] ? jobDescriptions[0].id : null);
-    if (!activeJobId) return;
-
-    if (newMode === 'ai') {
-      const cachedSource = jobResultsCache[activeJobId];
-      if (cachedSource && cachedSource.length > 0) {
-        setCandidates(cachedSource);
-      }
-    } else if (newMode === 'pool') {
+  const handleSearchModeChange = (mode) => {
+    setSearchMode(mode);
+    const activeJobId = selectedJobId;
+    if (activeJobId && mode === 'pool') {
       const cachedPool = jobResultsCache[`${activeJobId}:pool`];
       if (cachedPool && cachedPool.length > 0) {
         setCandidates(cachedPool);
@@ -335,39 +266,65 @@ function DashboardContent() {
   };
 
   const handleSelectJob = (jobOrId) => {
-    // Handle both job object and job ID
     const job = typeof jobOrId === 'object' ? jobOrId : jobDescriptions.find(j => String(j.id) === String(jobOrId));
-    
     if (!job) return;
     setSelectedJobId(job.id);
 
     const cached = jobResultsCache[job.id];
     if (cached && cached.length > 0) {
-      // Restore cached results instantly — no API call
       setCandidates(cached);
     } else {
-      // Clear candidates when switching to a job with no cached results
       setCandidates([]);
     }
   };
 
   const handleCreateJob = (newJob) => {
+    if (!hasPrivilege('create_roles')) {
+      triggerToast(lang === 'FR' ? 'Privilège requis : Création de postes (HR Admin).' : 'Action restricted: Requires Create & Edit Roles privilege.');
+      return;
+    }
     setJobDescriptions(prev => [...prev, newJob]);
     handleSelectJob(newJob);
+    recordActivity('ROLE_CREATED', newJob.title, `Created job description for ${newJob.department || 'tech team'} (${newJob.location || 'Remote'})`);
+    triggerToast(lang === 'FR' ? 'Fiche de poste créée avec succès.' : 'Job description created successfully.');
   };
 
   const handleEditJob = (updatedJob) => {
+    if (!hasPrivilege('create_roles')) {
+      triggerToast(lang === 'FR' ? 'Privilège requis : Modification de postes.' : 'Action restricted: Requires Create & Edit Roles privilege.');
+      return;
+    }
     setJobDescriptions(prev => prev.map(j => j.id === updatedJob.id ? updatedJob : j));
+    recordActivity('ROLE_UPDATED', updatedJob.title, 'Updated job requirements & tech stack');
     triggerToast(lang === 'FR' ? 'Fiche de poste mise à jour.' : 'Job description updated.');
   };
 
-  const handleDeleteJob = (e, jobId) => {
-    e.stopPropagation();
-    if (confirm(lang === 'FR' ? 'Voulez-vous supprimer cette fiche de poste ?' : 'Are you sure you want to delete this job description?')) {
+  const handleDeleteJob = async (e, jobId) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (!hasPrivilege('create_roles')) {
+      await showAlert({
+        title: lang === 'FR' ? 'Action restreinte' : 'Action Restricted',
+        message: lang === 'FR' ? 'Privilège requis : Suppression de postes.' : 'Action restricted: Requires Create & Edit Roles privilege.',
+        type: 'warning',
+      });
+      return;
+    }
+    const targetJob = jobDescriptions.find(j => j.id === jobId);
+    const confirmed = await confirm({
+      title: lang === 'FR' ? 'Supprimer la fiche de poste ?' : 'Delete Job Description?',
+      message: lang === 'FR'
+        ? `Êtes-vous sûr de vouloir supprimer la fiche "${targetJob?.title || 'sélectionnée'}" ? Cette action effacera également les résultats de sourcing associés.`
+        : `Are you sure you want to delete "${targetJob?.title || 'this job'}"? This action will also clear associated sourcing results.`,
+      itemBadge: targetJob?.title || 'Job Role',
+      confirmText: lang === 'FR' ? 'Supprimer le poste' : 'Delete Job',
+      cancelText: lang === 'FR' ? 'Annuler' : 'Cancel',
+      type: 'danger',
+    });
+
+    if (confirmed) {
       const updated = jobDescriptions.filter(j => j.id !== jobId);
       setJobDescriptions(updated);
 
-      // Clean up saved candidates & cache for this deleted job
       setSavedRoleCandidates(prev => {
         const next = { ...prev };
         delete next[jobId];
@@ -388,11 +345,20 @@ function DashboardContent() {
         handleSelectJob(updated[0]);
       }
 
+      recordActivity('ROLE_DELETED', targetJob?.title || 'Job Description', 'Deleted role description from team workspace');
       triggerToast(lang === 'FR' ? 'Fiche de poste supprimée.' : 'Job description deleted.');
     }
   };
 
   const handleToggleSaveForJob = (candidateId, jobId) => {
+    if (!hasPrivilege('shortlist_candidates')) {
+      triggerToast(lang === 'FR' ? 'Privilège requis : Sélection de candidats.' : 'Action restricted: Requires Shortlist Candidates privilege.');
+      return;
+    }
+
+    const cand = allKnownCandidates.find(c => c.id === candidateId);
+    const job = jobDescriptions.find(j => j.id === jobId);
+
     setSavedRoleCandidates(prev => {
       const current = prev[jobId] || [];
       const isAlreadySaved = current.includes(candidateId);
@@ -400,35 +366,38 @@ function DashboardContent() {
         ? current.filter(id => id !== candidateId)
         : [...current, candidateId];
 
-      triggerToast(isAlreadySaved
-        ? (lang === 'FR' ? 'Candidat retiré du poste.' : 'Candidate removed from role.')
-        : (lang === 'FR' ? 'Candidat enregistré au poste.' : 'Candidate saved to role.')
-      );
+      if (isAlreadySaved) {
+        recordActivity('CANDIDATE_UNSHORTLISTED', cand?.fullName || 'Candidate', `Removed from ${job?.title || 'role'}`);
+        triggerToast(lang === 'FR' ? 'Candidat retiré du poste.' : 'Candidate removed from role.');
+      } else {
+        recordActivity('CANDIDATE_SHORTLISTED', cand?.fullName || 'Candidate', `Saved to role: ${job?.title || 'position'}`);
+        triggerToast(lang === 'FR' ? 'Candidat enregistré au poste.' : 'Candidate saved to role.');
+      }
 
       return { ...prev, [jobId]: updated };
     });
   };
 
   const toggleShortlist = (candidate) => {
+    if (!hasPrivilege('shortlist_candidates')) {
+      triggerToast(lang === 'FR' ? 'Privilège requis : Sélection de candidats.' : 'Action restricted: Requires Shortlist Candidates privilege.');
+      return;
+    }
+
     const isAlreadyShortlisted = shortlist.some(c => c.id === candidate.id);
     let updated;
     if (isAlreadyShortlisted) {
       updated = shortlist.filter(c => c.id !== candidate.id);
-      const removeMsg = lang === 'FR'
-        ? `${candidate.fullName} retiré de la sélection.`
-        : `Removed ${candidate.fullName} from shortlist.`;
-      triggerToast(removeMsg);
+      recordActivity('CANDIDATE_UNSHORTLISTED', candidate.fullName, 'Removed candidate from team shortlist');
+      triggerToast(lang === 'FR' ? `${candidate.fullName} retiré de la sélection.` : `Removed ${candidate.fullName} from shortlist.`);
     } else {
       updated = [...shortlist, candidate];
-      const addMsg = lang === 'FR'
-        ? `${candidate.fullName} ajouté à la sélection.`
-        : `Added ${candidate.fullName} to shortlist.`;
-      triggerToast(addMsg);
+      recordActivity('CANDIDATE_SHORTLISTED', candidate.fullName, `Shortlisted candidate (${candidate.matchScore || 85}% match)`);
+      triggerToast(lang === 'FR' ? `${candidate.fullName} ajouté à la sélection.` : `Added ${candidate.fullName} to shortlist.`);
     }
     setShortlist(updated);
   };
 
-  // HR Profile Control Actions
   const handleOpenAddCandidate = () => {
     setEditingCandidate(null);
     setIsEditOpen(true);
@@ -451,163 +420,145 @@ function DashboardContent() {
     }
     setCandidates(updatedList);
 
-    // Sync shortlist state
     if (savedCandidate.shortlisted) {
       setShortlist(prev => {
         const shortExists = prev.some(c => c.id === savedCandidate.id);
-        if (shortExists) {
-          return prev.map(c => c.id === savedCandidate.id ? savedCandidate : c);
-        } else {
-          return [...prev, savedCandidate];
-        }
+        return shortExists ? prev.map(c => c.id === savedCandidate.id ? savedCandidate : c) : [...prev, savedCandidate];
       });
     } else {
       setShortlist(prev => prev.filter(c => c.id !== savedCandidate.id));
     }
   };
 
-  const handleDeleteCandidate = (id) => {
-    if (confirm(lang === 'FR' ? 'Voulez-vous supprimer ce profil ?' : 'Are you sure you want to delete this profile?')) {
+  const handleDeleteCandidate = async (target) => {
+    const id = typeof target === 'object' && target !== null ? target.id : target;
+    const cand = allKnownCandidates.find(c => c.id === id) || (typeof target === 'object' ? target : null);
+    const candidateName = cand?.fullName || 'Candidate';
+
+    const confirmed = await confirm({
+      title: lang === 'FR' ? 'Supprimer le profil candidat ?' : 'Delete Candidate Profile?',
+      message: lang === 'FR'
+        ? `Êtes-vous sûr de vouloir supprimer ${candidateName} ? Cette action retirera le profil de la sélection et du pipeline.`
+        : `Are you sure you want to delete ${candidateName}? This will remove the profile from your workspace, shortlist, and pipeline.`,
+      itemBadge: cand?.currentRole ? `${candidateName} • ${cand.currentRole}` : candidateName,
+      confirmText: lang === 'FR' ? 'Supprimer le profil' : 'Delete Profile',
+      cancelText: lang === 'FR' ? 'Conserver' : 'Keep',
+      type: 'danger',
+    });
+
+    if (confirmed) {
       setCandidates(prev => prev.filter(c => c.id !== id));
       setShortlist(prev => prev.filter(c => c.id !== id));
+      if (selectedCandidate?.id === id) {
+        setSelectedCandidate(null);
+      }
+      recordActivity('PROFILE_DELETED', candidateName, 'Deleted candidate profile');
       triggerToast(lang === 'FR' ? 'Profil supprimé.' : 'Profile deleted.');
     }
   };
 
   const handleAddNote = (candidateId, noteText) => {
+    if (!hasPrivilege('manage_notes')) {
+      triggerToast(lang === 'FR' ? 'Privilège requis : Gestion des notes.' : 'Action restricted: Requires Recruiter Notes privilege.');
+      return;
+    }
+
+    const cand = allKnownCandidates.find(c => c.id === candidateId);
     const isFR = lang === 'FR';
     const now = new Date();
-    const datePart = now.toLocaleDateString(isFR ? 'fr-FR' : 'en-US', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-    const timePart = now.toLocaleTimeString(isFR ? 'fr-FR' : 'en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const datePart = now.toLocaleDateString(isFR ? 'fr-FR' : 'en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timePart = now.toLocaleTimeString(isFR ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' });
     const timestamp = isFR ? `${datePart} à ${timePart}` : `${datePart} at ${timePart}`;
-    // Generate a unique ID using timestamp + random to prevent collisions
+
     const newNote = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       text: noteText,
       time: timestamp,
+      authorName: user?.fullName || user?.name || 'Recruiter',
+      authorRole: user?.role || 'RECRUITER',
       createdAt: now.toISOString(),
     };
 
-    setCandidates(prev => prev.map(c => {
-      if (c.id === candidateId) {
-        return {
-          ...c,
-          notes: [...(c.notes || []), newNote]
-        };
-      }
-      return c;
-    }));
+    setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, notes: [...(c.notes || []), newNote] } : c));
+    setSelectedCandidate(prev => prev && prev.id === candidateId ? { ...prev, notes: [...(prev.notes || []), newNote] } : prev);
+    setShortlist(prev => prev.map(c => c.id === candidateId ? { ...c, notes: [...(c.notes || []), newNote] } : c));
 
-    setSelectedCandidate(prev => {
-      if (prev && prev.id === candidateId) {
-        return {
-          ...prev,
-          notes: [...(prev.notes || []), newNote]
-        };
-      }
-      return prev;
-    });
-
-    setShortlist(prev => prev.map(c => {
-      if (c.id === candidateId) {
-        return {
-          ...c,
-          notes: [...(c.notes || []), newNote]
-        };
-      }
-      return c;
-    }));
-
-    // Also update jobResultsCache to ensure notes sync across all sources
-    setJobResultsCache(prev => {
-      const updated = {};
-      Object.entries(prev).forEach(([jobId, list]) => {
-        if (Array.isArray(list)) {
-          updated[jobId] = list.map(c => {
-            if (c.id === candidateId) {
-              return {
-                ...c,
-                notes: [...(c.notes || []), newNote]
-              };
-            }
-            return c;
-          });
-        } else {
-          updated[jobId] = list;
-        }
-      });
-      return updated;
-    });
-
+    recordActivity('NOTE_ADDED', cand?.fullName || 'Candidate', `Added note: "${noteText.substring(0, 50)}${noteText.length > 50 ? '...' : ''}"`);
     triggerToast(lang === 'FR' ? 'Note enregistrée.' : 'Note saved.');
   };
 
-  const handleDeleteNote = (candidateId, noteId) => {
-    const removeNote = (c) => {
-      if (c.id == candidateId) {
-        const filteredNotes = (c.notes || []).filter(n => n.id != noteId);
-        return { ...c, notes: filteredNotes };
-      }
-      return c;
-    };
-
-    setCandidates(prev => prev.map(removeNote));
-    setShortlist(prev => prev.map(removeNote));
-    
-    setJobResultsCache(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(jobId => {
-        if (Array.isArray(next[jobId])) {
-          next[jobId] = next[jobId].map(removeNote);
-        }
+  const handleDeleteNote = async (candidateId, noteId) => {
+    if (!hasPrivilege('manage_notes')) {
+      await showAlert({
+        title: lang === 'FR' ? 'Action restreinte' : 'Action Restricted',
+        message: lang === 'FR' ? 'Privilège requis : Gestion des notes.' : 'Action restricted: Requires Recruiter Notes privilege.',
+        type: 'warning',
       });
-      return next;
+      return;
+    }
+
+    const cand = allKnownCandidates.find(c => c.id === candidateId);
+    const confirmed = await confirm({
+      title: lang === 'FR' ? 'Supprimer la note d\'évaluation ?' : 'Delete Screening Note?',
+      message: lang === 'FR'
+        ? 'Êtes-vous sûr de vouloir supprimer cette note d\'évaluation ? Cette action est irréversible.'
+        : 'Are you sure you want to delete this evaluation note? This action cannot be undone.',
+      itemBadge: cand?.fullName ? `Candidate: ${cand.fullName}` : 'Screening Note',
+      confirmText: lang === 'FR' ? 'Supprimer la note' : 'Delete Note',
+      cancelText: lang === 'FR' ? 'Annuler' : 'Cancel',
+      type: 'danger',
     });
 
-    setSelectedCandidate(prev => {
-      if (!prev) return prev;
-      if (prev.id == candidateId) {
-        return { ...prev, notes: (prev.notes || []).filter(n => n.id != noteId) };
-      }
-      return prev;
-    });
+    if (confirmed) {
+      setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, notes: (c.notes || []).filter(n => n.id !== noteId) } : c));
+      setSelectedCandidate(prev => prev && prev.id === candidateId ? { ...prev, notes: (prev.notes || []).filter(n => n.id !== noteId) } : prev);
+      setShortlist(prev => prev.map(c => c.id === candidateId ? { ...c, notes: (c.notes || []).filter(n => n.id !== noteId) } : c));
 
-    triggerToast(lang === 'FR' ? 'Note supprimée.' : 'Note deleted.');
+      recordActivity('NOTE_DELETED', cand?.fullName || 'Candidate', 'Deleted screening note evaluation');
+      triggerToast(lang === 'FR' ? 'Note supprimée.' : 'Note deleted.');
+    }
   };
 
+  const handleUpdateCandidateStage = (candidateId, stage) => {
+    const cand = allKnownCandidates.find(c => c.id === candidateId);
+    setCandidatePipelineStage(prev => ({
+      ...prev,
+      [candidateId]: stage,
+    }));
+    recordActivity('STAGE_CHANGED', cand?.fullName || 'Candidate', `Moved to pipeline stage: ${stage.toUpperCase()}`);
+  };
+
+  const handleViewDetails = (candidate, e) => {
+    if (e && e.currentTarget) {
+      setSelectedCardRect(e.currentTarget.getBoundingClientRect());
+    }
+    setSelectedCandidate(candidate);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans relative">
+    <div className="min-h-screen bg-[#FBFAF7] text-[#12151B] font-sans antialiased selection:bg-[#E9F7FA] selection:text-[#0A7E96]">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#12151B] text-white px-5 py-3 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2 animate-bounce">
+          <Sparkles className="w-4 h-4 text-[#6FCEE3]" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
-      {/* Navigation Header */}
+      {/* Main Navbar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenAuth={() => setIsAuthOpen(true)}
         shortlistCount={shortlist.length}
-        notesCount={allKnownCandidates.filter(c => c.notes && c.notes.length > 0).reduce((s, c) => s + c.notes.length, 0)}
-        isBackendOnline={isBackendOnline}
+        notesCount={allKnownCandidates.reduce((acc, c) => acc + (c.notes?.length || 0), 0)}
+        onToast={triggerToast}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+      {/* Main Content Area */}
+      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6 pb-20">
 
-        {/* Toast Alert Notification */}
-        {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3.5 rounded-xl shadow-2xl flex items-center space-x-2.5 border border-slate-700 animate-bounce">
-            <Sparkles className="w-4 h-4 text-indigo-400" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
-
-        {/* Tab 1: Sourcing Hub */}
+        {/* Tab: Sourcing Hub */}
         {activeTab === 'sourcing' && (
           <SourcingHubView
             jobDescriptions={jobDescriptions}
@@ -639,8 +590,7 @@ function DashboardContent() {
           />
         )}
 
-
-        {/* Tab 2: Kanban Pipeline View */}
+        {/* Tab: Kanban Pipeline View */}
         {activeTab === 'pipeline' && (
           <KanbanPipeline
             candidates={pipelineCandidates}
@@ -652,9 +602,7 @@ function DashboardContent() {
           />
         )}
 
-      
-
-        {/* Tab 3: Dashboard Analytics View */}
+        {/* Tab: Dashboard Overview & Team Activity Feed */}
         {activeTab === 'dashboard' && (
           <DashboardView
             user={user}
@@ -662,41 +610,40 @@ function DashboardContent() {
             candidates={allKnownCandidates}
             savedRoleCandidates={savedRoleCandidates}
             candidatePipelineStage={candidatePipelineStage}
+            activities={teamActivities}
             lang={lang}
             onStageClick={(stage) => {
-              // When a stage is clicked, we could filter the view or navigate to pipeline
-              if (stage) {
-                setActiveTab('pipeline');
-              }
+              if (stage) setActiveTab('pipeline');
             }}
             onSelectJob={(jobId) => {
-              // When a job is selected, switch to sourcing tab and select that job
               if (jobId) {
                 setActiveTab('sourcing');
                 handleSelectJob(jobId);
               }
             }}
             onSelectCandidate={(candidate) => {
-              // When a candidate is selected, show their details
-              if (candidate) {
-                setSelectedCandidate(candidate);
-              }
+              if (candidate) setSelectedCandidate(candidate);
             }}
           />
         )}
 
-        {/* Tab 5: Recruiter Notes */}
+        {/* Tab: Recruiter Notes */}
         {activeTab === 'notes' && (
           <RecruiterNotesView
             candidates={allKnownCandidates}
             jobDescriptions={jobDescriptions}
             savedRoleCandidates={savedRoleCandidates}
             jobResultsCache={jobResultsCache}
-            onViewCandidate={(candidate) => {
-              setSelectedCandidate(candidate);
-            }}
+            onViewCandidate={(candidate) => setSelectedCandidate(candidate)}
             onDeleteNote={handleDeleteNote}
             onAddNote={handleAddNote}
+          />
+        )}
+
+        {/* Tab: HR Admin Team & Privilege Management */}
+        {activeTab === 'team' && (
+          <TeamManagementView
+            onNavigateToDashboard={() => setActiveTab('dashboard')}
           />
         )}
 
@@ -741,47 +688,53 @@ function DashboardContent() {
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
-        onSuccess={() => triggerToast(lang === 'FR' ? 'Connexion réussie !' : 'Successfully logged in!')}
       />
 
-      {/* Candidate Side-by-Side Comparator Modal */}
-      <CandidateComparator
-        isOpen={isComparatorOpen}
-        onClose={() => setIsComparatorOpen(false)}
-        candidates={candidates}
-      />
-
-
-
+      {/* Candidate Comparator */}
+      {isComparatorOpen && (
+        <CandidateComparator
+          candidates={shortlist}
+          onClose={() => setIsComparatorOpen(false)}
+          onViewCandidate={setSelectedCandidate}
+        />
+      )}
     </div>
   );
-}
-
-function AppContent() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center space-y-4 text-white">
-        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-bold tracking-wide text-slate-400">Loading Digitalia Platform...</p>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthPage />;
-  }
-
-  return <DashboardContent />;
 }
 
 export default function App() {
   return (
     <LanguageProvider>
       <AuthProvider>
-        <AppContent />
+        <ConfirmDialogProvider>
+          <AppContent />
+        </ConfirmDialogProvider>
       </AuthProvider>
     </LanguageProvider>
   );
+}
+
+function AppContent() {
+  const { user, loading } = useAuth();
+  const [hasInvite, setHasInvite] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return Boolean(params.get('invite'));
+    }
+    return false;
+  });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#FBFAF7] flex items-center justify-center">
+        <div className="w-8 h-8 border-3 border-[#0A7E96]/30 border-t-[#0A7E96] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (hasInvite || !user) {
+    return <AuthPage onAccepted={() => setHasInvite(false)} onClearInvite={() => setHasInvite(false)} />;
+  }
+
+  return <DashboardContent />;
 }

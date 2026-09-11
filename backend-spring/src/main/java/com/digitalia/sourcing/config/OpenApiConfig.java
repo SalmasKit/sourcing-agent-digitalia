@@ -16,7 +16,7 @@ public class OpenApiConfig {
         final String securitySchemeName = "bearerAuth";
         return new OpenAPI()
                 .info(new Info()
-                        .title("Digitalia Sourcing Agent API")
+                        .title("Targetalent Sourcing Agent API")
                         .version("1.0")
                         .description("API Documentation for Sourcing Profils Agent System"))
                 .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))

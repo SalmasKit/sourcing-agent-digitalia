@@ -1,5 +1,5 @@
 """
-main.py — FastAPI entrypoint for Digitalia Sourcing Agent Service.
+main.py — FastAPI entrypoint for Targetalent Sourcing Agent Service.
 """
 import logging
 import os
@@ -145,7 +145,7 @@ async def _check_and_log_api_keys():
     settings = get_settings()
 
     logger.info("=" * 65)
-    logger.info("       DIGITALIA SOURCING AGENT — API KEYS & QUOTA MONITOR       ")
+    logger.info("       TARGETALENT SOURCING AGENT — API KEYS & QUOTA MONITOR       ")
     logger.info("=" * 65)
 
     # 1. SerpAPI Status & Quota Check
@@ -215,7 +215,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Digitalia Sourcing Agent",
+    title="Targetalent Sourcing Agent",
     description="AI Sourcing Service powered by LangGraph, Groq Llama 3.3 70B and MCP.",
     version="1.0.0",
     lifespan=lifespan,
@@ -259,7 +259,7 @@ _DEV_ORIGINS = [
     "http://localhost:8080",   # Spring Boot (service-to-service)
 ]
 _PROD_ORIGINS = [
-    _settings.frontend_origin,   # e.g. https://digitalia.example.com
+    _settings.frontend_origin,   # e.g. https://targetalent.example.com
     # Note: spring_boot_url is intentionally omitted. CORS is a browser-enforced
     # restriction and only applies to requests originating from a browser page.
     # Spring Boot → agent-service calls are server-to-server and bypass CORS

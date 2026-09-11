@@ -1,5 +1,5 @@
 """
-config.py — Centralized Pydantic Settings for Digitalia Sourcing Agent.
+config.py — Centralized Pydantic Settings for Targetalent Sourcing Agent.
 """
 from functools import lru_cache
 

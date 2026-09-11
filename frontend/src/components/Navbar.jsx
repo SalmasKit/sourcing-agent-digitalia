@@ -1,22 +1,15 @@
 /**
- * Navbar — redesigned
- *
- * Real interactive upgrades, not just a retheme:
- *  - The active tab is a pill that slides/resizes to the selected item
- *    (measured against the nav container) instead of an instant swap.
- *  - Count badges (shortlist, notes) pulse briefly when the number goes
- *    up, so a new item landing there is noticeable instead of a silent
- *    number change.
- *  - The avatar opens a real dropdown (profile info + sign out) instead
- *    of a bare logout icon sitting next to the name.
- *  - Below the "sm" breakpoint, tabs collapse into a hamburger menu that
- *    drops down, rather than just hiding the labels and leaving bare icons.
+ * Navbar — enterprise multi-role navigation
  */
 
 import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
-import { Sparkles, Users, BookmarkCheck, LayoutDashboard, Kanban, LogOut, Globe, NotebookPen, ChevronDown, Menu, X, Settings } from 'lucide-react';
+import {
+  Sparkles, Users, BookmarkCheck, LayoutDashboard, Kanban, LogOut,
+  Globe, NotebookPen, ChevronDown, Menu, X, Settings, ShieldCheck, KeyRound
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { ChangePasswordModal } from './ChangePasswordModal';
 
 function useFonts() {
   const loaded = useRef(false);
@@ -39,28 +32,35 @@ function usePulseOnIncrease(value) {
   return pulse;
 }
 
-export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOpenAuth = () => { }, shortlistCount = 0, notesCount = 0 }) {
+export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOpenAuth = () => { }, shortlistCount = 0, notesCount = 0, onToast = () => {} }) {
   useFonts();
   const { user, logout } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
   const isFR = lang === 'FR';
 
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
-  const navRef = useRef(null);
-  const btnRefs = useRef({});
-  const userMenuRef = useRef(null);
+  const [userMenuOpen, setUserMenuOpen]         = useState(false);
+  const [mobileOpen, setMobileOpen]             = useState(false);
+  const [isPasswordModalOpen, setPasswordModal] = useState(false);
+  const [indicator, setIndicator]               = useState({ left: 0, width: 0 });
+  const navRef                                  = useRef(null);
+  const btnRefs                                 = useRef({});
+  const userMenuRef                             = useRef(null);
 
   const shortlistPulse = usePulseOnIncrease(shortlistCount);
-  const notesPulse = usePulseOnIncrease(notesCount);
+  const notesPulse     = usePulseOnIncrease(notesCount);
+
+  const isAdmin = user?.role === 'HR_ADMIN' || user?.role === 'SUPER_ADMIN';
 
   const TABS = [
     { id: 'dashboard', icon: LayoutDashboard, label: t('dashboard') || 'Dashboard' },
-    { id: 'sourcing', icon: Users, label: t('sourcingHub') },
+    { id: 'sourcing', icon: Users, label: t('sourcingHub') || 'Sourcing' },
     { id: 'pipeline', icon: Kanban, label: 'Pipeline' },
     { id: 'notes', icon: NotebookPen, label: 'Notes', badge: notesCount, pulse: notesPulse },
   ];
+
+  if (isAdmin) {
+    TABS.push({ id: 'team', icon: ShieldCheck, label: isFR ? 'Équipe & Droits' : 'Team & Privileges' });
+  }
 
   useLayoutEffect(() => {
     const el = btnRefs.current[activeTab];
@@ -69,7 +69,7 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
       const elRect = el.getBoundingClientRect(), containerRect = container.getBoundingClientRect();
       setIndicator({ left: elRect.left - containerRect.left, width: elRect.width });
     }
-  }, [activeTab, shortlistCount, notesCount]);
+  }, [activeTab, shortlistCount, notesCount, isAdmin]);
 
   useEffect(() => {
     function handleClick(e) { if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenuOpen(false); }
@@ -84,9 +84,9 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
       <style>{`
         @keyframes nbBadgePulse { 0% { transform:scale(1); } 40% { transform:scale(1.35); } 100% { transform:scale(1); } }
         @keyframes nbMenuIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes nbMobileIn { from { opacity:0; max-height:0; } to { opacity:1; max-height:320px; } }
+        @keyframes nbMobileIn { from { opacity:0; max-height:0; } to { opacity:1; max-height:360px; } }
 
-        .nb-wrapper { position:sticky; top:0; z-index:50; padding:12px 0; background:rgba(251,250,247,0.85); backdrop-filter:blur(12px); font-family:'Inter', system-ui, sans-serif; }
+        .nb-wrapper { position:sticky; top:0; z-index:50; padding:12px 0; background:rgba(251,250,247,0.88); backdrop-filter:blur(12px); font-family:'Inter', system-ui, sans-serif; }
         .nb-container { max-width:1200px; margin:0 auto; padding:0 24px; }
         .nb-bar { background:#fff; border:1px solid #E4E1D9; border-radius:18px; padding:8px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; box-shadow:0 2px 10px -4px rgba(18,21,27,0.06); }
 
@@ -118,11 +118,11 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
         .nb-role-admin { background:#FFF3E0; color:#9A5B0A; }
         .nb-role-recruiter { background:#E9F7FA; color:#0A7E96; }
 
-        .nb-dropdown { position:absolute; top:calc(100% + 8px); right:0; width:200px; background:#fff; border:1px solid #E4E1D9; border-radius:13px; box-shadow:0 16px 32px -12px rgba(18,21,27,0.2); padding:8px; animation: nbMenuIn .15s ease both; z-index:60; }
+        .nb-dropdown { position:absolute; top:calc(100% + 8px); right:0; width:220px; background:#fff; border:1px solid #E4E1D9; border-radius:13px; box-shadow:0 16px 32px -12px rgba(18,21,27,0.2); padding:8px; animation: nbMenuIn .15s ease both; z-index:60; }
         .nb-dropdown-head { padding:8px 10px 10px; border-bottom:1px solid #EFEDE7; margin-bottom:6px; }
         .nb-dropdown-name { font-size:12.5px; font-weight:700; color:#12151B; }
         .nb-dropdown-email { font-size:10.5px; color:#9B9C9E; margin-top:1px; }
-        .nb-dropdown-item { display:flex; align-items:center; gap:8px; width:100%; text-align:left; font-size:12px; font-weight:600; color:#3A3D44; background:none; border:none; padding:8px 10px; border-radius:8px; cursor:pointer; }
+        .nb-dropdown-item { display:flex; align-items:center; gap:8px; width:100%; text-align:left; font-size:12px; font-weight:600; color:#3A3D44; background:none; border:none; padding:8px 10px; border-radius:8px; cursor:pointer; transition: background .15s; }
         .nb-dropdown-item:hover { background:#F1F1EC; }
         .nb-dropdown-item.danger:hover { background:#FDEEE9; color:#B3261E; }
 
@@ -132,7 +132,7 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
         .nb-hamburger { display:none; background:none; border:none; color:#3A3D44; cursor:pointer; padding:6px; }
         .nb-mobile-menu { display:none; }
 
-        @media (max-width: 760px) {
+        @media (max-width: 860px) {
           .nb-nav { display:none; }
           .nb-hamburger { display:flex; }
           .nb-user-info { display:none; }
@@ -146,7 +146,7 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
         <div className="nb-bar">
           <div className="nb-brand" onClick={() => selectTab('dashboard')}>
             <div className="nb-logo-icon"><Sparkles size={16} color="#6FCEE3" /></div>
-            <span className="nb-brand-name">DIGITALIA</span>
+            <span className="nb-brand-name">TARGETALENT</span>
           </div>
 
           <nav className="nb-nav" ref={navRef}>
@@ -169,16 +169,31 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
                 <button className="nb-user-box" onClick={() => setUserMenuOpen(o => !o)}>
                   <div className="nb-avatar">{(user.fullName || 'U').charAt(0).toUpperCase()}</div>
                   <div className="nb-user-info">
-                    <span className="nb-user-name">{user.fullName}</span>
+                    <span className="nb-user-name">{user.fullName || user.name}</span>
                     <span className={`nb-role-badge ${user.role === 'HR_ADMIN' ? 'nb-role-admin' : 'nb-role-recruiter'}`}>{user.role === 'HR_ADMIN' ? 'HR Admin' : 'Recruiter'}</span>
                   </div>
                   <ChevronDown size={13} color="#9B9C9E" />
                 </button>
                 {userMenuOpen && (
                   <div className="nb-dropdown">
-                    <div className="nb-dropdown-head"><div className="nb-dropdown-name">{user.fullName}</div><div className="nb-dropdown-email">{user.email}</div></div>
-                    <button className="nb-dropdown-item"><Settings size={13} />Account settings</button>
-                    <button className="nb-dropdown-item danger" onClick={logout}><LogOut size={13} />{isFR ? 'Déconnexion' : 'Sign out'}</button>
+                    <div className="nb-dropdown-head">
+                      <div className="nb-dropdown-name">{user.fullName || user.name}</div>
+                      <div className="nb-dropdown-email">{user.email}</div>
+                    </div>
+                    {isAdmin && (
+                      <button className="nb-dropdown-item" onClick={() => { selectTab('team'); setUserMenuOpen(false); }}>
+                        <ShieldCheck size={14} color="#0A7E96" />
+                        <span>{isFR ? 'Gestion d\'équipe' : 'Team & Privileges'}</span>
+                      </button>
+                    )}
+                    <button className="nb-dropdown-item" onClick={() => { setPasswordModal(true); setUserMenuOpen(false); }}>
+                      <KeyRound size={14} />
+                      <span>{isFR ? 'Changer mot de passe' : 'Change password'}</span>
+                    </button>
+                    <button className="nb-dropdown-item danger" onClick={() => { logout(); setUserMenuOpen(false); }}>
+                      <LogOut size={14} />
+                      <span>{isFR ? 'Déconnexion' : 'Sign out'}</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -196,6 +211,12 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
           ))}
         </div>
       </div>
+
+      <ChangePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setPasswordModal(false)}
+        onSuccess={(msg) => onToast(msg)}
+      />
     </header>
   );
 }

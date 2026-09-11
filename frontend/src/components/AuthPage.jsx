@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   LogIn, UserPlus, Lock, Mail, User, ShieldCheck, Briefcase,
-  Eye, EyeOff, ArrowRight, AlertCircle, FlaskConical, Radar
+  Eye, EyeOff, ArrowRight, AlertCircle, Radar, KeyRound, CheckCircle2, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 /* ------------------------------------------------------------------
    Copy — kept bilingual (EN/FR) like the source component.
@@ -16,11 +17,11 @@ const COPY = {
     headline1: 'Source and match',
     headlineAccent: 'top engineers',
     headline2: 'faster.',
-    sub: 'An enterprise sourcing platform that scans, scores, and routes candidates automatically \u2014 with permissions built around how recruiting teams actually work.',
+    sub: 'An enterprise sourcing platform that scans, scores, and routes candidates automatically — with permissions built around how recruiting teams actually work.',
     consoleLabel: 'Live agent activity',
     stages: [
       { n: '01', t: 'Source', d: 'Scan LinkedIn, GitHub and referrals for matching engineers.' },
-      { n: '02', t: 'Score', d: "Rank each profile against the role\u2019s real requirements." },
+      { n: '02', t: 'Score', d: "Rank each profile against the role’s real requirements." },
       { n: '03', t: 'Route', d: 'Send shortlists straight to the right recruiter queue.' },
       { n: '04', t: 'Track', d: 'Watch every candidate move through the pipeline, live.' },
     ],
@@ -33,7 +34,7 @@ const COPY = {
     fullName: 'Full name',
     fullNamePh: 'e.g. Salma Barrak',
     email: 'Work email',
-    emailPh: 'name@digitalia.io',
+    emailPh: 'name@example.com',
     password: 'Password',
     roleLabel: 'Account role',
     roleBadge: 'Sets permissions',
@@ -43,16 +44,11 @@ const COPY = {
     hrDesc: 'Team management and configuration',
     submitLogin: 'Sign in',
     submitReg: 'Create account',
-    sandboxLabel: 'Try a sandbox account',
-    sandboxSub: 'No setup required \u2014 explore either role instantly.',
-    sandboxRecruiter: 'Demo recruiter',
-    sandboxHr: 'Demo HR admin',
-    sandboxEnter: 'Enter',
-    footerCopy: 'Digitalia \u2014 Enterprise sourcing platform \u00a9 2026',
+    footerCopy: 'Targetalent — Enterprise sourcing platform © 2026',
     footerLinks: ['Security', 'Status', 'Support'],
-    errLogin: 'We couldn\u2019t sign you in. Check your email and password.',
-    errReg: 'We couldn\u2019t create your account. Please try again.',
-    langToggle: 'Fran\u00e7ais',
+    errLogin: 'We couldn’t sign you in. Check your email and password.',
+    errReg: 'We couldn’t create your account. Please try again.',
+    langToggle: 'Français',
   },
   FR: {
     brandTag: 'v2.5 Entreprise',
@@ -61,42 +57,37 @@ const COPY = {
     headline1: 'Trouvez et',
     headlineAccent: 'qualifiez les talents',
     headline2: 'plus vite.',
-    sub: 'Une plateforme de sourcing d\u2019entreprise qui analyse, classe et oriente les candidats automatiquement \u2014 avec des permissions pens\u00e9es pour le travail r\u00e9el des recruteurs.',
-    consoleLabel: 'Activit\u00e9 de l\u2019agent en direct',
+    sub: 'Une plateforme de sourcing d’entreprise qui analyse, classe et oriente les candidats automatiquement — avec des permissions pensées pour le travail réel des recruteurs.',
+    consoleLabel: 'Activité de l’agent en direct',
     stages: [
       { n: '01', t: 'Sourcing', d: 'Analyse LinkedIn, GitHub et cooptations pour trouver les bons profils.' },
-      { n: '02', t: 'Scoring', d: 'Classe chaque profil selon les exigences r\u00e9elles du poste.' },
+      { n: '02', t: 'Scoring', d: 'Classe chaque profil selon les exigences réelles du poste.' },
       { n: '03', t: 'Routage', d: 'Envoie les shortlists directement dans la bonne file recruteur.' },
       { n: '04', t: 'Suivi', d: 'Suivez chaque candidat dans le pipeline, en direct.' },
     ],
-    cardTitleLogin: 'Connexion \u00e0 votre espace',
+    cardTitleLogin: 'Connexion à votre espace',
     cardSubLogin: 'Utilisez votre email et mot de passe professionnels.',
-    cardTitleReg: 'Cr\u00e9er votre compte',
-    cardSubReg: 'Choisissez votre r\u00f4le pour configurer les bonnes permissions.',
+    cardTitleReg: 'Créer votre compte',
+    cardSubReg: 'Choisissez votre rôle pour configurer les bonnes permissions.',
     tabLogin: 'Connexion',
-    tabReg: 'Cr\u00e9er un compte',
+    tabReg: 'Créer un compte',
     fullName: 'Nom complet',
     fullNamePh: 'ex. Salma Barrak',
     email: 'Email professionnel',
-    emailPh: 'nom@digitalia.io',
+    emailPh: 'nom@example.com',
     password: 'Mot de passe',
-    roleLabel: 'R\u00f4le du compte',
-    roleBadge: 'D\u00e9finit les permissions',
+    roleLabel: 'Rôle du compte',
+    roleBadge: 'Définit les permissions',
     recruiterTitle: 'Recruteur',
     recruiterDesc: 'Sourcing et pipelines de candidats',
     hrTitle: 'Admin RH',
-    hrDesc: 'Gestion d\u2019\u00e9quipe et configuration',
+    hrDesc: 'Gestion d’équipe et configuration',
     submitLogin: 'Se connecter',
-    submitReg: 'Cr\u00e9er le compte',
-    sandboxLabel: 'Essayer un compte bac \u00e0 sable',
-    sandboxSub: 'Aucune configuration \u2014 explorez chaque r\u00f4le instantan\u00e9ment.',
-    sandboxRecruiter: 'D\u00e9mo recruteur',
-    sandboxHr: 'D\u00e9mo admin RH',
-    sandboxEnter: 'Entrer',
-    footerCopy: 'Digitalia \u2014 Plateforme de sourcing d\u2019entreprise \u00a9 2026',
-    footerLinks: ['S\u00e9curit\u00e9', 'Statut', 'Support'],
-    errLogin: 'Connexion impossible. V\u00e9rifiez votre email et mot de passe.',
-    errReg: 'Impossible de cr\u00e9er le compte. Veuillez r\u00e9essayer.',
+    submitReg: 'Créer le compte',
+    footerCopy: 'Targetalent — Plateforme de sourcing d’entreprise © 2026',
+    footerLinks: ['Sécurité', 'Statut', 'Support'],
+    errLogin: 'Connexion impossible. Vérifiez votre email et mot de passe.',
+    errReg: 'Impossible de créer le compte. Veuillez réessayer.',
     langToggle: 'English',
   },
 };
@@ -175,7 +166,7 @@ function Terminal({ lang }) {
    Main component
    ------------------------------------------------------------------ */
 
-export default function AuthPage() {
+export default function AuthPage({ onAccepted, onClearInvite }) {
   const [lang, setLang] = useState('EN');
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -185,6 +176,14 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isForgotOpen, setIsForgotOpen] = useState(false);
+  const [inviteToken, setInviteToken] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('invite') || '';
+    }
+    return '';
+  });
   const fontsLoaded = useRef(false);
 
   const t = COPY[lang];
@@ -199,14 +198,24 @@ export default function AuthPage() {
     document.head.appendChild(link);
   }, []);
 
-  const { login, register } = useAuth();
+  const { login, register, acceptInvitation } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      if (isLogin) {
+      if (inviteToken) {
+        const success = await acceptInvitation(inviteToken, name || email.split('@')[0], password);
+        if (success) {
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+          if (onAccepted) onAccepted();
+        } else {
+          setError(lang === 'FR' ? 'Invitation invalide ou expirée.' : 'Invalid or expired invitation.');
+        }
+      } else if (isLogin) {
         const success = await login(email, password);
         if (!success) setError(t.errLogin);
       } else {
@@ -214,22 +223,15 @@ export default function AuthPage() {
         if (!success) setError(t.errReg);
       }
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || (isLogin ? t.errLogin : t.errReg));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSandbox = async (sandboxRole) => {
-    setError('');
-    setLoading(true);
-    const demoEmail = sandboxRole === 'RECRUITER' ? 'recruiter@digitalia.io' : 'hr@digitalia.io';
-    const demoName = sandboxRole === 'RECRUITER' ? 'Recruiter User' : 'HR Admin';
-    try {
-      await login(demoEmail, 'SecurePassword123!');
-    } catch {
-      try { await register(demoName, demoEmail, 'SecurePassword123!', sandboxRole); }
-      catch (err) { setError(err?.message || t.errLogin); }
+      const fieldErrors = err?.response?.data?.data;
+      let errorMsg = '';
+      if (fieldErrors && typeof fieldErrors === 'object') {
+        errorMsg = Object.values(fieldErrors).filter(Boolean).join('. ');
+      }
+      if (!errorMsg) {
+        errorMsg = err?.response?.data?.message || err.message || (isLogin ? t.errLogin : t.errReg);
+      }
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -433,20 +435,6 @@ export default function AuthPage() {
         }
         @keyframes dgspin { to { transform: rotate(360deg); } }
 
-        .dg-sandbox { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--dg-border); }
-        .dg-sandbox-label { font-size: 12px; font-weight: 700; color: var(--dg-ink-900); display: flex; align-items: center; gap: 6px; }
-        .dg-sandbox-sub { font-size: 11.5px; color: var(--dg-ink-500); margin-top: 3px; }
-        .dg-sandbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-        .dg-sandbox-card {
-          text-align: left; border-radius: 12px; padding: 10px 11px; cursor: pointer;
-          background: var(--dg-paper); border: 1px solid var(--dg-border);
-          transition: border-color .15s ease, background .15s ease;
-        }
-        .dg-sandbox-card:hover { border-color: var(--dg-border-strong); background: var(--dg-sunken); }
-        .dg-sandbox-name { font-size: 12px; font-weight: 700; color: var(--dg-ink-900); }
-        .dg-sandbox-tag { font-family: var(--font-mono); font-size: 9.5px; color: var(--dg-ink-500); margin-top: 6px; }
-        .dg-sandbox-enter { font-size: 10.5px; color: var(--dg-ink-400); display: flex; align-items: center; gap: 3px; margin-top: 6px; }
-
         .dg-footer {
           max-width: 1200px; margin: 0 auto; padding: 22px 24px 30px;
           display: flex; align-items: center; justify-content: space-between;
@@ -468,7 +456,7 @@ export default function AuthPage() {
           <div className="dg-brand-mark"><Logomark /></div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <span className="dg-brand-name dg-display">DIGITALIA</span>
+              <span className="dg-brand-name dg-display">TARGETALENT</span>
               <span className="dg-brand-badge dg-mono">{t.brandTag}</span>
             </div>
             <div className="dg-brand-tag">{t.tagline}</div>
@@ -506,25 +494,43 @@ export default function AuthPage() {
 
         <div className="dg-card-wrap">
           <div className="dg-card">
-            <div className="dg-card-title dg-display">{isLogin ? t.cardTitleLogin : t.cardTitleReg}</div>
-            <div className="dg-card-sub">{isLogin ? t.cardSubLogin : t.cardSubReg}</div>
+            {inviteToken ? (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#E9F7FA', color: '#0A7E96', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono' }}>
+                  <Sparkles size={12} /> {lang === 'FR' ? 'INVITATION D\'ÉQUIPE' : 'TEAM INVITATION'}
+                </div>
+                <div className="dg-card-title dg-display" style={{ marginTop: 8 }}>
+                  {lang === 'FR' ? 'Rejoindre l\'espace recrutement' : 'Join Recruiting Workspace'}
+                </div>
+                <div className="dg-card-sub">
+                  {lang === 'FR'
+                    ? 'Vous avez été invité par un administrateur RH. Définissez votre nom et mot de passe pour accéder au tableau de bord partagé.'
+                    : 'You\'ve been invited by an HR admin. Set your full name and password to access the shared hiring dashboard.'}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="dg-card-title dg-display">{isLogin ? t.cardTitleLogin : t.cardTitleReg}</div>
+                <div className="dg-card-sub">{isLogin ? t.cardSubLogin : t.cardSubReg}</div>
 
-            <div className="dg-tabs">
-              <button
-                type="button"
-                className={'dg-tab' + (isLogin ? ' dg-tab-active' : '')}
-                onClick={() => { setIsLogin(true); setError(''); }}
-              >
-                <LogIn size={13} />{t.tabLogin}
-              </button>
-              <button
-                type="button"
-                className={'dg-tab' + (!isLogin ? ' dg-tab-active' : '')}
-                onClick={() => { setIsLogin(false); setError(''); }}
-              >
-                <UserPlus size={13} />{t.tabReg}
-              </button>
-            </div>
+                <div className="dg-tabs">
+                  <button
+                    type="button"
+                    className={'dg-tab' + (isLogin ? ' dg-tab-active' : '')}
+                    onClick={() => { setIsLogin(true); setError(''); }}
+                  >
+                    <LogIn size={13} />{t.tabLogin}
+                  </button>
+                  <button
+                    type="button"
+                    className={'dg-tab' + (!isLogin ? ' dg-tab-active' : '')}
+                    onClick={() => { setIsLogin(false); setError(''); }}
+                  >
+                    <UserPlus size={13} />{t.tabReg}
+                  </button>
+                </div>
+              </>
+            )}
 
             {error && (
               <div className="dg-error">
@@ -534,7 +540,7 @@ export default function AuthPage() {
             )}
 
             <form onSubmit={handleSubmit}>
-              {!isLogin && (
+              {(!isLogin || inviteToken) && (
                 <div className="dg-field">
                   <label className="dg-field-label">{t.fullName}</label>
                   <div className="dg-input-wrap">
@@ -551,23 +557,36 @@ export default function AuthPage() {
                 </div>
               )}
 
-              <div className="dg-field">
-                <label className="dg-field-label">{t.email}</label>
-                <div className="dg-input-wrap">
-                  <Mail size={15} className="dg-input-icon" />
-                  <input
-                    className="dg-input"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder={t.emailPh}
-                  />
+              {!inviteToken && (
+                <div className="dg-field">
+                  <label className="dg-field-label">{t.email}</label>
+                  <div className="dg-input-wrap">
+                    <Mail size={15} className="dg-input-icon" />
+                    <input
+                      className="dg-input"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={t.emailPh}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="dg-field">
-                <label className="dg-field-label">{t.password}</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="dg-field-label">{t.password}</label>
+                  {isLogin && !inviteToken && (
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotOpen(true)}
+                      style={{ background: 'none', border: 'none', color: 'var(--dg-teal-600)', fontSize: '11.5px', fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 5 }}
+                    >
+                      {lang === 'FR' ? 'Mot de passe oublié ?' : 'Forgot password?'}
+                    </button>
+                  )}
+                </div>
                 <div className="dg-input-wrap">
                   <Lock size={15} className="dg-input-icon" />
                   <input
@@ -585,7 +604,7 @@ export default function AuthPage() {
                 </div>
               </div>
 
-              {!isLogin && (
+              {!isLogin && !inviteToken && (
                 <div className="dg-field">
                   <div className="dg-role-row">
                     <span className="dg-field-label" style={{ margin: 0 }}>{t.roleLabel}</span>
@@ -605,7 +624,7 @@ export default function AuthPage() {
                     </button>
                     <button
                       type="button"
-                      className={'dg-role-card' + (role === 'HR_ADMIN' ? ' dg-role-card-active-bronze' : '')}
+                      className={'dg-role-card' + (role === 'HR_ADMIN' ? ' dg-role-card-active-bron' : '')}
                       onClick={() => setRole('HR_ADMIN')}
                     >
                       <div className="dg-role-title">
@@ -623,33 +642,44 @@ export default function AuthPage() {
                   <span className="dg-spinner" />
                 ) : (
                   <>
-                    {isLogin ? <LogIn size={15} /> : <UserPlus size={15} />}
-                    {isLogin ? t.submitLogin : t.submitReg}
+                    {inviteToken ? <Sparkles size={15} /> : (isLogin ? <LogIn size={15} /> : <UserPlus size={15} />)}
+                    {inviteToken ? (lang === 'FR' ? 'Accepter & Rejoindre l\'espace' : 'Accept & Join Workspace') : (isLogin ? t.submitLogin : t.submitReg)}
                   </>
                 )}
               </button>
+
+              {inviteToken && (
+                <div style={{ marginTop: 14, textAlign: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInviteToken('');
+                      if (typeof window !== 'undefined') {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                      }
+                      if (onClearInvite) onClearInvite();
+                    }}
+                    style={{ background: 'none', border: 'none', color: 'var(--dg-teal-600)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    {lang === 'FR' ? 'Vous avez déjà un compte ? Se connecter' : 'Already have an account? Sign in'}
+                  </button>
+                </div>
+              )}
             </form>
-
-            <div className="dg-sandbox">
-              <div className="dg-sandbox-label"><FlaskConical size={13} />{t.sandboxLabel}</div>
-              <div className="dg-sandbox-sub">{t.sandboxSub}</div>
-
-              <div className="dg-sandbox-grid">
-                <button type="button" className="dg-sandbox-card" onClick={() => handleSandbox('RECRUITER')}>
-                  <div className="dg-sandbox-name">{t.sandboxRecruiter}</div>
-                  <div className="dg-sandbox-tag">RECRUITER</div>
-                  <div className="dg-sandbox-enter">{t.sandboxEnter} <ArrowRight size={11} /></div>
-                </button>
-                <button type="button" className="dg-sandbox-card" onClick={() => handleSandbox('HR_ADMIN')}>
-                  <div className="dg-sandbox-name">{t.sandboxHr}</div>
-                  <div className="dg-sandbox-tag">HR_ADMIN</div>
-                  <div className="dg-sandbox-enter">{t.sandboxEnter} <ArrowRight size={11} /></div>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </main>
+
+      <ForgotPasswordModal
+        isOpen={isForgotOpen}
+        onClose={() => setIsForgotOpen(false)}
+        lang={lang}
+        onResetSuccess={(em, pwd) => {
+          setEmail(em);
+          setPassword(pwd);
+          setIsLogin(true);
+        }}
+      />
 
       <footer className="dg-footer">
         <div>{t.footerCopy}</div>

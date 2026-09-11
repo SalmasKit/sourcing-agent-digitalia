@@ -22,7 +22,7 @@ Push-Location backend-spring
 .\mvnw.cmd package -DskipTests -q
 Check-LastExitCode "Maven package"
 Pop-Location
-docker build --network host -t sourcing-backend-spring:latest ./backend-spring
+docker build --no-cache --network host -t sourcing-backend-spring:latest ./backend-spring
 Check-LastExitCode "Docker build sourcing-backend-spring"
 
 Write-Host "==> Building frontend (copies pre-built dist/)" -ForegroundColor Cyan
@@ -30,7 +30,7 @@ Push-Location frontend
 npm run build --silent
 Check-LastExitCode "NPM build frontend"
 Pop-Location
-docker build --network host -t sourcing-frontend:latest ./frontend
+docker build --no-cache --network host -t sourcing-frontend:latest ./frontend
 Check-LastExitCode "Docker build sourcing-frontend"
 
 Write-Host "==> Building agent-service (pip installs from PyPI with host network)" -ForegroundColor Cyan

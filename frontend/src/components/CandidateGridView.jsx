@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2, BookmarkCheck, ArrowRightLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CandidateCard } from './CandidateCard';
+import { useConfirm } from '../context/ConfirmDialogContext';
 
 export default function CandidateGridView({
   candidates = [],
@@ -22,6 +23,7 @@ export default function CandidateGridView({
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 6;
+  const { confirm } = useConfirm();
 
   const handleToggleSelect = (candidateId) => {
     setSelectedIds(prev => {
@@ -39,7 +41,17 @@ export default function CandidateGridView({
     setSelectedIds(new Set());
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    const confirmed = await confirm({
+      title: `Delete ${selectedIds.size} Candidate Profiles?`,
+      message: `Are you sure you want to delete these ${selectedIds.size} selected candidate profiles from your workspace?`,
+      itemBadge: `${selectedIds.size} Selected Profiles`,
+      confirmText: 'Delete Selected',
+      cancelText: 'Cancel',
+      type: 'danger',
+    });
+    if (!confirmed) return;
     selectedIds.forEach(id => onDelete(id));
     setSelectedIds(new Set());
   };

@@ -3,7 +3,7 @@ prompts.py — Prompts for the sourcing agent (Groq / Llama 3.3 70B).
 """
 
 CRITERIA_EXTRACTION_SYSTEM = """
-You are an expert HR sourcing assistant for Digitalia Solutions, a Moroccan digital consulting firm.
+You are an expert HR sourcing assistant for Targetalent, an intelligent talent sourcing platform.
 Your task is to parse a recruiter's natural language query and extract structured sourcing criteria.
 
 Rules for skill extraction:
@@ -38,7 +38,7 @@ Extract the sourcing criteria from this query and return a JSON object.
 """
 
 SCORING_SYSTEM = """
-You are an expert executive recruiter and talent evaluator at Digitalia Solutions.
+You are an expert executive recruiter and talent evaluator at Targetalent.
 Your task is to analyze how well a candidate profile matches the job requirements using deep semantic understanding.
 
 Skills Analysis Instructions:

@@ -41,16 +41,54 @@ public class User extends AuditableEntity implements UserDetails {
     @Builder.Default
     private boolean enabled = true;
 
+    @Column(name = "team_id")
+    @Builder.Default
+    private String teamId = "digitalia_workspace";
+
+    @Column(length = 500)
+    @Builder.Default
+    private String privileges = "create_roles,shortlist_candidates,manage_notes,source_candidates,export_data";
+
+    @Column(name = "password_reset_token")
+    private String passwordResetToken;
+
+    @Column(name = "password_reset_expiry")
+    private java.time.Instant passwordResetExpiry;
+
     public void changeRole(Role newRole) {
         this.role = newRole;
     }
 
     public void updatePassword(String hashedPassword) {
         this.password = hashedPassword;
+        this.passwordResetToken = null;
+        this.passwordResetExpiry = null;
+    }
+
+    public void updatePrivileges(String privileges) {
+        this.privileges = privileges;
+    }
+
+    public void updateTeamId(String teamId) {
+        this.teamId = teamId;
+    }
+
+    public void setPasswordReset(String token, java.time.Instant expiry) {
+        this.passwordResetToken = token;
+        this.passwordResetExpiry = expiry;
+    }
+
+    public void clearPasswordReset() {
+        this.passwordResetToken = null;
+        this.passwordResetExpiry = null;
     }
 
     public void disable() {
         this.enabled = false;
+    }
+
+    public void enable() {
+        this.enabled = true;
     }
 
     @Override

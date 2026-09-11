@@ -1,7 +1,7 @@
 [project]
 name = "agent-service"
 version = "0.1.0"
-description = "Digitalia Sourcing Agent — FastAPI + LangGraph + Groq + MCP"
+description = "Targetalent Sourcing Agent — FastAPI + LangGraph + Groq + MCP"
 requires-python = ">=3.12"
 readme = "README.md"
 

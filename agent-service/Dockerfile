@@ -27,7 +27,13 @@ RUN pip install --no-cache-dir \
     "python-dotenv>=1.0.0" \
     "asyncpg>=0.29.0" \
     "sqlalchemy[asyncio]>=2.0.30" \
-    "orjson>=3.10.0"
+    "orjson>=3.10.0" \
+    "PyJWT>=2.8.0" \
+    "prometheus-client>=0.20.0" \
+    "prometheus-fastapi-instrumentator>=7.0.0" \
+    "slowapi>=0.1.9" \
+    "python-json-logger>=2.0.7,<3.0.0" \
+    "cachetools>=5.3.0"
 
 # ── Layer 2: numpy alone (16.7 MB binary – the slow one) ────────────────────
 # Isolated in its own layer so Docker caches it once it succeeds.

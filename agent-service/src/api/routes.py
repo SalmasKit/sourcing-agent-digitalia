@@ -93,7 +93,7 @@ async def health_check() -> HealthResponse:
 
     return HealthResponse(
         status="ok" if db_connected else "degraded",
-        agent="Digitalia Sourcing Agent v1.0",
+        agent="Targetalent Sourcing Agent v1.0",
         model=settings.groq_model,
         data_sources={
             "serpapi": serpapi_ok,
