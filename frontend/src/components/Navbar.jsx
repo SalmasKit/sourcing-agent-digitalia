@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useConfirm } from '../context/ConfirmDialogContext';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import targetalentLogo from '../assets/targetalent.svg';
 
@@ -37,6 +38,7 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
   useFonts();
   const { user, logout } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
+  const { confirm } = useConfirm();
   const isFR = lang === 'FR';
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -95,6 +97,22 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
   }, []);
 
   function selectTab(id) { setActiveTab(id); setMobileOpen(false); }
+
+  const handleLogout = async () => {
+    setUserMenuOpen(false);
+    const confirmed = await confirm({
+      title: isFR ? 'Confirmer la déconnexion' : 'Confirm Sign Out',
+      message: isFR
+        ? 'Êtes-vous sûr de vouloir vous déconnecter de votre compte ?'
+        : 'Are you sure you want to sign out of your account?',
+      confirmText: isFR ? 'Déconnexion' : 'Sign out',
+      cancelText: isFR ? 'Annuler' : 'Cancel',
+      type: 'warning',
+    });
+    if (confirmed) {
+      logout();
+    }
+  };
 
   return (
     <header className="nb-wrapper">
@@ -205,7 +223,7 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
                       <KeyRound size={14} />
                       <span>{isFR ? 'Changer mot de passe' : 'Change password'}</span>
                     </button>
-                    <button className="nb-dropdown-item danger" onClick={() => { logout(); setUserMenuOpen(false); }}>
+                    <button className="nb-dropdown-item danger" onClick={handleLogout}>
                       <LogOut size={14} />
                       <span>{isFR ? 'Déconnexion' : 'Sign out'}</span>
                     </button>
@@ -224,6 +242,11 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
               <tab.icon size={15} /><span>{tab.label}</span>{tab.badge > 0 && <span className="nb-count-badge">{tab.badge}</span>}
             </button>
           ))}
+          {user && (
+            <button className="nb-mobile-item" style={{ color: '#C1361F', borderTop: '1px solid #EFEDE7', marginTop: 4, paddingTop: 8 }} onClick={() => { setMobileOpen(false); handleLogout(); }}>
+              <LogOut size={15} /><span>{isFR ? 'Déconnexion' : 'Sign out'}</span>
+            </button>
+          )}
         </div>
       </div>
 
