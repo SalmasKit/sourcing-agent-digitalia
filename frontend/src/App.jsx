@@ -1003,7 +1003,7 @@ function DashboardContent() {
     const timestamp = isFR ? `${datePart} à ${timePart}` : `${datePart} at ${timePart}`;
 
     const newNote = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `${Date.now()}-${crypto.randomUUID()}`,
       text: noteText,
       time: timestamp,
       authorName: user?.fullName || user?.name || 'Recruiter',

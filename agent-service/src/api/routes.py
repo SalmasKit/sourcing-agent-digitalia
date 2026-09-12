@@ -105,6 +105,12 @@ async def health_check() -> HealthResponse:
     )
 
 
+def _sanitize_log(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).replace("\r", " ").replace("\n", " ").strip()
+
+
 @router.post("/api/search", tags=["Sourcing"])
 @router.post("/api/v1/agent/search", tags=["Sourcing"])
 @limiter.limit("10/minute")
@@ -113,18 +119,22 @@ async def run_search(
     search_request: SearchRequest,
     _token: Annotated[dict, Depends(verify_jwt)],
 ) -> dict:
-    job_identifier = search_request.search_request_id or search_request.job_id
-    logger.info(f"[API] Search query: {search_request.query[:80]} (ID: {job_identifier})")
+    raw_job_id = search_request.search_request_id or search_request.job_id
+    safe_query = _sanitize_log(search_request.query[:80])
+    safe_job_id = _sanitize_log(raw_job_id)
+    logger.info(f"[API] Search query: {safe_query} (ID: {safe_job_id})")
     try:
         return await run_sourcing_agent(
             raw_query=search_request.query,
-            job_id=job_identifier,
+            job_id=raw_job_id,
             max_results=search_request.max_results,
             offset=search_request.offset,
         )
     except Exception as exc:
-        logger.error(f"[API] Search error: {exc}")
+        safe_exc = _sanitize_log(exc)
+        logger.error(f"[API] Search error: {safe_exc}")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
 
 
 class PoolSearchRequest(BaseModel):

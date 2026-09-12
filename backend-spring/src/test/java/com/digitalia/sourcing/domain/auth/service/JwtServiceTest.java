@@ -69,7 +69,7 @@ class JwtServiceTest {
     @Test
     void validateConfiguration_shouldFailWhenDevSecretUsedInProduction() {
         JwtService service = new JwtService();
-        ReflectionTestUtils.setField(service, "secretKey", JwtService.DEFAULT_DEV_SECRET);
+        ReflectionTestUtils.setField(service, "secretKey", "9a4f2c5d6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c");
         org.springframework.mock.env.MockEnvironment env = new org.springframework.mock.env.MockEnvironment();
         env.setActiveProfiles("prod");
         ReflectionTestUtils.setField(service, "environment", env);

@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     def has_enrichment(self) -> bool:
         """True when Apollo.io key is configured and enrichment is enabled."""
         has_key = bool(self.apollo_api_key and self.apollo_api_key.strip())
-        return bool(has_key and self.enrichment_enabled)
+        return has_key and self.enrichment_enabled
 
 
 @lru_cache

@@ -31,8 +31,8 @@ jobs:
     - name: Install dependencies
       run: |
         cd agent-service
-        python -m pip install --upgrade pip
-        pip install -e .[dev]
+        python -m pip install --upgrade --no-cache-dir pip==24.3.1
+        pip install --no-cache-dir -e .[dev]
 
     - name: Run Ruff Linter
       run: |
@@ -41,22 +41,21 @@ jobs:
 
     - name: Run Bandit SAST Security Scan
       run: |
-        pip install bandit
+        pip install --no-cache-dir bandit==1.7.10
         bandit -r agent-service/src -ll -q
-
 
     - name: Run Pytest with Coverage
       run: |
         cd agent-service
         pytest --cov=src --cov-report=xml --cov-report=term --cov-fail-under=48
 
-    - name: Install Trivy
-      run: |
-        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-
     - name: Run Trivy Vulnerability Scanner
-      run: |
-        trivy fs agent-service --severity CRITICAL,HIGH --exit-code 0
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: 'agent-service'
+        severity: 'CRITICAL,HIGH'
+        exit-code: '0'
       continue-on-error: true
 
 
@@ -83,16 +82,18 @@ jobs:
         if: env.SONAR_TOKEN != ''
         run: |
           cd agent-service
-          python -m pip install --upgrade pip
-          pip install -e .[dev]
+          python -m pip install --upgrade --no-cache-dir pip==24.3.1
+          pip install --no-cache-dir -e .[dev]
           pytest --cov=src --cov-report=xml --cov-report=term
 
       - name: SonarCloud Scan
         if: env.SONAR_TOKEN != ''
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarcloud-github-action@v3.1.0
         with:
           projectBaseDir: agent-service
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+
 

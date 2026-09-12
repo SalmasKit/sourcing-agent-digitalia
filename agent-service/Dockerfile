@@ -9,6 +9,7 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 # Each wheel here is < 3 MB; --timeout 300 / --retries 10 handles WSL2 stalls.
 # This layer is cached independently, so a numpy failure won't evict it.
 RUN pip install --no-cache-dir \
+    --prefer-binary \
     --timeout 300 \
     --retries 10 \
     "setuptools>=61.0" \
@@ -39,6 +40,7 @@ RUN pip install --no-cache-dir \
 # Isolated in its own layer so Docker caches it once it succeeds.
 # --timeout 600 = 10-min stall tolerance; --retries 10 = up to 10 restarts.
 RUN pip install --no-cache-dir \
+    --prefer-binary \
     --timeout 600 \
     --retries 10 \
     "numpy>=1.26.0"

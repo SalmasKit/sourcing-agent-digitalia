@@ -15,17 +15,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Trivy
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-
       - name: Run Trivy Config / IaC Scanner
-        run: |
-          trivy config . --severity HIGH,CRITICAL --exit-code 0
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
 
       - name: Run Checkov IaC Security Scanner
         run: |
-          pip install checkov --quiet
+          pip install --no-cache-dir checkov==3.2.378 --quiet
           checkov -d . --framework dockerfile --soft-fail --compact
 
 
@@ -62,3 +62,4 @@ jobs:
       - name: Verify Cosign Installation
         run: |
           cosign version
+

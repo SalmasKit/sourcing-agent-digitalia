@@ -175,13 +175,22 @@ def _compute_skill_score(
     return round(min(100, base + bonus)), nice_matched
 
 
+def _clean_log(val: Any) -> str:
+    if val is None:
+        return ""
+    return str(val).replace("\r", " ").replace("\n", " ").strip()
+
+
 async def score_profile(
     profile: dict,
     criteria: dict,
     use_llm_rationale: bool = True,
 ) -> dict:
     """Score a single candidate profile against job criteria."""
-    logger.info(f"[score_profile] Scoring profile: {profile.get('full_name')}, skills: {profile.get('skills')}, experience_years: {profile.get('experience_years')}")
+    safe_name = _clean_log(profile.get("full_name"))
+    safe_skills = _clean_log(profile.get("skills"))
+    safe_exp = _clean_log(profile.get("experience_years"))
+    logger.info(f"[score_profile] Scoring profile: {safe_name}, skills: {safe_skills}, experience_years: {safe_exp}")
 
     job_text = _build_job_context(criteria)
     profile_text = _build_profile_context(profile)
@@ -215,8 +224,11 @@ async def score_profile(
         if _baseline_skill_check(s, full_corpus, profile_skills)
     ]
     missing_skills = [s for s in required_skills if s not in matched_skills]
-
-    logger.info(f"[score_profile] Required skills: {required_skills}, Profile skills: {profile_skills}, Matched: {matched_skills}, Missing: {missing_skills}")
+    safe_req_skills = _clean_log(required_skills)
+    safe_prof_skills = _clean_log(profile_skills)
+    safe_matched = _clean_log(matched_skills)
+    safe_missing = _clean_log(missing_skills)
+    logger.info(f"[score_profile] Required skills: {safe_req_skills}, Profile skills: {safe_prof_skills}, Matched: {safe_matched}, Missing: {safe_missing}")
 
     skill_score, nice_to_have_matched = _compute_skill_score(
         required_skills, matched_skills, nice_to_have_skills, full_corpus, profile_skills
@@ -313,7 +325,7 @@ async def score_profile(
             content = response.content
             if isinstance(content, list):
                 raw = "".join(
-                    block.get("text", "") if isinstance(block, dict) else str(block)
+                    block.get("text", "") if isinstance(block, dict) else (block if isinstance(block, str) else str(block))
                     for block in content
                 ).strip()
             else:
@@ -336,7 +348,9 @@ async def score_profile(
                 base_score = int((base_score * 0.4) + (llm_score * 0.6))
         except Exception as exc:
             if not _groq_breaker.check_and_trigger_from_exception(exc):
-                logger.warning(f"LLM rationale failed for {profile.get('full_name')}: {exc}")
+                safe_cand = _clean_log(profile.get("full_name"))
+                safe_exc = _clean_log(exc)
+                logger.warning(f"LLM rationale failed for {safe_cand}: {safe_exc}")
 
     # Recommendation tier
     if base_score >= 80:

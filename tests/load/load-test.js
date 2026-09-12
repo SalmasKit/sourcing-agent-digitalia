@@ -58,7 +58,7 @@ export default function (data) {
     'search list status is 200': (r) => r.status === 200,
   }) || errorRate.add(1);
 
-  sleep(Math.random() * 2); // Random think time between 0-2s
+  sleep(Math.random() * 2); // NOSONAR - load test think time, not security-sensitive
 
   const searchDescriptions = [
     'Senior Java Developer with Spring Boot experience',
@@ -68,7 +68,7 @@ export default function (data) {
     'Data Scientist with Python and Machine Learning',
   ];
 
-  const randomDesc = searchDescriptions[Math.floor(Math.random() * searchDescriptions.length)];
+  const randomDesc = searchDescriptions[Math.floor(Math.random() * searchDescriptions.length)]; // NOSONAR
   const searchRes = http.post(`${BASE_URL}/api/v1/searches`, JSON.stringify({
     rawDescription: randomDesc
   }), { headers });
@@ -78,5 +78,5 @@ export default function (data) {
     'search has ID': (r) => r.json('data.id') !== undefined,
   }) || errorRate.add(1);
 
-  sleep(Math.random() * 3); // Random think time between 0-3s
+  sleep(Math.random() * 3); // NOSONAR - load test think time, not security-sensitive
 }

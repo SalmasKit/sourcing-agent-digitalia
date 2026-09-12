@@ -25,7 +25,7 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
 
     try {
       const res = await forgotPasswordApi(email);
-      const token = res.resetToken || ('rst-' + Math.random().toString(36).substring(2, 8));
+      const token = res.resetToken || ('rst-' + crypto.randomUUID().substring(0, 8));
       setPreviewToken(token);
       setResetToken(token);
       setStep(2);

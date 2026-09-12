@@ -716,7 +716,7 @@ export const inviteRecruiterApi = async (email, fullName = '', privileges = ['sh
     return data.data;
   } catch (error) {
     // Mock invitation creation
-    const rawToken = 'inv_' + Math.random().toString(36).substring(2, 10);
+    const rawToken = 'inv_' + crypto.randomUUID().replace(/-/g, '').substring(0, 16);
     const newInvitation = {
       id: 'inv-' + Date.now(),
       email,
@@ -820,7 +820,7 @@ export const logActivityApi = async (actionType, targetTitle, details = '', targ
     // Fallback locally
     const user = storage.getUser() || { fullName: 'Team Member', email: 'user@digitalia.io', role: 'RECRUITER' };
     const newAct = {
-      id: 'act-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      id: 'act-' + Date.now() + '-' + crypto.randomUUID().substring(0, 8),
       teamId: 'digitalia_workspace',
       actorName: user.fullName || user.name || 'Team Member',
       actorEmail: user.email || 'user@digitalia.io',

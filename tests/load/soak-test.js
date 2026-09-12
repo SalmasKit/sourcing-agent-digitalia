@@ -67,7 +67,7 @@ export default function (data) {
         'UX Designer with Figma expertise',
         'Backend Developer with microservices experience',
       ];
-      const randomDesc = searchDescriptions[Math.floor(Math.random() * searchDescriptions.length)];
+      const randomDesc = searchDescriptions[Math.floor(Math.random() * searchDescriptions.length)]; // NOSONAR
       const res = http.post(`${BASE_URL}/api/v1/searches`, JSON.stringify({
         rawDescription: randomDesc
       }), { headers });
@@ -89,9 +89,9 @@ export default function (data) {
   ];
 
   // Execute random action
-  const randomAction = actions[Math.floor(Math.random() * actions.length)];
+  const randomAction = actions[Math.floor(Math.random() * actions.length)]; // NOSONAR
   randomAction();
 
   // Variable think time between 1-5 seconds
-  sleep(1 + Math.random() * 4);
+  sleep(1 + Math.random() * 4); // NOSONAR
 }
