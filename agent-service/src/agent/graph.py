@@ -112,39 +112,22 @@ async def interpret_request(state: SourcingState) -> SourcingState:
 
 
     if not llm:
-
         fallback = _build_fallback_criteria(state["raw_query"])
-
         return {
-
             **state,
-
             "criteria": fallback,
-
             "messages": state["messages"] + [AIMessage(content="Fallback criteria extracted (Groq API key absent).")],
-
-            "error": "GROQ_API_KEY absent",
-
+            "error": None,
         }
 
-
-
     if _groq_breaker.is_rate_limited():
-
         logger.warning("[Node 1] Groq rate-limited (circuit breaker) — using fallback criteria.")
-
         fallback = _build_fallback_criteria(state["raw_query"])
-
         return {
-
             **state,
-
             "criteria": fallback,
-
             "messages": state["messages"] + [AIMessage(content="Fallback criteria extracted (Groq rate-limited).")],
-
-            "error": "GROQ_RATE_LIMITED",
-
+            "error": None,
         }
 
 
@@ -254,17 +237,11 @@ async def interpret_request(state: SourcingState) -> SourcingState:
             logger.error(f"[Node 1] Failed: {exc}")
 
         fallback = _build_fallback_criteria(state["raw_query"])
-
         return {
-
             **state,
-
             "criteria": fallback,
-
             "messages": state["messages"] + [AIMessage(content="Fallback criteria used.")],
-
-            "error": str(exc)[:100],
-
+            "error": None,
         }
 
 
@@ -272,29 +249,20 @@ async def interpret_request(state: SourcingState) -> SourcingState:
 
 
 async def search_node(state: SourcingState) -> SourcingState:
-
     limit = state.get("max_results", 10)
-
-    logger.info(f"[Node 2] Searching profiles (limit: {limit})...")
+    offset = state.get("offset", 0)
+    logger.info(f"[Node 2] Searching profiles (limit: {limit}, offset: {offset})...")
 
     try:
-
-        profiles = await search_profiles(state["criteria"], limit=limit)
-
+        profiles = await search_profiles(state["criteria"], limit=limit, offset=offset)
         return {
-
             **state,
-
             "raw_profiles": profiles,
-
             "messages": state["messages"] + [AIMessage(content=f"Found {len(profiles)} profiles.")],
-
         }
 
     except Exception as exc:
-
-        logger.error(f"[Node 2] Failed: {exc}")
-
+        logger.error(f"[Node 2] Failed: {exc}", exc_info=True)
         return {
 
             **state,
@@ -1031,56 +999,36 @@ sourcing_graph = build_sourcing_graph()
 
 
 async def run_sourcing_agent(
-
     raw_query: str,
-
     job_id: str | None = None,
-
     max_results: int = 10,
-
+    offset: int = 0,
 ) -> dict:
-
     start_time = time.time()
-
     status = "success"
 
-
-
     try:
-
         initial_state: SourcingState = {
-
             "raw_query": raw_query,
-
             "job_id": job_id,
-
             "max_results": max_results,
-
+            "offset": offset,
             "criteria": {},
-
             "raw_profiles": [],
-
             "scored_profiles": [],
-
             "final_output": {},
-
             "messages": [],
-
             "error": None,
-
         }
 
         result = await sourcing_graph.ainvoke(initial_state)
-
-        if result.get("error"):
-
+        final_output = result.get("final_output", {})
+        if result.get("error") and not final_output.get("profiles"):
             logger.error(f"[Agent] Sourcing agent execution failed: {result['error']}")
-
             status = "error"
-
             raise RuntimeError(result["error"])
 
-        return result.get("final_output", {})
+        return final_output
 
     except Exception:
 

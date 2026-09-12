@@ -24,6 +24,7 @@ class SourcingState(TypedDict):
     raw_query: str
     job_id: str | None
     max_results: int
+    offset: int
 
     # Extracted structured criteria
     criteria: dict

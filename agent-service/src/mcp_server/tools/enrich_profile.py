@@ -470,7 +470,7 @@ def format_period_date(raw: Any) -> str | None:
 
             if m:
 
-                if isinstance(m, int) or (isinstance(m, str) and str(m).isdigit()):
+                if isinstance(m, int) or (isinstance(m, str) and m.isdigit()):
 
                     try:
 
@@ -816,9 +816,10 @@ def clean_4_line_summary(
 
             first_clause = desc.split(".")[0].strip()
 
-            if not first_clause.lower().startswith(full_name.lower()):
+            if first_clause and not first_clause.lower().startswith(full_name.lower()):
 
-                sentences.append(f"Key operational responsibilities include {first_clause.lower() if not first_clause[0].isupper() else first_clause}.")
+                clause_text = first_clause.lower() if not first_clause[0].isupper() else first_clause
+                sentences.append(f"Key operational responsibilities include {clause_text}.")
 
 
 
@@ -930,7 +931,7 @@ def _parse_apollo_person(person: dict, snippet_hint: str = "") -> EnrichedProfil
 
                 else:
 
-                    is_curr = bool(idx == 0 and not e_raw)
+                    is_curr = (idx == 0 and not e_raw)
 
 
 

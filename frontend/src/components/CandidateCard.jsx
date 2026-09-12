@@ -39,7 +39,10 @@ import {
   Sparkles,
   Check,
   ArrowUpRight,
+  Clock,
+  Users,
 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 
 /* ──────────────────────────────────────────────────────────
@@ -296,6 +299,7 @@ export function CandidateCard({
   selectedJobId = null,
 }) {
   useFonts();
+  const { t, lang } = useLanguage();
 
   const [
     reasoningOpen,
@@ -637,6 +641,47 @@ export function CandidateCard({
             var(--tier-color);
 
           opacity: .75;
+        }
+
+        .cc-status-badges {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          margin-left: 6px;
+        }
+
+        .cc-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 3.5px;
+          padding: 2.5px 7px;
+          border-radius: 6px;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 8px;
+          font-weight: 700;
+          letter-spacing: .05em;
+          text-transform: uppercase;
+          line-height: 1.2;
+          transition: all .2s ease;
+        }
+
+        .cc-badge-new {
+          background: #E8F8F2;
+          border: 1px solid #A3E5CB;
+          color: #0B7A54;
+          box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+        }
+
+        .cc-badge-previous {
+          background: #F1EFEA;
+          border: 1px solid #DDD8CD;
+          color: #6C7078;
+        }
+
+        .cc-badge-pool {
+          background: #EEF4FF;
+          border: 1px solid #CCDDFE;
+          color: #1E50B3;
         }
 
 
@@ -1551,6 +1596,27 @@ export function CandidateCard({
                 CANDIDATE
               </span>
             </span>
+
+            <div className="cc-status-badges">
+              {candidate.isNew && (
+                <span className="cc-badge cc-badge-new" title={lang === 'FR' ? 'Sourcé lors de cette recherche' : 'Sourced in this search'}>
+                  <Sparkles size={9} />
+                  <span>{t?.badgeNew || (lang === 'FR' ? 'NOUVEAU' : 'NEW')}</span>
+                </span>
+              )}
+              {candidate.isPrevious && (
+                <span className="cc-badge cc-badge-previous" title={lang === 'FR' ? 'Sourcé précédemment pour ce poste' : 'Previously sourced for this role'}>
+                  <Clock size={9} />
+                  <span>{t?.badgePrevious || (lang === 'FR' ? 'PRÉCÉDENT' : 'PREVIOUS')}</span>
+                </span>
+              )}
+              {candidate.source === 'talent_pool' && (
+                <span className="cc-badge cc-badge-pool" title={lang === 'FR' ? 'Candidat du vivier talent interne' : 'Internal talent pool candidate'}>
+                  <Users size={9} />
+                  <span>{t?.badgePool || (lang === 'FR' ? 'VIVIER' : 'POOL')}</span>
+                </span>
+              )}
+            </div>
 
           </div>
 

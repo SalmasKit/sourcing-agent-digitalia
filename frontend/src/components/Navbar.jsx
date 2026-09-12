@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { ChangePasswordModal } from './ChangePasswordModal';
+import targetalentLogo from '../assets/targetalent.svg';
 
 function useFonts() {
   const loaded = useRef(false);
@@ -32,22 +33,22 @@ function usePulseOnIncrease(value) {
   return pulse;
 }
 
-export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOpenAuth = () => { }, shortlistCount = 0, notesCount = 0, onToast = () => {} }) {
+export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOpenAuth = () => { }, shortlistCount = 0, notesCount = 0, onToast = () => { } }) {
   useFonts();
   const { user, logout } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
   const isFR = lang === 'FR';
 
-  const [userMenuOpen, setUserMenuOpen]         = useState(false);
-  const [mobileOpen, setMobileOpen]             = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [isPasswordModalOpen, setPasswordModal] = useState(false);
-  const [indicator, setIndicator]               = useState({ left: 0, width: 0 });
-  const navRef                                  = useRef(null);
-  const btnRefs                                 = useRef({});
-  const userMenuRef                             = useRef(null);
+  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
+  const navRef = useRef(null);
+  const btnRefs = useRef({});
+  const userMenuRef = useRef(null);
 
   const shortlistPulse = usePulseOnIncrease(shortlistCount);
-  const notesPulse     = usePulseOnIncrease(notesCount);
+  const notesPulse = usePulseOnIncrease(notesCount);
 
   const isAdmin = user?.role === 'HR_ADMIN' || user?.role === 'SUPER_ADMIN';
 
@@ -90,10 +91,9 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
         .nb-container { max-width:1200px; margin:0 auto; padding:0 24px; }
         .nb-bar { background:#fff; border:1px solid #E4E1D9; border-radius:18px; padding:8px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; box-shadow:0 2px 10px -4px rgba(18,21,27,0.06); }
 
-        .nb-brand { display:flex; align-items:center; gap:10px; cursor:pointer; transition: transform .15s ease; }
+        .nb-brand { display:flex; align-items:center; cursor:pointer; transition: transform .15s ease; }
         .nb-brand:hover { transform: scale(1.02); }
-        .nb-logo-icon { width:34px; height:34px; border-radius:10px; background:#12151B; color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-        .nb-brand-name { font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:800; color:#12151B; letter-spacing:-0.02em; }
+        .nb-logo-icon { height:70px; width:auto; object-fit:contain; flex-shrink:0; }
 
         .nb-nav { position:relative; display:flex; align-items:center; gap:2px; background:#F6F5F1; border:1px solid #E4E1D9; border-radius:13px; padding:4px; }
         .nb-nav-indicator { position:absolute; top:4px; bottom:4px; background:#fff; border-radius:9px; box-shadow:0 1px 3px rgba(18,21,27,0.08); transition: left .25s cubic-bezier(0.22,1,0.36,1), width .25s cubic-bezier(0.22,1,0.36,1); z-index:0; }
@@ -145,8 +145,7 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
       <div className="nb-container">
         <div className="nb-bar">
           <div className="nb-brand" onClick={() => selectTab('dashboard')}>
-            <div className="nb-logo-icon"><Sparkles size={16} color="#6FCEE3" /></div>
-            <span className="nb-brand-name">TARGETALENT</span>
+            <img src={targetalentLogo} alt="Targetalent" className="nb-logo-icon" />
           </div>
 
           <nav className="nb-nav" ref={navRef}>

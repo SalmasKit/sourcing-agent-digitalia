@@ -142,6 +142,8 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
     );
   };
 
+  const { confirm, showAlert } = useConfirm();
+
   const goNext = () => {
     if (step === 0 && !inviteEmail.trim()) { setEmailErr(true); return; }
     setStep(s => Math.min(s + 1, STEP_LABELS.length - 1));
@@ -155,6 +157,19 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
   const handleSendInvite = async (e) => {
     e.preventDefault();
     if (!inviteEmail.trim()) { setStep(0); setEmailErr(true); return; }
+
+    const confirmed = await confirm({
+      title: isFR ? "Envoyer l'invitation ?" : "Send Invitation?",
+      message: isFR
+        ? `Êtes-vous sûr de vouloir inviter ${inviteName || inviteEmail} en tant que ${inviteRole === 'HR_ADMIN' ? 'HR Admin' : 'Recruiter'} ?`
+        : `Are you sure you want to invite ${inviteName || inviteEmail} as ${inviteRole === 'HR_ADMIN' ? 'HR Admin' : 'Recruiter'}?`,
+      itemBadge: inviteEmail,
+      confirmText: isFR ? "Envoyer" : "Send",
+      cancelText: isFR ? "Annuler" : "Cancel",
+      type: "info",
+    });
+
+    if (!confirmed) return;
 
     try {
       setSubmittingInvite(true);
@@ -176,9 +191,27 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
 
   const handleToggleMemberPrivilege = async (member, privId) => {
     const currentPrivs = member.privileges || [];
-    const updated = currentPrivs.includes(privId)
-      ? currentPrivs.filter(p => p !== privId)
-      : [...currentPrivs, privId];
+    const isAdding = !currentPrivs.includes(privId);
+    const updated = isAdding
+      ? [...currentPrivs, privId]
+      : currentPrivs.filter(p => p !== privId);
+
+    const memberName = member.fullName || member.email;
+    const privDef = PRIVILEGE_DEFINITIONS.find(p => p.id === privId);
+    const privName = privDef ? (isFR ? privDef.labelFR : privDef.labelEN) : privId;
+
+    const confirmed = await confirm({
+      title: isFR ? "Modifier les privilèges ?" : "Update Privileges?",
+      message: isFR
+        ? `Êtes-vous sûr de vouloir ${isAdding ? 'ajouter' : 'retirer'} le privilège "${privName}" pour ${memberName} ?`
+        : `Are you sure you want to ${isAdding ? 'add' : 'remove'} "${privName}" privilege for ${memberName}?`,
+      itemBadge: memberName,
+      confirmText: isFR ? "Modifier" : "Update",
+      cancelText: isFR ? "Annuler" : "Cancel",
+      type: "info",
+    });
+
+    if (!confirmed) return;
 
     try {
       await updateMemberPrivilegesApi(member.id, updated);
@@ -189,8 +222,6 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
       triggerToast('Failed to update privileges');
     }
   };
-
-  const { confirm, showAlert } = useConfirm();
 
   const handleToggleStatus = async (member) => {
     const isDisabling = member.enabled;

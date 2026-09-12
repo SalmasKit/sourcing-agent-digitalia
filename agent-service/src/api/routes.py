@@ -24,6 +24,7 @@ class SearchRequest(BaseModel):
     job_id: str | None = Field(default=None, description="Optional Job Description ID")
     search_request_id: str | None = Field(default=None, description="Optional Search Request ID from Spring Boot")
     max_results: int = Field(default=10, ge=1, le=50)
+    offset: int = Field(default=0, ge=0, description="Result offset for pagination/refresh")
 
 
 class ScoreRequest(BaseModel):
@@ -119,6 +120,7 @@ async def run_search(
             raw_query=search_request.query,
             job_id=job_identifier,
             max_results=search_request.max_results,
+            offset=search_request.offset,
         )
     except Exception as exc:
         logger.error(f"[API] Search error: {exc}")

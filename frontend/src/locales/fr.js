@@ -127,5 +127,24 @@ export const fr = {
   jobDescriptionText: 'Description du Poste',
   createAndSource: 'Créer & Lancer le Sourcing',
   selectJobDescToSource: 'Sélectionnez une fiche de poste pour lancer le sourcing',
-  selectJobDescSubtext: 'Sélectionnez la fiche de poste à sourcer pour personnaliser la recherche'
+  selectJobDescSubtext: 'Sélectionnez la fiche de poste à sourcer pour personnaliser la recherche',
+
+  // Sourcing Hub Tabs & Badges
+  poolTab: 'Vivier Talent',
+  sourcedTab: 'Sourcés',
+  shortlistedTab: 'Sélectionnés',
+  badgeNew: 'NOUVEAU',
+  badgePrevious: 'PRÉCÉDENT',
+  badgePool: 'VIVIER',
+
+  // Search Merge Modal
+  searchConflictTitle: 'Profils Précédents Détectés',
+  searchConflictMessage: 'Vous avez déjà {count} profil(s) dans cette section. Comment souhaitez-vous traiter les résultats ?',
+  keepAndMerge: 'Conserver et Fusionner',
+  keepAndMergeDesc: 'Conserve les profils précédents et ajoute les nouveaux candidats (les nouveaux profils porteront le badge NOUVEAU).',
+  replaceResults: 'Remplacer les Profils',
+  replaceResultsDesc: 'Efface les profils précédents pour ce poste et affiche uniquement les nouveaux résultats.',
+  noPoolCandidates: 'Aucun candidat dans le vivier',
+  noPoolCandidatesDesc: 'Recherchez des candidats internes depuis votre vivier talent pour ce poste.',
+  searchTalentPoolBtn: 'Rechercher dans le Vivier'
 };

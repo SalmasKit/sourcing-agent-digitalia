@@ -181,6 +181,10 @@ const SourcingHubView = ({
       return cached;
     }
 
+    if (Array.isArray(cached?.sourced)) {
+      return cached.sourced;
+    }
+
     if (Array.isArray(cached?.candidates)) {
       return cached.candidates;
     }
@@ -195,8 +199,34 @@ const SourcingHubView = ({
     return [];
   };
 
+  const getJobPoolCandidates = (jobId) => {
+    if (!jobId) return [];
+
+    const poolKey = `${jobId}:pool`;
+    const cachedPool = jobResultsCache?.[poolKey];
+
+    if (Array.isArray(cachedPool)) {
+      return cachedPool;
+    }
+
+    if (Array.isArray(cachedPool?.candidates)) {
+      return cachedPool.candidates;
+    }
+
+    const cached = jobResultsCache?.[jobId];
+    if (Array.isArray(cached?.pool)) {
+      return cached.pool;
+    }
+
+    return [];
+  };
+
   const displayCandidates = activeJob
     ? getJobCandidates(activeJob.id)
+    : [];
+
+  const poolCandidates = activeJob
+    ? getJobPoolCandidates(activeJob.id)
     : [];
 
   /*
@@ -232,6 +262,14 @@ const SourcingHubView = ({
           Array.isArray(cached?.candidates)
         ) {
           indexList(cached.candidates);
+        } else if (
+          Array.isArray(cached?.sourced)
+        ) {
+          indexList(cached.sourced);
+        } else if (
+          Array.isArray(cached?.pool)
+        ) {
+          indexList(cached.pool);
         }
       }
     );
@@ -262,6 +300,8 @@ const SourcingHubView = ({
   const visibleCandidates =
     workspaceTab === "shortlisted"
       ? shortlistedCandidates
+      : workspaceTab === "pool"
+      ? poolCandidates
       : displayCandidates;
 
   const avgShortlistScore = useMemo(
@@ -304,6 +344,15 @@ const SourcingHubView = ({
   ]);
 
   /*
+   * Keep workspace open to selectedJobId when it changes externally
+   */
+  useEffect(() => {
+    if (selectedJobId && selectedJobId !== workspaceJobId) {
+      setWorkspaceJobId(selectedJobId);
+    }
+  }, [selectedJobId]);
+
+  /*
    * Keep pagination valid when roles are deleted or
    * filtered.
    */
@@ -319,15 +368,20 @@ const SourcingHubView = ({
   }, [totalPages]);
 
   const handleRefresh = () => {
+    const currentMode = workspaceTab === "pool" ? "pool" : (searchMode || "ai");
+
     if (onRefresh) {
-      onRefresh(activeJob?.id);
+      onRefresh(activeJob?.id, currentMode);
       return;
     }
 
     if (lastSearch && onSearch) {
       onSearch(
         lastSearch.query,
-        lastSearch.filters,
+        {
+          ...(lastSearch.filters || {}),
+          searchMode: currentMode,
+        },
         activeJob?.id ||
           lastSearch.jobId
       );
@@ -343,6 +397,7 @@ const SourcingHubView = ({
         {
           maxResults:
             activeJob.maxResults || 10,
+          searchMode: currentMode,
         },
         activeJob.id
       );
@@ -732,10 +787,11 @@ const SourcingHubView = ({
               </div>
 
               <p>
-                {workspaceTab ===
-                "shortlisted"
-                  ? "Shortlisted for"
-                  : "Sourced for"}{" "}
+                {workspaceTab === "shortlisted"
+                  ? (t?.shortlistedTab || (lang === "FR" ? "Sélectionnés pour" : "Shortlisted for"))
+                  : workspaceTab === "pool"
+                  ? (t?.poolTab || (lang === "FR" ? "Vivier talent pour" : "Talent pool for"))
+                  : (t?.sourcedTab || (lang === "FR" ? "Sourcés pour" : "Sourced for"))}{" "}
                 <strong>
                   {activeJob?.title ||
                     "this role"}
@@ -752,13 +808,34 @@ const SourcingHubView = ({
                   ? "candidate-view-tab active"
                   : "candidate-view-tab"
               }
-              onClick={() =>
-                setWorkspaceTab("sourced")
-              }
+              onClick={() => {
+                setWorkspaceTab("sourced");
+                onSearchModeChange?.("ai");
+              }}
             >
-              Sourced
+              <Sparkles size={13} />
+              {t?.sourcedTab || (lang === "FR" ? "Sourcés" : "Sourced")}
               <span className="candidate-view-tab-count">
                 {displayCandidates.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={
+                workspaceTab === "pool"
+                  ? "candidate-view-tab active"
+                  : "candidate-view-tab"
+              }
+              onClick={() => {
+                setWorkspaceTab("pool");
+                onSearchModeChange?.("pool");
+              }}
+            >
+              <Users size={13} />
+              {t?.poolTab || (lang === "FR" ? "Vivier" : "Talent Pool")}
+              <span className="candidate-view-tab-count">
+                {poolCandidates.length}
               </span>
             </button>
 
@@ -776,7 +853,7 @@ const SourcingHubView = ({
                 )
               }
             >
-              Shortlisted
+              {t?.shortlistedTab || (lang === "FR" ? "Sélectionnés" : "Shortlisted")}
               <span className="candidate-view-tab-count">
                 {
                   shortlistedCandidates.length
@@ -797,12 +874,12 @@ const SourcingHubView = ({
               </button>
             )}
 
-            {workspaceTab ===
-              "sourced" && (
+            {(workspaceTab === "sourced" || workspaceTab === "pool") && (
               <button
                 className="workspace-action-button workspace-action-primary"
                 onClick={handleRefresh}
                 disabled={isSearching}
+                title={workspaceTab === "pool" ? "Refresh pool search" : "Refresh sourcing search"}
               >
                 <RefreshCw
                   size={15}
@@ -861,10 +938,14 @@ const SourcingHubView = ({
               {...candidateGridProps}
             />
           ) : !isSearching ? (
-            workspaceTab ===
-            "shortlisted" ? (
+            workspaceTab === "shortlisted" ? (
               <EmptyShortlistState
                 activeJob={activeJob}
+              />
+            ) : workspaceTab === "pool" ? (
+              <EmptyPoolCandidateState
+                activeJob={activeJob}
+                onSearch={onSearch}
               />
             ) : (
               <EmptyCandidateState
@@ -1211,53 +1292,111 @@ const EmptyShortlistState = ({
   </div>
 );
 
+const EmptyPoolCandidateState = ({
+  activeJob,
+  onSearch,
+}) => {
+  const queryText = activeJob?.description || activeJob?.prompt || activeJob?.title || "";
+  const skillsList = activeJob?.skills || activeJob?.requiredSkills || activeJob?.technologies || [];
+  const loc = activeJob?.location && activeJob.location !== 'All Locations' ? activeJob.location : '';
+
+  return (
+    <div className="candidate-empty">
+      <div className="empty-search-visual">
+        <div className="empty-circle empty-circle-one" />
+        <div className="empty-circle empty-circle-two" />
+
+        <Users size={22} />
+      </div>
+
+      <h3>
+        No talent pool candidates yet
+      </h3>
+
+      <p>
+        Search verified internal profiles from your talent pool for{" "}
+        <strong>
+          {activeJob?.title || "this role"}
+        </strong>
+        .
+      </p>
+
+      <button
+        className="sourcing-primary-button"
+        onClick={() =>
+          onSearch?.(
+            queryText,
+            {
+              location: loc,
+              minExp: Number(activeJob?.minExperience) || 0,
+              tech: Array.isArray(skillsList) ? skillsList : [],
+              maxResults: Number(activeJob?.maxResults) || 10,
+              searchMode: "pool",
+            },
+            activeJob?.id
+          )
+        }
+      >
+        <Users size={15} />
+        Search talent pool
+      </button>
+    </div>
+  );
+};
+
 const EmptyCandidateState = ({
   activeJob,
   onSearch,
-}) => (
-  <div className="candidate-empty">
-    <div className="empty-search-visual">
-      <div className="empty-circle empty-circle-one" />
-      <div className="empty-circle empty-circle-two" />
+}) => {
+  const queryText = activeJob?.description || activeJob?.prompt || activeJob?.title || "";
+  const skillsList = activeJob?.skills || activeJob?.requiredSkills || activeJob?.technologies || [];
+  const loc = activeJob?.location && activeJob.location !== 'All Locations' ? activeJob.location : '';
 
-      <Search size={22} />
+  return (
+    <div className="candidate-empty">
+      <div className="empty-search-visual">
+        <div className="empty-circle empty-circle-one" />
+        <div className="empty-circle empty-circle-two" />
+
+        <Search size={22} />
+      </div>
+
+      <h3>
+        No candidates sourced yet
+      </h3>
+
+      <p>
+        Run sourcing using the{" "}
+        <strong>
+          {activeJob?.title ||
+            "role"}
+        </strong>{" "}
+        description, or add a refinement
+        first.
+      </p>
+
+      <button
+        className="sourcing-primary-button"
+        onClick={() =>
+          onSearch?.(
+            queryText,
+            {
+              location: loc,
+              minExp: Number(activeJob?.minExperience) || 0,
+              tech: Array.isArray(skillsList) ? skillsList : [],
+              maxResults: Number(activeJob?.maxResults) || 10,
+              searchMode: "ai",
+            },
+            activeJob?.id
+          )
+        }
+      >
+        <Sparkles size={15} />
+        Start sourcing
+      </button>
     </div>
-
-    <h3>
-      No candidates sourced yet
-    </h3>
-
-    <p>
-      Run sourcing using the{" "}
-      <strong>
-        {activeJob?.title ||
-          "role"}
-      </strong>{" "}
-      description, or add a refinement
-      first.
-    </p>
-
-    <button
-      className="sourcing-primary-button"
-      onClick={() =>
-        onSearch?.(
-          activeJob?.description ||
-            activeJob?.prompt ||
-            "",
-          {
-            maxResults:
-              activeJob?.maxResults ||
-              10,
-          },
-          activeJob?.id
-        )
-      }
-    >
-      <Sparkles size={15} />
-      Start sourcing
-    </button>
-  </div>
-);
+  );
+};
 
 /* -------------------------------------------------------------------------- */
 /*                                    CSS                                     */

@@ -135,7 +135,7 @@ def _get_llm():
     )
 
 
-async def _extract_skills_via_llm(profile: dict, criteria: dict = None) -> list[dict]:
+async def _extract_skills_via_llm(profile: dict, criteria: dict | None = None) -> list[dict]:
     """
     Extract skills from candidate text signals using LLM with evidence tracking.
 
@@ -347,12 +347,12 @@ LinkedIn Extensions: {extensions_text}"""
     return profile
 
 
-async def search_profiles(criteria: dict[str, Any], limit: int = 10) -> list[dict]:
+async def search_profiles(criteria: dict[str, Any], limit: int = 10, offset: int = 0) -> list[dict]:
     """Search for candidate profiles via SerpAPI based on criteria."""
     if not settings.has_serpapi:
         raise ValueError("SERPAPI_API_KEY is missing or not configured. Cannot perform real candidate search.")
 
-    return await _serpapi_search(criteria, limit)
+    return await _serpapi_search(criteria, limit, offset=offset)
 
 
 def _build_search_query(criteria: dict) -> tuple[str, str, str]:
@@ -468,31 +468,58 @@ def _build_search_query(criteria: dict) -> tuple[str, str, str]:
     return query, gl_code, location
 
 
-async def _serpapi_search(criteria: dict, limit: int = 10) -> list[dict]:
+async def _serpapi_search(criteria: dict, limit: int = 10, offset: int = 0) -> list[dict]:
     query, gl_code, location = _build_search_query(criteria)
 
     profiles = []
     seen_urls = set()
-    start_offset = 0
+    start_offset = max(0, offset)
+    max_search_offset = start_offset + 40
 
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        while len(profiles) < limit and start_offset <= 30:
-            response = await client.get(
-                "https://serpapi.com/search",
-                params={
-                    "q": query,
-                    "api_key": settings.serpapi_api_key,
-                    "engine": "google",
-                    "num": min(limit * 2, 20),
-                    "start": start_offset,
-                    "hl": "en",
-                    "gl": "us",  # Use US to avoid regional redirect wrappers
-                },
-            )
+    async with httpx.AsyncClient(timeout=50.0) as client:
+        while len(profiles) < limit and start_offset <= max_search_offset:
+            try:
+                response = await client.get(
+                    "https://serpapi.com/search",
+                    params={
+                        "q": query,
+                        "api_key": settings.serpapi_api_key,
+                        "engine": "google",
+                        "num": min(limit * 2, 20),
+                        "start": start_offset,
+                        "hl": "en",
+                        "gl": "us",  # Use US to avoid regional redirect wrappers
+                    },
+                )
+            except (httpx.ReadTimeout, httpx.ConnectTimeout) as timeout_exc:
+                logger.warning(f"SerpAPI request timed out at offset {start_offset}: {timeout_exc}")
+                if profiles:
+                    break
+                # Retry once if zero profiles collected so far
+                try:
+                    response = await client.get(
+                        "https://serpapi.com/search",
+                        params={
+                            "q": query,
+                            "api_key": settings.serpapi_api_key,
+                            "engine": "google",
+                            "num": min(limit, 10),
+                            "start": start_offset,
+                            "hl": "en",
+                            "gl": "us",
+                        },
+                    )
+                except Exception as retry_exc:
+                    if profiles:
+                        break
+                    raise RuntimeError(f"SerpAPI connection timed out: {retry_exc}") from retry_exc
+
             if response.status_code != 200:
                 err_msg = f"🔑 [API Monitor] 🔴 SerpAPI: Returned HTTP {response.status_code} — {response.text[:200]}"
                 logger.error(err_msg)
                 serpapi_failures.labels(error_type=f"http_{response.status_code}").inc()
+                if profiles:
+                    break
                 raise RuntimeError(err_msg)
 
             data = response.json()

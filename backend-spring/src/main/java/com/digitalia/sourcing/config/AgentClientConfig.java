@@ -1,7 +1,9 @@
 package com.digitalia.sourcing.config;
 
+import com.digitalia.sourcing.domain.auth.service.JwtService;
 import io.netty.channel.ChannelOption;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,6 +28,9 @@ public class AgentClientConfig {
     @Value("${app.agent.connect-timeout-ms:5000}")
     private int connectTimeoutMs;
 
+    @Autowired
+    private JwtService jwtService;
+
     @Bean
     public WebClient agentWebClient() {
         HttpClient httpClient = HttpClient.create()
@@ -36,9 +41,26 @@ public class AgentClientConfig {
                 .baseUrl(agentUrl)
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .defaultHeader("Content-Type", "application/json")
+                .filter(authFilter())
                 .filter(logRequest())
                 .filter(logResponse())
                 .build();
+    }
+
+    private ExchangeFilterFunction authFilter() {
+        return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
+            try {
+                String token = jwtService.generateSystemToken();
+                org.springframework.web.reactive.function.client.ClientRequest authorizedRequest =
+                        org.springframework.web.reactive.function.client.ClientRequest.from(clientRequest)
+                                .header("Authorization", "Bearer " + token)
+                                .build();
+                return Mono.just(authorizedRequest);
+            } catch (Exception e) {
+                log.error("Failed to attach system JWT token to agentWebClient request: {}", e.getMessage());
+                return Mono.just(clientRequest);
+            }
+        });
     }
 
     private ExchangeFilterFunction logRequest() {

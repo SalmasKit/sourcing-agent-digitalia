@@ -128,5 +128,24 @@ export const en = {
   jobDescriptionText: 'Detailed Job Description',
   createAndSource: 'Create & Source Candidates',
   selectJobDescToSource: 'Select a profile to run sourcing',
-  selectJobDescSubtext: 'Select a job description to anchor and customize candidate sourcing'
+  selectJobDescSubtext: 'Select a job description to anchor and customize candidate sourcing',
+
+  // Sourcing Hub Tabs & Badges
+  poolTab: 'Talent Pool',
+  sourcedTab: 'Sourced',
+  shortlistedTab: 'Shortlisted',
+  badgeNew: 'NEW',
+  badgePrevious: 'PREVIOUS',
+  badgePool: 'TALENT POOL',
+
+  // Search Merge Modal
+  searchConflictTitle: 'Previous Candidates Found',
+  searchConflictMessage: 'You already have {count} candidate profile(s) for this section. How would you like to handle the previous results?',
+  keepAndMerge: 'Keep & Merge',
+  keepAndMergeDesc: 'Retain previous profiles and append new candidates (new profiles will be marked with a NEW badge).',
+  replaceResults: 'Replace Results',
+  replaceResultsDesc: 'Clear previous candidates for this role and display only the fresh search results.',
+  noPoolCandidates: 'No talent pool candidates yet',
+  noPoolCandidatesDesc: 'Search internal candidates from the talent pool for this role.',
+  searchTalentPoolBtn: 'Search Talent Pool'
 };

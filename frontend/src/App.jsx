@@ -1,11 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { ConfirmDialogProvider, useConfirm } from './context/ConfirmDialogContext';
 import { Navbar } from './components/Navbar';
-import SearchConsole from './components/SearchConsole';
-import AgentStatusWidget from './components/AgentStatusWidget';
-import { CandidateCard } from './components/CandidateCard';
 import CandidateDetailPanel from './components/CandidateDetailPanel';
 import { EditCandidateModal } from './components/EditCandidateModal';
 import { JobDescriptionModal } from './components/JobDescriptionModal';
@@ -16,9 +13,9 @@ import { CandidateComparator } from './components/CandidateComparator';
 import SourcingHubView from './components/SourcingHubView';
 import TeamManagementView from './components/TeamManagementView';
 import { AuthModal } from './components/AuthModal';
+import SearchMergeModal from './components/SearchMergeModal';
 import AuthPage from './components/AuthPage';
-import { searchCandidatesApi, getInitialCandidates, getTeamActivitiesApi, logActivityApi } from './services/api';
-import { getAvatarUrl } from './utils/avatar';
+import { searchCandidatesApi, getTeamActivitiesApi, logActivityApi } from './services/api';
 import { Sparkles } from 'lucide-react';
 
 function getEmptyWorkspaceState() {
@@ -54,6 +51,89 @@ function loadInitialWorkspaceData(teamKey, userKey) {
     candidatePipelineStage: getVal('pipeline_stages') || {},
     searchHistory: getVal('search_history') || [],
   };
+}
+
+function mergeCandidateResults(existingList = [], newResults = []) {
+  const existingMap = new Map();
+  const existingNameMap = new Map();
+
+  existingList.forEach((cand) => {
+    if (!cand) return;
+    const normalized = {
+      ...cand,
+      isNew: false,
+      isPrevious: true,
+    };
+    if (cand.id) {
+      existingMap.set(String(cand.id), normalized);
+    }
+    if (cand.fullName) {
+      existingNameMap.set(cand.fullName.toLowerCase().trim(), normalized);
+    }
+  });
+
+  const merged = [];
+  const handledKeys = new Set();
+
+  newResults.forEach((cand) => {
+    if (!cand) return;
+    const candId = cand.id ? String(cand.id) : null;
+    const candName = cand.fullName ? cand.fullName.toLowerCase().trim() : null;
+
+    const matchedPrev =
+      (candId && existingMap.get(candId)) ||
+      (candName && existingNameMap.get(candName));
+
+    if (matchedPrev) {
+      const prevKey = matchedPrev.id ? String(matchedPrev.id) : candName;
+      handledKeys.add(prevKey);
+      merged.push({
+        ...cand,
+        id: matchedPrev.id || cand.id,
+        notes: matchedPrev.notes?.length ? matchedPrev.notes : cand.notes || [],
+        isSavedForJob: matchedPrev.isSavedForJob || cand.isSavedForJob,
+        isNew: false,
+        isPrevious: true,
+        timesSeen: (Number(matchedPrev.timesSeen) || 1) + 1,
+      });
+    } else {
+      if (candId) handledKeys.add(candId);
+      merged.push({
+        ...cand,
+        isNew: true,
+        isPrevious: false,
+        sourcedAt: new Date().toISOString(),
+      });
+    }
+  });
+
+  // Append remaining candidates that were previously sourced but not returned in new search
+  existingList.forEach((cand) => {
+    if (!cand) return;
+    const key = cand.id
+      ? String(cand.id)
+      : cand.fullName
+      ? cand.fullName.toLowerCase().trim()
+      : null;
+    if (key && !handledKeys.has(key)) {
+      merged.push({
+        ...cand,
+        isNew: false,
+        isPrevious: true,
+      });
+    }
+  });
+
+  return merged;
+}
+
+function tagFreshResults(results = []) {
+  return results.map((c) => ({
+    ...c,
+    isNew: true,
+    isPrevious: false,
+    sourcedAt: new Date().toISOString(),
+  }));
 }
 
 function DashboardContent() {
@@ -167,16 +247,40 @@ function DashboardContent() {
   // Derive all unique known candidates across cache and shortlist
   const allKnownCandidates = useMemo(() => {
     const map = new Map();
-    candidates.forEach(c => { if (c?.id) map.set(c.id, c); });
-    Object.values(jobResultsCache).flat().forEach(c => { if (c?.id) map.set(c.id, c); });
-    shortlist.forEach(c => { if (c?.id) map.set(c.id, c); });
+    candidates.forEach((c) => {
+      if (c?.id) map.set(c.id, c);
+    });
+    Object.values(jobResultsCache).forEach((entry) => {
+      if (Array.isArray(entry)) {
+        entry.forEach((c) => {
+          if (c?.id) map.set(c.id, c);
+        });
+      } else if (Array.isArray(entry?.candidates)) {
+        entry.candidates.forEach((c) => {
+          if (c?.id) map.set(c.id, c);
+        });
+      } else if (Array.isArray(entry?.sourced)) {
+        entry.sourced.forEach((c) => {
+          if (c?.id) map.set(c.id, c);
+        });
+      } else if (Array.isArray(entry?.pool)) {
+        entry.pool.forEach((c) => {
+          if (c?.id) map.set(c.id, c);
+        });
+      }
+    });
+    shortlist.forEach((c) => {
+      if (c?.id) map.set(c.id, c);
+    });
     return Array.from(map.values());
   }, [candidates, jobResultsCache, shortlist]);
 
   // Extract candidates that are in the pipeline for the Kanban view
   const pipelineCandidates = useMemo(() => {
-    const savedIds = new Set(Object.values(savedRoleCandidates).flat().filter(Boolean));
-    const list = allKnownCandidates.filter(c => savedIds.has(c.id));
+    const savedIds = new Set(
+      Object.values(savedRoleCandidates).flat().filter(Boolean)
+    );
+    const list = allKnownCandidates.filter((c) => savedIds.has(c.id));
     return list;
   }, [allKnownCandidates, savedRoleCandidates]);
 
@@ -185,7 +289,18 @@ function DashboardContent() {
   const [agentStep, setAgentStep] = useState(0);
   const [lastSearch, setLastSearch] = useState(null);
   const [candidatesKey, setCandidatesKey] = useState(0);
-  const [searchMode, setSearchMode] = useState('live');
+  const [searchMode, setSearchMode] = useState('ai');
+
+  // Merge modal state
+  const [mergeModalState, setMergeModalState] = useState({
+    isOpen: false,
+    jobTitle: '',
+    existingCount: 0,
+    mode: 'ai',
+    query: '',
+    filters: {},
+    targetJobId: null,
+  });
 
   // Candidate inspection & editing state
   const [selectedCandidate, setSelectedCandidate] = useState(null);
@@ -209,43 +324,95 @@ function DashboardContent() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleSearch = async (query, filters = {}) => {
-    if (!hasPrivilege('source_candidates')) {
-      triggerToast(lang === 'FR' ? 'Privilège requis : Recherche et Sourcing IA.' : 'Action restricted: Requires Sourcing & Search privilege.');
-      return;
+  const executeSearch = async (query, filters = {}, targetJobId = null, action = 'replace') => {
+    const activeJobId = targetJobId || selectedJobId;
+    const activeJob = jobDescriptions.find((j) => String(j.id) === String(activeJobId));
+    const effectiveMode = filters.searchMode || searchMode || 'ai';
+    const isPool = effectiveMode === 'pool';
+    const cacheKey = isPool ? `${activeJobId}:pool` : activeJobId;
+
+    if (activeJobId && activeJobId !== selectedJobId) {
+      setSelectedJobId(activeJobId);
     }
+
+    let effectiveQuery = (query || '').trim();
+    if (!effectiveQuery && activeJob) {
+      effectiveQuery = activeJob.description || activeJob.prompt || activeJob.title || 'Technical Sourcing';
+    }
+
+    let existing = [];
+    const cached = jobResultsCache[cacheKey];
+    if (Array.isArray(cached)) {
+      existing = cached;
+    } else if (Array.isArray(cached?.candidates)) {
+      existing = cached.candidates;
+    }
+
+    const mergedFilters = {
+      location: activeJob?.location && activeJob.location !== 'All Locations' ? activeJob.location : '',
+      minExp: Number(activeJob?.minExperience) || 0,
+      tech: activeJob?.skills || activeJob?.requiredSkills || activeJob?.technologies || [],
+      maxResults: Number(activeJob?.maxResults) || 10,
+      ...filters,
+      offset: action === 'merge' ? existing.length : 0,
+      searchMode: effectiveMode,
+    };
 
     setIsSearching(true);
     setAgentStep(1);
 
     const stepTimer = setInterval(() => {
-      setAgentStep(prev => (prev < 4 ? prev + 1 : prev));
+      setAgentStep((prev) => (prev < 4 ? prev + 1 : prev));
     }, 450);
 
     try {
-      const results = await searchCandidatesApi(query, { ...filters, searchMode });
+      const results = await searchCandidatesApi(effectiveQuery, mergedFilters);
       clearInterval(stepTimer);
       setAgentStep(4);
-      setCandidates(results);
-      setCandidatesKey(prev => prev + 1);
 
-      // Cache results under selected job if active
-      if (selectedJobId) {
-        setJobResultsCache(prev => ({
+      let finalList;
+      if (action === 'merge' && existing.length > 0) {
+        finalList = mergeCandidateResults(existing, results);
+        const newlyAdded = finalList.filter(c => c.isNew).length;
+        triggerToast(
+          lang === 'FR'
+            ? `${results.length} profil(s) récupéré(s) (${newlyAdded} nouveaux, ${finalList.length} au total).`
+            : `${results.length} profile(s) fetched (${newlyAdded} new, ${finalList.length} total).`
+        );
+      } else {
+        finalList = tagFreshResults(results);
+        triggerToast(
+          lang === 'FR'
+            ? `${finalList.length} nouveaux profils sourcés.`
+            : `${finalList.length} fresh candidate profiles sourced.`
+        );
+      }
+
+      setCandidates(finalList);
+      setCandidatesKey((prev) => prev + 1);
+
+      // Cache results under appropriate key
+      if (activeJobId) {
+        setJobResultsCache((prev) => ({
           ...prev,
-          [selectedJobId]: results
+          [cacheKey]: finalList,
         }));
       }
 
       setLastSearch({
-        query,
-        filters,
-        count: results.length,
+        query: effectiveQuery,
+        filters: mergedFilters,
+        count: finalList.length,
         timestamp: new Date().toLocaleTimeString(),
       });
 
       // Record activity
-      recordActivity('SOURCE_SEARCH', query || 'Candidate Search', `Sourced ${results.length} candidate profiles.`);
+      const activityTitle = activeJob?.title || (isPool ? 'Talent Pool' : 'Live Candidate Search');
+      recordActivity(
+        'SOURCE_SEARCH',
+        activityTitle,
+        `Sourced ${finalList.length} candidate profile(s) (${isPool ? 'Talent Pool' : 'Live Sourcing'}).`
+      );
     } catch (err) {
       clearInterval(stepTimer);
       triggerToast(lang === 'FR' ? 'Erreur lors de la recherche.' : 'Search execution failed.');
@@ -254,46 +421,133 @@ function DashboardContent() {
     }
   };
 
+  const handleSearch = async (query, filters = {}, targetJobId = null) => {
+    if (!hasPrivilege('source_candidates')) {
+      triggerToast(
+        lang === 'FR'
+          ? 'Privilège requis : Recherche et Sourcing IA.'
+          : 'Action restricted: Requires Sourcing & Search privilege.'
+      );
+      return;
+    }
+
+    const activeJobId = targetJobId || selectedJobId;
+    const activeJob = jobDescriptions.find((j) => String(j.id) === String(activeJobId));
+    const effectiveMode = filters.searchMode || searchMode || 'ai';
+    const isPool = effectiveMode === 'pool';
+    const cacheKey = isPool ? `${activeJobId}:pool` : activeJobId;
+
+    if (activeJobId && activeJobId !== selectedJobId) {
+      setSelectedJobId(activeJobId);
+    }
+
+    const cached = jobResultsCache[cacheKey];
+    let existing = [];
+    if (Array.isArray(cached)) {
+      existing = cached;
+    } else if (Array.isArray(cached?.candidates)) {
+      existing = cached.candidates;
+    }
+
+    if (existing.length > 0) {
+      setMergeModalState({
+        isOpen: true,
+        jobTitle: activeJob?.title || '',
+        existingCount: existing.length,
+        mode: effectiveMode,
+        query,
+        filters,
+        targetJobId: activeJobId,
+      });
+      return;
+    }
+
+    // Direct search if no previous results exist
+    executeSearch(query, filters, activeJobId, 'replace');
+  };
+
   const handleSearchModeChange = (mode) => {
     setSearchMode(mode);
     const activeJobId = selectedJobId;
-    if (activeJobId && mode === 'pool') {
-      const cachedPool = jobResultsCache[`${activeJobId}:pool`];
-      if (cachedPool && cachedPool.length > 0) {
-        setCandidates(cachedPool);
+    if (activeJobId) {
+      if (mode === 'pool') {
+        const cachedPool = jobResultsCache[`${activeJobId}:pool`];
+        if (Array.isArray(cachedPool) && cachedPool.length > 0) {
+          setCandidates(cachedPool);
+        } else {
+          setCandidates([]);
+        }
+      } else {
+        const cachedSourced = jobResultsCache[activeJobId];
+        if (Array.isArray(cachedSourced) && cachedSourced.length > 0) {
+          setCandidates(cachedSourced);
+        } else {
+          setCandidates([]);
+        }
       }
     }
   };
 
   const handleSelectJob = (jobOrId) => {
-    const job = typeof jobOrId === 'object' ? jobOrId : jobDescriptions.find(j => String(j.id) === String(jobOrId));
+    const job = typeof jobOrId === 'object' ? jobOrId : jobDescriptions.find((j) => String(j.id) === String(jobOrId));
     if (!job) return;
     setSelectedJobId(job.id);
 
-    const cached = jobResultsCache[job.id];
-    if (cached && cached.length > 0) {
+    const targetKey = searchMode === 'pool' ? `${job.id}:pool` : job.id;
+    const cached = jobResultsCache[targetKey] || jobResultsCache[job.id];
+    if (Array.isArray(cached) && cached.length > 0) {
       setCandidates(cached);
     } else {
       setCandidates([]);
     }
   };
 
-  const handleCreateJob = (newJob) => {
+  const handleCreateJob = async (newJob, options = { autoSource: true }) => {
     if (!hasPrivilege('create_roles')) {
-      triggerToast(lang === 'FR' ? 'Privilège requis : Création de postes (HR Admin).' : 'Action restricted: Requires Create & Edit Roles privilege.');
+      await showAlert({
+        title: lang === 'FR' ? 'Action restreinte' : 'Action Restricted',
+        message: lang === 'FR' ? 'Privilège requis : Création de postes (HR Admin).' : 'Action restricted: Requires Create & Edit Roles privilege.',
+        type: 'warning',
+      });
       return;
     }
+    
     setJobDescriptions(prev => [...prev, newJob]);
-    handleSelectJob(newJob);
+    setSelectedJobId(newJob.id);
+    setActiveTab('sourcing');
     recordActivity('ROLE_CREATED', newJob.title, `Created job description for ${newJob.department || 'tech team'} (${newJob.location || 'Remote'})`);
-    triggerToast(lang === 'FR' ? 'Fiche de poste créée avec succès.' : 'Job description created successfully.');
+    triggerToast(lang === 'FR' ? 'Fiche de poste créée. Lancement du sourcing IA...' : 'Job description created. Starting AI sourcing...');
+
+    if (options?.autoSource !== false) {
+      const queryText = newJob.description || newJob.prompt || newJob.title || 'Technical Sourcing';
+      const skillsList = newJob.skills || newJob.requiredSkills || newJob.technologies || [];
+      const loc = newJob.location && newJob.location !== 'All Locations' ? newJob.location : '';
+
+      executeSearch(
+        queryText,
+        {
+          location: loc,
+          minExp: Number(newJob.minExperience) || 0,
+          tech: Array.isArray(skillsList) ? skillsList : [],
+          maxResults: Number(newJob.maxResults) || 10,
+          searchMode: 'ai',
+        },
+        newJob.id,
+        'replace'
+      );
+    }
   };
 
-  const handleEditJob = (updatedJob) => {
+  const handleEditJob = async (updatedJob) => {
     if (!hasPrivilege('create_roles')) {
-      triggerToast(lang === 'FR' ? 'Privilège requis : Modification de postes.' : 'Action restricted: Requires Create & Edit Roles privilege.');
+      await showAlert({
+        title: lang === 'FR' ? 'Action restreinte' : 'Action Restricted',
+        message: lang === 'FR' ? 'Privilège requis : Modification de postes.' : 'Action restricted: Requires Create & Edit Roles privilege.',
+        type: 'warning',
+      });
       return;
     }
+    
     setJobDescriptions(prev => prev.map(j => j.id === updatedJob.id ? updatedJob : j));
     recordActivity('ROLE_UPDATED', updatedJob.title, 'Updated job requirements & tech stack');
     triggerToast(lang === 'FR' ? 'Fiche de poste mise à jour.' : 'Job description updated.');
@@ -316,7 +570,7 @@ function DashboardContent() {
         ? `Êtes-vous sûr de vouloir supprimer la fiche "${targetJob?.title || 'sélectionnée'}" ? Cette action effacera également les résultats de sourcing associés.`
         : `Are you sure you want to delete "${targetJob?.title || 'this job'}"? This action will also clear associated sourcing results.`,
       itemBadge: targetJob?.title || 'Job Role',
-      confirmText: lang === 'FR' ? 'Supprimer le poste' : 'Delete Job',
+      confirmText: lang === 'FR' ? 'Supprimer' : 'Delete',
       cancelText: lang === 'FR' ? 'Annuler' : 'Cancel',
       type: 'danger',
     });
@@ -334,6 +588,7 @@ function DashboardContent() {
       setJobResultsCache(prev => {
         const next = { ...prev };
         delete next[jobId];
+        delete next[`${jobId}:pool`];
         return next;
       });
 
@@ -350,14 +605,48 @@ function DashboardContent() {
     }
   };
 
-  const handleToggleSaveForJob = (candidateId, jobId) => {
+  const handleToggleSaveForJob = async (candidateId, jobId) => {
     if (!hasPrivilege('shortlist_candidates')) {
-      triggerToast(lang === 'FR' ? 'Privilège requis : Sélection de candidats.' : 'Action restricted: Requires Shortlist Candidates privilege.');
+      await showAlert({
+        title: lang === 'FR' ? 'Action restreinte' : 'Action Restricted',
+        message: lang === 'FR' ? 'Privilège requis : Sélection de candidats.' : 'Action restricted: Requires Shortlist Candidates privilege.',
+        type: 'warning',
+      });
       return;
     }
 
     const cand = allKnownCandidates.find(c => c.id === candidateId);
     const job = jobDescriptions.find(j => j.id === jobId);
+
+    const current = savedRoleCandidates[jobId] || [];
+    const isAlreadySaved = current.includes(candidateId);
+    let confirmed = true;
+
+    if (isAlreadySaved) {
+      confirmed = await confirm({
+        title: lang === 'FR' ? 'Retirer du poste ?' : 'Remove from Role?',
+        message: lang === 'FR'
+          ? `Êtes-vous sûr de vouloir retirer ${cand?.fullName || 'ce candidat'} du poste "${job?.title}" ?`
+          : `Are you sure you want to remove ${cand?.fullName || 'this candidate'} from "${job?.title}"?`,
+        itemBadge: cand?.fullName || 'Candidate',
+        confirmText: lang === 'FR' ? 'Retirer' : 'Remove',
+        cancelText: lang === 'FR' ? 'Conserver' : 'Keep',
+        type: 'warning',
+      });
+    } else {
+      confirmed = await confirm({
+        title: lang === 'FR' ? 'Enregistrer au poste ?' : 'Save to Role?',
+        message: lang === 'FR'
+          ? `Êtes-vous sûr de vouloir enregistrer ${cand?.fullName || 'ce candidat'} au poste "${job?.title}" ?`
+          : `Are you sure you want to save ${cand?.fullName || 'this candidate'} to "${job?.title}"?`,
+        itemBadge: cand?.fullName || 'Candidate',
+        confirmText: lang === 'FR' ? 'Enregistrer' : 'Save',
+        cancelText: lang === 'FR' ? 'Annuler' : 'Cancel',
+        type: 'info',
+      });
+    }
+
+    if (!confirmed) return;
 
     setSavedRoleCandidates(prev => {
       const current = prev[jobId] || [];
@@ -378,13 +667,45 @@ function DashboardContent() {
     });
   };
 
-  const toggleShortlist = (candidate) => {
+  const toggleShortlist = async (candidate) => {
     if (!hasPrivilege('shortlist_candidates')) {
-      triggerToast(lang === 'FR' ? 'Privilège requis : Sélection de candidats.' : 'Action restricted: Requires Shortlist Candidates privilege.');
+      await showAlert({
+        title: lang === 'FR' ? 'Action restreinte' : 'Action Restricted',
+        message: lang === 'FR' ? 'Privilège requis : Sélection de candidats.' : 'Action restricted: Requires Shortlist Candidates privilege.',
+        type: 'warning',
+      });
       return;
     }
 
     const isAlreadyShortlisted = shortlist.some(c => c.id === candidate.id);
+    let confirmed = true;
+    
+    if (isAlreadyShortlisted) {
+      confirmed = await confirm({
+        title: lang === 'FR' ? 'Retirer de la sélection ?' : 'Remove from Shortlist?',
+        message: lang === 'FR'
+          ? `Êtes-vous sûr de vouloir retirer ${candidate.fullName} de la sélection ?`
+          : `Are you sure you want to remove ${candidate.fullName} from shortlist?`,
+        itemBadge: candidate.fullName,
+        confirmText: lang === 'FR' ? 'Retirer' : 'Remove',
+        cancelText: lang === 'FR' ? 'Conserver' : 'Keep',
+        type: 'warning',
+      });
+    } else {
+      confirmed = await confirm({
+        title: lang === 'FR' ? 'Ajouter à la sélection ?' : 'Add to Shortlist?',
+        message: lang === 'FR'
+          ? `Êtes-vous sûr de vouloir ajouter ${candidate.fullName} à la sélection ?`
+          : `Are you sure you want to add ${candidate.fullName} to shortlist?`,
+        itemBadge: candidate.fullName,
+        confirmText: lang === 'FR' ? 'Ajouter' : 'Add',
+        cancelText: lang === 'FR' ? 'Annuler' : 'Cancel',
+        type: 'info',
+      });
+    }
+
+    if (!confirmed) return;
+
     let updated;
     if (isAlreadyShortlisted) {
       updated = shortlist.filter(c => c.id !== candidate.id);
@@ -409,25 +730,54 @@ function DashboardContent() {
   };
 
   const handleSaveCandidate = (savedCandidate) => {
-    const exists = candidates.some(c => c.id === savedCandidate.id);
-    let updatedList;
-    if (exists) {
-      updatedList = candidates.map(c => c.id === savedCandidate.id ? savedCandidate : c);
-      triggerToast(lang === 'FR' ? 'Profil candidat mis à jour.' : 'Candidate profile updated.');
-    } else {
-      updatedList = [savedCandidate, ...candidates];
-      triggerToast(lang === 'FR' ? 'Nouveau candidat inséré avec succès.' : 'New candidate profile inserted.');
-    }
-    setCandidates(updatedList);
+    // 1. Update candidates array
+    setCandidates(prev => {
+      const exists = prev.some(c => c.id === savedCandidate.id);
+      return exists ? prev.map(c => c.id === savedCandidate.id ? savedCandidate : c) : [savedCandidate, ...prev];
+    });
 
-    if (savedCandidate.shortlisted) {
-      setShortlist(prev => {
-        const shortExists = prev.some(c => c.id === savedCandidate.id);
-        return shortExists ? prev.map(c => c.id === savedCandidate.id ? savedCandidate : c) : [...prev, savedCandidate];
+    // 2. Update jobResultsCache across ALL roles & pool entries
+    setJobResultsCache(prev => {
+      const next = {};
+      Object.entries(prev).forEach(([key, val]) => {
+        if (Array.isArray(val)) {
+          const exists = val.some(c => c.id === savedCandidate.id);
+          next[key] = exists ? val.map(c => c.id === savedCandidate.id ? savedCandidate : c) : val;
+        } else if (val && typeof val === 'object') {
+          const nextVal = { ...val };
+          if (Array.isArray(val.candidates)) {
+            nextVal.candidates = val.candidates.map(c => c.id === savedCandidate.id ? savedCandidate : c);
+          }
+          if (Array.isArray(val.sourced)) {
+            nextVal.sourced = val.sourced.map(c => c.id === savedCandidate.id ? savedCandidate : c);
+          }
+          if (Array.isArray(val.pool)) {
+            nextVal.pool = val.pool.map(c => c.id === savedCandidate.id ? savedCandidate : c);
+          }
+          next[key] = nextVal;
+        } else {
+          next[key] = val;
+        }
       });
-    } else {
-      setShortlist(prev => prev.filter(c => c.id !== savedCandidate.id));
-    }
+
+      // If active job cache exists and didn't have the candidate, add it
+      if (selectedJobId && Array.isArray(next[selectedJobId]) && !next[selectedJobId].some(c => c.id === savedCandidate.id)) {
+        next[selectedJobId] = [savedCandidate, ...next[selectedJobId]];
+      }
+
+      return next;
+    });
+
+    // 3. Update shortlist if present
+    setShortlist(prev => {
+      const exists = prev.some(c => c.id === savedCandidate.id);
+      return exists ? prev.map(c => c.id === savedCandidate.id ? savedCandidate : c) : prev;
+    });
+
+    // 4. Update selectedCandidate if currently open in detail panel
+    setSelectedCandidate(prev => (prev && prev.id === savedCandidate.id ? savedCandidate : prev));
+
+    triggerToast(lang === 'FR' ? 'Profil candidat mis à jour avec succès.' : 'Candidate profile updated successfully.');
   };
 
   const handleDeleteCandidate = async (target) => {
@@ -438,10 +788,10 @@ function DashboardContent() {
     const confirmed = await confirm({
       title: lang === 'FR' ? 'Supprimer le profil candidat ?' : 'Delete Candidate Profile?',
       message: lang === 'FR'
-        ? `Êtes-vous sûr de vouloir supprimer ${candidateName} ? Cette action retirera le profil de la sélection et du pipeline.`
+        ? `Êtes-vous sûr de vouloir supprimer ${candidateName} ? Cette action retirera le profil de votre espace de travail.`
         : `Are you sure you want to delete ${candidateName}? This will remove the profile from your workspace, shortlist, and pipeline.`,
       itemBadge: cand?.currentRole ? `${candidateName} • ${cand.currentRole}` : candidateName,
-      confirmText: lang === 'FR' ? 'Supprimer le profil' : 'Delete Profile',
+      confirmText: lang === 'FR' ? 'Supprimer' : 'Delete',
       cancelText: lang === 'FR' ? 'Conserver' : 'Keep',
       type: 'danger',
     });
@@ -449,6 +799,33 @@ function DashboardContent() {
     if (confirmed) {
       setCandidates(prev => prev.filter(c => c.id !== id));
       setShortlist(prev => prev.filter(c => c.id !== id));
+
+      setJobResultsCache(prev => {
+        const next = {};
+        Object.entries(prev).forEach(([key, val]) => {
+          if (Array.isArray(val)) {
+            next[key] = val.filter(c => c.id !== id);
+          } else if (val && typeof val === 'object') {
+            const nextVal = { ...val };
+            if (Array.isArray(val.candidates)) nextVal.candidates = val.candidates.filter(c => c.id !== id);
+            if (Array.isArray(val.sourced)) nextVal.sourced = val.sourced.filter(c => c.id !== id);
+            if (Array.isArray(val.pool)) nextVal.pool = val.pool.filter(c => c.id !== id);
+            next[key] = nextVal;
+          } else {
+            next[key] = val;
+          }
+        });
+        return next;
+      });
+
+      setSavedRoleCandidates(prev => {
+        const next = {};
+        Object.entries(prev).forEach(([jobId, ids]) => {
+          next[jobId] = Array.isArray(ids) ? ids.filter(candId => candId !== id) : [];
+        });
+        return next;
+      });
+
       if (selectedCandidate?.id === id) {
         setSelectedCandidate(null);
       }
@@ -457,9 +834,13 @@ function DashboardContent() {
     }
   };
 
-  const handleAddNote = (candidateId, noteText) => {
+  const handleAddNote = async (candidateId, noteText) => {
     if (!hasPrivilege('manage_notes')) {
-      triggerToast(lang === 'FR' ? 'Privilège requis : Gestion des notes.' : 'Action restricted: Requires Recruiter Notes privilege.');
+      await showAlert({
+        title: lang === 'FR' ? 'Action restreinte' : 'Action Restricted',
+        message: lang === 'FR' ? 'Privilège requis : Gestion des notes.' : 'Action restricted: Requires Recruiter Notes privilege.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -479,9 +860,29 @@ function DashboardContent() {
       createdAt: now.toISOString(),
     };
 
-    setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, notes: [...(c.notes || []), newNote] } : c));
-    setSelectedCandidate(prev => prev && prev.id === candidateId ? { ...prev, notes: [...(prev.notes || []), newNote] } : prev);
-    setShortlist(prev => prev.map(c => c.id === candidateId ? { ...c, notes: [...(c.notes || []), newNote] } : c));
+    const updateCandNotes = (c) => (c.id === candidateId ? { ...c, notes: [...(c.notes || []), newNote] } : c);
+
+    setCandidates(prev => prev.map(updateCandNotes));
+    setSelectedCandidate(prev => (prev && prev.id === candidateId ? updateCandNotes(prev) : prev));
+    setShortlist(prev => prev.map(updateCandNotes));
+
+    setJobResultsCache(prev => {
+      const next = {};
+      Object.entries(prev).forEach(([key, val]) => {
+        if (Array.isArray(val)) {
+          next[key] = val.map(updateCandNotes);
+        } else if (val && typeof val === 'object') {
+          const nextVal = { ...val };
+          if (Array.isArray(val.candidates)) nextVal.candidates = val.candidates.map(updateCandNotes);
+          if (Array.isArray(val.sourced)) nextVal.sourced = val.sourced.map(updateCandNotes);
+          if (Array.isArray(val.pool)) nextVal.pool = val.pool.map(updateCandNotes);
+          next[key] = nextVal;
+        } else {
+          next[key] = val;
+        }
+      });
+      return next;
+    });
 
     recordActivity('NOTE_ADDED', cand?.fullName || 'Candidate', `Added note: "${noteText.substring(0, 50)}${noteText.length > 50 ? '...' : ''}"`);
     triggerToast(lang === 'FR' ? 'Note enregistrée.' : 'Note saved.');
@@ -504,15 +905,35 @@ function DashboardContent() {
         ? 'Êtes-vous sûr de vouloir supprimer cette note d\'évaluation ? Cette action est irréversible.'
         : 'Are you sure you want to delete this evaluation note? This action cannot be undone.',
       itemBadge: cand?.fullName ? `Candidate: ${cand.fullName}` : 'Screening Note',
-      confirmText: lang === 'FR' ? 'Supprimer la note' : 'Delete Note',
+      confirmText: lang === 'FR' ? 'Supprimer' : 'Delete',
       cancelText: lang === 'FR' ? 'Annuler' : 'Cancel',
       type: 'danger',
     });
 
     if (confirmed) {
-      setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, notes: (c.notes || []).filter(n => n.id !== noteId) } : c));
-      setSelectedCandidate(prev => prev && prev.id === candidateId ? { ...prev, notes: (prev.notes || []).filter(n => n.id !== noteId) } : prev);
-      setShortlist(prev => prev.map(c => c.id === candidateId ? { ...c, notes: (c.notes || []).filter(n => n.id !== noteId) } : c));
+      const filterCandNotes = (c) => (c.id === candidateId ? { ...c, notes: (c.notes || []).filter(n => n.id !== noteId) } : c);
+
+      setCandidates(prev => prev.map(filterCandNotes));
+      setSelectedCandidate(prev => (prev && prev.id === candidateId ? filterCandNotes(prev) : prev));
+      setShortlist(prev => prev.map(filterCandNotes));
+
+      setJobResultsCache(prev => {
+        const next = {};
+        Object.entries(prev).forEach(([key, val]) => {
+          if (Array.isArray(val)) {
+            next[key] = val.map(filterCandNotes);
+          } else if (val && typeof val === 'object') {
+            const nextVal = { ...val };
+            if (Array.isArray(val.candidates)) nextVal.candidates = val.candidates.map(filterCandNotes);
+            if (Array.isArray(val.sourced)) nextVal.sourced = val.sourced.map(filterCandNotes);
+            if (Array.isArray(val.pool)) nextVal.pool = val.pool.map(filterCandNotes);
+            next[key] = nextVal;
+          } else {
+            next[key] = val;
+          }
+        });
+        return next;
+      });
 
       recordActivity('NOTE_DELETED', cand?.fullName || 'Candidate', 'Deleted screening note evaluation');
       triggerToast(lang === 'FR' ? 'Note supprimée.' : 'Note deleted.');
@@ -698,6 +1119,27 @@ function DashboardContent() {
           onViewCandidate={setSelectedCandidate}
         />
       )}
+
+      {/* Search Merge / Retention Modal */}
+      <SearchMergeModal
+        isOpen={mergeModalState.isOpen}
+        jobTitle={mergeModalState.jobTitle}
+        existingCount={mergeModalState.existingCount}
+        mode={mergeModalState.mode}
+        onKeepAndMerge={() => {
+          const { query, filters, targetJobId } = mergeModalState;
+          setMergeModalState((prev) => ({ ...prev, isOpen: false }));
+          executeSearch(query, filters, targetJobId, 'merge');
+        }}
+        onReplace={() => {
+          const { query, filters, targetJobId } = mergeModalState;
+          setMergeModalState((prev) => ({ ...prev, isOpen: false }));
+          executeSearch(query, filters, targetJobId, 'replace');
+        }}
+        onCancel={() => {
+          setMergeModalState((prev) => ({ ...prev, isOpen: false }));
+        }}
+      />
     </div>
   );
 }

@@ -25,6 +25,7 @@ import {
   Search,
   SlidersHorizontal,
   Sparkles,
+  Users,
   X,
 } from "lucide-react";
 
@@ -543,7 +544,8 @@ const SearchConsole = ({
     const baseDescription =
       selectedJob?.description ||
       selectedJob?.prompt ||
-      "";
+      selectedJob?.title ||
+      "Technical Sourcing";
 
     const finalQuery =
       query.trim() || baseDescription;
@@ -704,9 +706,10 @@ const SearchConsole = ({
               onClick={() =>
                 onSearchModeChange?.("ai")
               }
+              title="Autonomous live AI web candidate sourcing"
             >
               <Sparkles size={12} />
-              AI
+              AI Sourcing
             </button>
 
             <button
@@ -721,9 +724,10 @@ const SearchConsole = ({
                   "pool"
                 )
               }
+              title="Search within internal verified talent pool"
             >
-              <Braces size={12} />
-              Boolean
+              <Users size={12} />
+              Talent Pool
             </button>
           </div>
 

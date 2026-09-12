@@ -435,6 +435,7 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
     const response = await agentClient.post('/api/search', {
       query: fullPrompt,
       max_results: limit,
+      offset: Number(filters.offset) || 0,
     });
 
     const agentData = response.data;
@@ -520,45 +521,47 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
       await new Promise((r) => setTimeout(r, 2500));
       const profilesRes = await apiClient.get(`/searches/${searchObj.id}/profiles?size=20`);
       const pData = profilesRes.data?.data?.content || profilesRes.data?.content || [];
-      return pData.map(p => {
-        const name = p.fullName || 'Candidate';
-        const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0284c7&color=fff&bold=true`;
-        const candEmail = (p.email && !p.email.endsWith('@talent-candidate.ma'))
-          ? p.email
-          : (p.emailAddress && !p.emailAddress.endsWith('@talent-candidate.ma') ? p.emailAddress : null);
-        const exp = p.experienceYears || 3;
-        const comp = p.headline ? (p.headline.includes(' at ') ? p.headline.split(' at ')[1] : 'Listed on LinkedIn Profile') : 'Listed on LinkedIn Profile';
-        const cleanRole = p.headline ? p.headline.split(' at ')[0].split(' chez ')[0].split(' - ')[0].trim() : 'Software Professional';
+      if (Array.isArray(pData) && pData.length > 0) {
+        return pData.map(p => {
+          const name = p.fullName || 'Candidate';
+          const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0284c7&color=fff&bold=true`;
+          const candEmail = (p.email && !p.email.endsWith('@talent-candidate.ma'))
+            ? p.email
+            : (p.emailAddress && !p.emailAddress.endsWith('@talent-candidate.ma') ? p.emailAddress : null);
+          const exp = p.experienceYears || 3;
+          const comp = p.headline ? (p.headline.includes(' at ') ? p.headline.split(' at ')[1] : 'Listed on LinkedIn Profile') : 'Listed on LinkedIn Profile';
+          const cleanRole = p.headline ? p.headline.split(' at ')[0].split(' chez ')[0].split(' - ')[0].trim() : 'Software Professional';
 
-        return {
-          id: p.id || `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-          fullName: name,
-          headline: p.headline,
-          location: p.location,
-          experienceYears: exp,
-          email: candEmail,
-          matchScore: Math.round(p.score || 80),
-          summary: p.about || p.bio || p.summary || p.headline || p.fullName,
-          skills: Array.isArray(p.skills) ? p.skills : (p.skills?.skills || []),
-          linkedin: p.sourceUrl,
-          source: p.sourcePlatform,
-          avatarUrl: p.avatarUrl || p.avatar_url || defaultAvatar,
-          availability: p.availability || 'Open for Outreach (Contact Candidate)',
-          salaryExpectation: p.salaryExpectation || (exp >= 5 ? '[Est. Market Benchmark] 25,000 - 34,000 MAD / mo' : '[Est. Market Benchmark] 16,000 - 24,000 MAD / mo'),
-          languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : [],
-          experiences: Array.isArray(p.experiences) && p.experiences.length > 0 ? p.experiences : [
-            {
-              role: cleanRole,
-              company: comp,
-              period: 'Current Position',
-              description: `Active ${cleanRole} position at ${comp}.`
-            }
-          ]
-        };
-      });
+          return {
+            id: p.id || `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+            fullName: name,
+            headline: p.headline,
+            location: p.location,
+            experienceYears: exp,
+            email: candEmail,
+            matchScore: Math.round(p.score || 80),
+            summary: p.about || p.bio || p.summary || p.headline || p.fullName,
+            skills: Array.isArray(p.skills) ? p.skills : (p.skills?.skills || []),
+            linkedin: p.sourceUrl,
+            source: p.sourcePlatform,
+            avatarUrl: p.avatarUrl || p.avatar_url || defaultAvatar,
+            availability: p.availability || 'Open for Outreach (Contact Candidate)',
+            salaryExpectation: p.salaryExpectation || (exp >= 5 ? '[Est. Market Benchmark] 25,000 - 34,000 MAD / mo' : '[Est. Market Benchmark] 16,000 - 24,000 MAD / mo'),
+            languages: Array.isArray(p.languages) && p.languages.length > 0 ? p.languages : [],
+            experiences: Array.isArray(p.experiences) && p.experiences.length > 0 ? p.experiences : [
+              {
+                role: cleanRole,
+                company: comp,
+                period: 'Current Position',
+                description: `Active ${cleanRole} position at ${comp}.`
+              }
+            ]
+          };
+        });
+      }
     }
   } catch (backendError) {
-    console.error('Backend search fallback failed:', backendError.message);
+    console.warn('Backend search fallback failed:', backendError.message);
   }
 
   return [];
@@ -801,12 +804,16 @@ export const getTeamActivitiesApi = async (limit = 30) => {
 };
 
 export const logActivityApi = async (actionType, targetTitle, details = '', targetId = '') => {
+  const safeTargetTitle = typeof targetTitle === 'string' ? targetTitle.slice(0, 200) : String(targetTitle || '').slice(0, 200);
+  const safeDetails = typeof details === 'string' ? details.slice(0, 1000) : String(details || '').slice(0, 1000);
+  const safeTargetId = typeof targetId === 'string' ? targetId.slice(0, 100) : String(targetId || '').slice(0, 100);
+
   try {
     const { data } = await apiClient.post('/team/activities', {
       actionType,
-      targetId,
-      targetTitle,
-      details,
+      targetId: safeTargetId,
+      targetTitle: safeTargetTitle,
+      details: safeDetails,
     });
     return data.data;
   } catch (error) {
@@ -819,9 +826,9 @@ export const logActivityApi = async (actionType, targetTitle, details = '', targ
       actorEmail: user.email || 'user@digitalia.io',
       actorRole: user.role || 'RECRUITER',
       actionType,
-      targetId,
-      targetTitle,
-      details,
+      targetId: safeTargetId,
+      targetTitle: safeTargetTitle,
+      details: safeDetails,
       createdAt: new Date().toISOString(),
     };
     const current = JSON.parse(localStorage.getItem('digitalia_shared_team_activities') || JSON.stringify(DEFAULT_ACTIVITIES));

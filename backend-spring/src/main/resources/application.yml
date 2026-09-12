@@ -67,8 +67,8 @@ app:
     cleanup-cron: "0 0 3 * * ?" # Daily purge of expired refresh tokens at 3 AM
   agent:
     url: ${AGENT_SERVICE_URL:http://localhost:8001}
-    timeout-ms: 60000 # 60 seconds per HTTP request attempt
-    global-timeout-ms: 90000 # 90 seconds global timeout wrapping retries
+    timeout-ms: 120000 # 120 seconds per HTTP request attempt
+    global-timeout-ms: 180000 # 180 seconds global timeout wrapping retries
   cors:
     allowed-origins:
       - ${FRONTEND_CORS_ORIGIN:http://localhost:5173}

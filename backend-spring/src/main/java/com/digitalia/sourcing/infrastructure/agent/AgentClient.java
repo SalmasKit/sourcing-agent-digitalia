@@ -40,7 +40,7 @@ public class AgentClient {
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static record AgentSearchRequest(String query, UUID searchRequestId, int maxResults) {
         public AgentSearchRequest(String query, UUID searchRequestId) {
-            this(query, searchRequestId, 20);
+            this(query, searchRequestId, 10);
         }
     }
 
@@ -51,7 +51,7 @@ public class AgentClient {
             String fullName,
             String headline,
             String location,
-            Map<String, Object> skills,
+            Object skills,
             Short experienceYears,
             Map<String, Object> rawData,
             BigDecimal score,

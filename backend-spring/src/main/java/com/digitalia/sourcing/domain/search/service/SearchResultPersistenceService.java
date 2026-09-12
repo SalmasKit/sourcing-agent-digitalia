@@ -10,7 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -23,6 +25,7 @@ public class SearchResultPersistenceService {
     private final ProfileRepository profileRepository;
 
     @Transactional
+    @SuppressWarnings("unchecked")
     public void saveSearchResults(UUID searchRequestId, AgentClient.AgentSearchResponse response) {
         log.info("Successfully received search results for request ID: {}", searchRequestId);
 
@@ -34,19 +37,28 @@ public class SearchResultPersistenceService {
 
         if (response.profiles() != null) {
             List<Profile> profiles = response.profiles().stream()
-                    .map(p -> Profile.builder()
-                            .searchRequest(searchRequest)
-                            .sourcePlatform(p.sourcePlatform())
-                            .sourceUrl(p.sourceUrl())
-                            .fullName(p.fullName())
-                            .headline(p.headline())
-                            .location(p.location())
-                            .skills(p.skills())
-                            .experienceYears(p.experienceYears())
-                            .rawData(p.rawData())
-                            .score(p.score())
-                            .scoreBreakdown(p.scoreBreakdown())
-                            .build())
+                    .map((AgentClient.AgentProfileResponse p) -> {
+                        Map<String, Object> skillsMap = new HashMap<>();
+                        if (p.skills() instanceof Map<?, ?> m) {
+                            skillsMap = (Map<String, Object>) m;
+                        } else if (p.skills() instanceof List<?> list) {
+                            skillsMap.put("skills", list);
+                        }
+                        Profile profile = Profile.builder()
+                                .searchRequest(searchRequest)
+                                .sourcePlatform(p.sourcePlatform())
+                                .sourceUrl(p.sourceUrl())
+                                .fullName(p.fullName())
+                                .headline(p.headline())
+                                .location(p.location())
+                                .skills(skillsMap)
+                                .experienceYears(p.experienceYears())
+                                .rawData(p.rawData())
+                                .score(p.score())
+                                .scoreBreakdown(p.scoreBreakdown())
+                                .build();
+                        return profile;
+                    })
                     .collect(Collectors.toList());
 
             profileRepository.saveAll(profiles);

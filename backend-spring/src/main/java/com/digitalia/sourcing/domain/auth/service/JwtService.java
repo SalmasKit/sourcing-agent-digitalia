@@ -80,6 +80,18 @@ public class JwtService {
         return buildToken(extraClaims, userDetails, jwtExpiration);
     }
 
+    public String generateSystemToken() {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", "SUPER_ADMIN");
+        return Jwts.builder()
+                .claims(claims)
+                .subject("system-internal@digitalia.io")
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + 86400000L)) // 24 hours
+                .signWith(getSignInKey(), Jwts.SIG.HS256)
+                .compact();
+    }
+
     public long getExpirationTime() {
         return jwtExpiration;
     }

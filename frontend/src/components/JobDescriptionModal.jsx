@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { searchLocations } from '../utils/geocoding';
 import { agentClient } from '../services/api';
+import { useConfirm } from '../context/ConfirmDialogContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const CONTRACT_ICON_MAP = { Briefcase, Clock, Laptop, Home };
 const SENIORITY_ICONS = [User, Users, Award, Crown];
@@ -62,8 +64,10 @@ function useFonts() {
 
 export function JobDescriptionModal({ isOpen = true, onClose = () => { }, onCreate = () => { }, onEdit = () => { }, editingJob = null, lang = 'EN' }) {
   useFonts();
+  const { confirm } = useConfirm();
+  const { lang: appLang } = useLanguage();
   const t = COPY.EN;
-  const isFR = false;
+  const isFR = appLang === 'FR';
 
   const [step, setStep] = useState(0);
   const [titleErr, setTitleErr] = useState(false);
@@ -182,6 +186,7 @@ export function JobDescriptionModal({ isOpen = true, onClose = () => { }, onCrea
       setIsGenerating(false);
     }
   }
+
   function handleConfirmPrompt() { if (generatedPromptPreview) setDescription(String(generatedPromptPreview)); setShowPromptConfirm(false); }
 
   function goNext() {
@@ -202,7 +207,7 @@ export function JobDescriptionModal({ isOpen = true, onClose = () => { }, onCrea
     return 3;
   };
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const safeTitle = String(title || '').trim();
     if (!safeTitle) { setStep(0); setTitleErr(true); return; }
@@ -216,8 +221,22 @@ export function JobDescriptionModal({ isOpen = true, onClose = () => { }, onCrea
       location: location.trim() || 'All Locations', requiredSkills: skills, niceToHaveSkills, skills,
       seniority, contractType, maxResults: Number(maxResults) || 10, minExperience: getMinExperienceFromSeniority(seniority), status: editingJob ? editingJob.status : 'active',
     };
-    if (editingJob) onEdit(jobData); else onCreate(jobData);
-    onClose();
+
+    const confirmed = await confirm({
+      title: editingJob ? (isFR ? 'Modifier la fiche de poste ?' : 'Update Job Description?') : (isFR ? 'Créer la fiche de poste ?' : 'Create Job Description?'),
+      message: editingJob
+        ? (isFR ? `Êtes-vous sûr de vouloir modifier la fiche "${safeTitle}" ?` : `Are you sure you want to update "${safeTitle}"?`)
+        : (isFR ? `Êtes-vous sûr de vouloir créer la fiche "${safeTitle}" ?` : `Are you sure you want to create "${safeTitle}"?`),
+      itemBadge: safeTitle,
+      confirmText: editingJob ? (isFR ? 'Modifier' : 'Update') : (isFR ? 'Créer' : 'Create'),
+      cancelText: isFR ? 'Annuler' : 'Cancel',
+      type: 'info',
+    });
+
+    if (confirmed) {
+      if (editingJob) onEdit(jobData); else onCreate(jobData);
+      onClose();
+    }
   }
 
   const previewVisible = title.trim() || skills.length > 0;

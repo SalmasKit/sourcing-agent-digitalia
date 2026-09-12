@@ -235,15 +235,22 @@ public class TeamService {
     public ActivityLogDto recordActivity(User currentUser, RecordActivityRequest request) {
         String teamId = currentUser.getTeamId() != null ? currentUser.getTeamId() : "targetalent_workspace";
 
+        String safeTargetTitle = request.targetTitle() != null && request.targetTitle().length() > 250
+                ? request.targetTitle().substring(0, 247) + "..."
+                : request.targetTitle();
+        String safeTargetId = request.targetId() != null && request.targetId().length() > 100
+                ? request.targetId().substring(0, 100)
+                : request.targetId();
+
         ActivityLog logEntry = ActivityLog.builder()
                 .teamId(teamId)
                 .actor(currentUser)
                 .actorName(currentUser.getFullName() != null ? currentUser.getFullName() : currentUser.getEmail().split("@")[0])
                 .actorEmail(currentUser.getEmail())
-                .actorRole(currentUser.getRole().name())
+                .actorRole(currentUser.getRole() != null ? currentUser.getRole().name() : "RECRUITER")
                 .actionType(request.actionType())
-                .targetId(request.targetId())
-                .targetTitle(request.targetTitle())
+                .targetId(safeTargetId)
+                .targetTitle(safeTargetTitle)
                 .details(request.details())
                 .build();
 
