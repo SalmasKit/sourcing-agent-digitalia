@@ -15,14 +15,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
       - name: Run Trivy Config / IaC Scanner
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          scan-type: 'config'
-          scan-ref: '.'
-          severity: 'HIGH,CRITICAL'
-          format: 'table'
-          exit-code: '0'
+        run: |
+          trivy config . --severity HIGH,CRITICAL --exit-code 0
 
       - name: Run Checkov IaC Security Scanner
         run: |

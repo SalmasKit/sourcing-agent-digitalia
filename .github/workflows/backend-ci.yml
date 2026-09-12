@@ -89,14 +89,14 @@ jobs:
           cd backend-spring
           mvn -B dependency:resolve dependency:resolve-plugins
 
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
       - name: Run Trivy vulnerability scanner (filesystem)
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: 'backend-spring'
-          severity: 'HIGH,CRITICAL'
-          exit-code: '1'
-          format: 'table'
+        run: |
+          trivy fs backend-spring --severity HIGH,CRITICAL --exit-code 1
+
 
   sonarqube:
     name: SonarQube Analysis
