@@ -81,6 +81,7 @@ const COPY = {
     hrDesc: 'Team administration, invites & settings',
     submitLogin: 'Sign in',
     submitReg: 'Create account',
+    rememberMe: 'Remember me',
     footerCopy: 'Targetalent — Enterprise sourcing platform © 2026',
     footerLinks: ['Security', 'Status', 'Documentation', 'Support'],
     errLogin: 'We couldn\u2019t sign you in. Check your email and password.',
@@ -152,6 +153,7 @@ const COPY = {
     hrDesc: 'Gestion d\u2019équipe, invitations et configuration',
     submitLogin: 'Se connecter',
     submitReg: 'Créer le compte',
+    rememberMe: 'Se souvenir de moi',
     footerCopy: 'Targetalent — Plateforme de sourcing d\u2019entreprise © 2026',
     footerLinks: ['Sécurité', 'Statut', 'Documentation', 'Support'],
     errLogin: 'Connexion impossible. Vérifiez votre email et mot de passe.',
@@ -656,7 +658,20 @@ export default function AuthPage({ onAccepted, onClearInvite }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(() => Boolean(inviteToken));
   const [isTourModalOpen, setIsTourModalOpen] = useState(false);
   const [isLogin, setIsLogin] = useState(!inviteToken);
-  const [email, setEmail] = useState('');
+  const [rememberMe, setRememberMe] = useState(() => {
+    try {
+      return localStorage.getItem('targetalent_remember_me') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [email, setEmail] = useState(() => {
+    try {
+      return localStorage.getItem('targetalent_remembered_email') || '';
+    } catch (e) {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('RECRUITER');
@@ -709,8 +724,20 @@ export default function AuthPage({ onAccepted, onClearInvite }) {
         }
       } else if (isLogin) {
         const success = await login(email, password);
-        if (!success) setError(t.errLogin);
-        else setIsAuthModalOpen(false);
+        if (!success) {
+          setError(t.errLogin);
+        } else {
+          try {
+            if (rememberMe) {
+              localStorage.setItem('targetalent_remember_me', 'true');
+              localStorage.setItem('targetalent_remembered_email', email.trim());
+            } else {
+              localStorage.removeItem('targetalent_remember_me');
+              localStorage.removeItem('targetalent_remembered_email');
+            }
+          } catch (e) { }
+          setIsAuthModalOpen(false);
+        }
       } else {
         const success = await register(name, email, password, role);
         if (!success) setError(t.errReg);
@@ -1136,6 +1163,10 @@ export default function AuthPage({ onAccepted, onClearInvite }) {
         .dg-role-title { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: var(--dg-ink-900); }
         .dg-role-desc { font-size: 10.5px; color: var(--dg-ink-500); margin-top: 4px; line-height: 1.4; }
 
+        .dg-remember-row { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+        .dg-checkbox-label { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; color: var(--dg-ink-700); cursor: pointer; user-select: none; }
+        .dg-checkbox { width: 16px; height: 16px; accent-color: var(--dg-teal-600); border-radius: 4px; cursor: pointer; margin: 0; }
+
         .dg-submit { width: 100%; margin-top: 22px; padding: 13px 0; border: none; border-radius: 12px; background: var(--dg-ink-900); color: #fff; font-size: 13.5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background .18s var(--ease), transform .1s ease; }
         .dg-submit:hover { background: var(--dg-teal-700); }
         .dg-submit:active { transform: scale(0.99); }
@@ -1384,6 +1415,20 @@ export default function AuthPage({ onAccepted, onClearInvite }) {
                   </button>
                 </div>
               </div>
+
+              {isLogin && !inviteToken && (
+                <div className="dg-remember-row">
+                  <label className="dg-checkbox-label">
+                    <input
+                      type="checkbox"
+                      className="dg-checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                    />
+                    <span>{t.rememberMe}</span>
+                  </label>
+                </div>
+              )}
 
               {!isLogin && !inviteToken && (
                 <div className="dg-field">

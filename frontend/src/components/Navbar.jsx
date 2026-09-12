@@ -213,12 +213,6 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
                       <div className="nb-dropdown-name">{user.fullName || user.name}</div>
                       <div className="nb-dropdown-email">{user.email}</div>
                     </div>
-                    {isAdmin && (
-                      <button className="nb-dropdown-item" onClick={() => { selectTab('team'); setUserMenuOpen(false); }}>
-                        <ShieldCheck size={14} color="#0A7E96" />
-                        <span>{isFR ? 'Gestion d\'équipe' : 'Team & Privileges'}</span>
-                      </button>
-                    )}
                     <button className="nb-dropdown-item" onClick={() => { setPasswordModal(true); setUserMenuOpen(false); }}>
                       <KeyRound size={14} />
                       <span>{isFR ? 'Changer mot de passe' : 'Change password'}</span>

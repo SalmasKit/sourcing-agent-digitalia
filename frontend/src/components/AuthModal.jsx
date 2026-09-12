@@ -5,7 +5,20 @@ import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
+  const [rememberMe, setRememberMe] = useState(() => {
+    try {
+      return localStorage.getItem('targetalent_remember_me') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [email, setEmail] = useState(() => {
+    try {
+      return localStorage.getItem('targetalent_remembered_email') || '';
+    } catch (e) {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('RECRUITER');
@@ -25,6 +38,15 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     try {
       if (isLogin) {
         await login(email, password);
+        try {
+          if (rememberMe) {
+            localStorage.setItem('targetalent_remember_me', 'true');
+            localStorage.setItem('targetalent_remembered_email', email.trim());
+          } else {
+            localStorage.removeItem('targetalent_remember_me');
+            localStorage.removeItem('targetalent_remembered_email');
+          }
+        } catch (e) { }
       } else {
         await register(name, email, password, role);
       }
@@ -164,6 +186,20 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                 />
               </div>
             </div>
+
+            {isLogin && (
+              <div className="flex items-center justify-between text-xs pt-0.5">
+                <label className="flex items-center space-x-2 text-slate-600 cursor-pointer select-none font-medium">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>Remember me</span>
+                </label>
+              </div>
+            )}
 
             <button
               type="submit"
