@@ -34,7 +34,7 @@
 		<jacoco.skip>false</jacoco.skip>
 		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
 		<sonar.version>4.0.0.4121</sonar.version>
-		<owasp.version>10.0.4</owasp.version>
+		<owasp.version>13.0.0</owasp.version>
 	</properties>
 
 	<dependencies>
