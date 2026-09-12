@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'backend-spring/**'
-      - '.github/workflows/backend-ci.yml'
+      - develop
   pull_request:
     branches:
       - main
@@ -15,9 +13,6 @@ on:
       - opened
       - synchronize
       - reopened
-    paths:
-      - 'backend-spring/**'
-      - '.github/workflows/backend-ci.yml'
   workflow_dispatch:
 
 jobs:

@@ -2,13 +2,18 @@ name: Python Agent Service CI
 
 on:
   push:
-    paths:
-      - 'agent-service/**'
-      - '.github/workflows/agent-ci.yml'
+    branches:
+      - main
+      - develop
   pull_request:
-    paths:
-      - 'agent-service/**'
-      - '.github/workflows/agent-ci.yml'
+    branches:
+      - main
+      - develop
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -53,4 +58,41 @@ jobs:
       run: |
         trivy fs agent-service --severity CRITICAL,HIGH --exit-code 0
       continue-on-error: true
+
+
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Checkout repository
+        if: env.SONAR_TOKEN != ''
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        if: env.SONAR_TOKEN != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies & generate coverage
+        if: env.SONAR_TOKEN != ''
+        run: |
+          cd agent-service
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          pytest --cov=src --cov-report=xml --cov-report=term
+
+      - name: SonarCloud Scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarcloud-github-action@master
+        with:
+          projectBaseDir: agent-service
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
