@@ -281,6 +281,12 @@ export default function CandidateDetailPanel({
   onClose,
   onToggleShortlist,
   isShortlisted = false,
+
+  // Role-based shortlist logic — same as CandidateCard
+  onToggleSaveForJob,
+  isSavedForJob = false,
+  selectedJobId = null,
+
   onEdit,
   onDelete,
   onAddNote,
@@ -531,7 +537,9 @@ export default function CandidateDetailPanel({
   ------------------------------------------------------- */
 
   const handleShortlistClick = () => {
-    onToggleShortlist?.(candidate);
+    if (!candidate || !selectedJobId || !onToggleSaveForJob) return;
+
+    onToggleSaveForJob(candidate.id, selectedJobId);
 
     setJustSaved(true);
 
@@ -699,20 +707,24 @@ export default function CandidateDetailPanel({
         <div className="cdp-commandbar">
           <button
             type="button"
-            className={`cdp-shortlist-btn ${
-              isShortlisted ? "is-active" : ""
-            }`}
+            className={`cdp-shortlist-btn ${isSavedForJob ? "is-active" : ""
+              }`}
             onClick={handleShortlistClick}
+            disabled={!selectedJobId}
           >
-            {isShortlisted ? (
+            {isSavedForJob ? (
               <BookmarkCheck size={17} />
             ) : (
               <Bookmark size={17} />
             )}
 
-            <span>{isShortlisted ? "Shortlisted" : "Shortlist"}</span>
+            <span>
+              {isSavedForJob ? "Shortlisted" : "Shortlist"}
+            </span>
 
-            {justSaved && <Check size={15} className="cdp-action-check" />}
+            {justSaved && (
+              <Check size={15} className="cdp-action-check" />
+            )}
           </button>
 
           <div className="cdp-command-divider" />
@@ -756,9 +768,8 @@ export default function CandidateDetailPanel({
 
             <button
               type="button"
-              className={`cdp-draft-btn ${
-                outreachOpen ? "is-open" : ""
-              }`}
+              className={`cdp-draft-btn ${outreachOpen ? "is-open" : ""
+                }`}
               onClick={() =>
                 handleDraftOutreach(outreachChannel || "email")
               }
@@ -1082,8 +1093,8 @@ export default function CandidateDetailPanel({
                         {score >= 90
                           ? "Strong candidate signal"
                           : score >= 80
-                          ? "Promising candidate signal"
-                          : "Worth reviewing"}
+                            ? "Promising candidate signal"
+                            : "Worth reviewing"}
                       </h3>
                     </div>
 
@@ -1096,7 +1107,7 @@ export default function CandidateDetailPanel({
                   </div>
 
                   {(Array.isArray(candidate.match_rationale) &&
-                  candidate.match_rationale.length > 0) ? (
+                    candidate.match_rationale.length > 0) ? (
                     <div className="cdp-reasons">
                       {candidate.match_rationale.map((reason, index) => (
                         <div key={index} className="cdp-reason">
@@ -1198,7 +1209,7 @@ export default function CandidateDetailPanel({
                 />
 
                 {Array.isArray(experienceArray) &&
-                experienceArray.length > 0 ? (
+                  experienceArray.length > 0 ? (
                   <div className="cdp-timeline">
                     {experienceArray.map((item, index) => (
                       <article

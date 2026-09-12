@@ -113,8 +113,8 @@ function mergeCandidateResults(existingList = [], newResults = []) {
     const key = cand.id
       ? String(cand.id)
       : cand.fullName
-      ? cand.fullName.toLowerCase().trim()
-      : null;
+        ? cand.fullName.toLowerCase().trim()
+        : null;
     if (key && !handledKeys.has(key)) {
       merged.push({
         ...cand,
@@ -511,7 +511,7 @@ function DashboardContent() {
       });
       return;
     }
-    
+
     setJobDescriptions(prev => [...prev, newJob]);
     setSelectedJobId(newJob.id);
     setActiveTab('sourcing');
@@ -547,7 +547,7 @@ function DashboardContent() {
       });
       return;
     }
-    
+
     setJobDescriptions(prev => prev.map(j => j.id === updatedJob.id ? updatedJob : j));
     recordActivity('ROLE_UPDATED', updatedJob.title, 'Updated job requirements & tech stack');
     triggerToast(lang === 'FR' ? 'Fiche de poste mise à jour.' : 'Job description updated.');
@@ -679,7 +679,7 @@ function DashboardContent() {
 
     const isAlreadyShortlisted = shortlist.some(c => c.id === candidate.id);
     let confirmed = true;
-    
+
     if (isAlreadyShortlisted) {
       confirmed = await confirm({
         title: lang === 'FR' ? 'Retirer de la sélection ?' : 'Remove from Shortlist?',
@@ -1076,12 +1076,23 @@ function DashboardContent() {
           candidate={selectedCandidate}
           anchorRect={selectedCardRect}
           panelSide="auto"
+
           onClose={() => {
             setSelectedCandidate(null);
             setSelectedCardRect(null);
           }}
-          onToggleShortlist={toggleShortlist}
-          isShortlisted={shortlist.some(c => c.id === selectedCandidate.id)}
+
+          // USE THE SAME SHORTLIST LOGIC AS THE CARD
+          onToggleSaveForJob={handleToggleSaveForJob}
+          selectedJobId={selectedJobId}
+          isSavedForJob={
+            selectedJobId
+              ? (savedRoleCandidates[selectedJobId] || []).includes(
+                selectedCandidate.id
+              )
+              : false
+          }
+
           onEdit={handleOpenEditCandidate}
           onDelete={handleDeleteCandidate}
           onAddNote={handleAddNote}
