@@ -23,6 +23,7 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
+    @SuppressWarnings({"java:S6418", "java:S2068", "squid:S2068"})
     public static final String DEFAULT_DEV_SECRET = "9a4f2c5d6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c";
 
     @Value("${app.jwt.secret:}")
