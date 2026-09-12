@@ -34,6 +34,12 @@ jobs:
         cd agent-service
         ruff check src
 
+    - name: Run Bandit SAST Security Scan
+      run: |
+        pip install bandit
+        bandit -r agent-service/src -ll -q
+
+
     - name: Run Pytest with Coverage
       run: |
         cd agent-service

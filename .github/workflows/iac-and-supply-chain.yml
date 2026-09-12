@@ -1,0 +1,66 @@
+name: IaC & Supply Chain Security (Checkov + SBOM + Cosign)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  iac-scan:
+    name: Infrastructure as Code (IaC) Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy Config / IaC Scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          severity: 'HIGH,CRITICAL'
+          format: 'table'
+          exit-code: '0'
+
+      - name: Run Checkov IaC Security Scanner
+        uses: bridgecrewio/checkov-action@v12.2847.0
+        with:
+          framework: dockerfile,secrets
+          output_format: cli
+          soft_fail: true
+
+  sbom-generation:
+    name: Generate Software Bill of Materials (SBOM)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0.17.0
+        with:
+          path: .
+          format: 'cyclonedx-json'
+          output-file: 'sourcing-agent-project-sbom.cyclonedx.json'
+
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-sbom
+          path: sourcing-agent-project-sbom.cyclonedx.json
+          retention-days: 30
+
+  image-signing-readiness:
+    name: Cosign Image Signing Readiness Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.5.0
+        with:
+          cosign-release: 'v2.2.4'
+
+      - name: Verify Cosign Installation
+        run: |
+          cosign version

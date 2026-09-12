@@ -35,7 +35,23 @@ jobs:
         cd frontend
         npx oxlint
 
+    - name: Run NPM Security Audit
+      run: |
+        cd frontend
+        npm audit --audit-level=high
+      continue-on-error: true
+
     - name: Build frontend
       run: |
         cd frontend
         npm run build
+
+    - name: Run Trivy Vulnerability Scanner (Frontend)
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: 'frontend'
+        severity: 'CRITICAL,HIGH'
+        format: 'table'
+        exit-code: '0'
+

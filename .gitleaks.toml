@@ -1,0 +1,17 @@
+# Gitleaks configuration
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for dummy/test secrets"
+paths = [
+    '''\.env\.example$''',
+    '''backend-spring/src/test/.*''',
+    '''agent-service/tests/.*''',
+    '''observability/.*'''
+]
+regexes = [
+    '''sqa_[a-f0-9]{40}''', # Sonar local demo token
+    '''sourcing_password''',
+    '''postgres:5432'''
+]
