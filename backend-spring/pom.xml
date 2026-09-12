@@ -30,7 +30,7 @@
 		<flyway.version>10.18.0</flyway.version>
 		<springdoc.version>2.8.14</springdoc.version>
 		<!-- Plugin versions & quality gates -->
-		<jacoco.version>0.8.12</jacoco.version>
+		<jacoco.version>0.8.15</jacoco.version>
 		<jacoco.skip>false</jacoco.skip>
 		<jacoco.haltOnFailure>true</jacoco.haltOnFailure>
 		<sonar.version>4.0.0.4121</sonar.version>
