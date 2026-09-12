@@ -2,9 +2,16 @@
  * CandidateGridView
  *
  * Grid view for displaying candidate cards in a responsive grid layout.
+ *
+ * Features:
+ *  - Candidate selection
+ *  - Bulk shortlist / compare / delete
+ *  - Pagination
+ *  - Score sorting
+ *  - French / English support
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Trash2,
   BookmarkCheck,
@@ -12,6 +19,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ArrowDownUp,
 } from 'lucide-react';
 
 import { CandidateCard } from './CandidateCard';
@@ -34,6 +42,9 @@ export default function CandidateGridView({
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [page, setPage] = useState(0);
 
+  // New: score sorting
+  const [scoreSort, setScoreSort] = useState('default');
+
   const PAGE_SIZE = 6;
 
   const { confirm } = useConfirm();
@@ -46,6 +57,7 @@ export default function CandidateGridView({
     candidates: isFrench ? 'candidats' : 'candidates',
 
     selected: isFrench ? 'sélectionné' : 'selected',
+
     selectedProfiles: isFrench
       ? 'Profils sélectionnés'
       : 'Selected Profiles',
@@ -70,14 +82,6 @@ export default function CandidateGridView({
       ? 'Supprimer la sélection'
       : 'Delete Selected',
 
-    deleteTitle: isFrench
-      ? 'Supprimer les profils sélectionnés ?'
-      : 'Delete Candidate Profiles?',
-
-    deleteMessage: isFrench
-      ? 'Êtes-vous sûr de vouloir supprimer les profils candidats sélectionnés de votre espace de travail ?'
-      : 'Are you sure you want to delete these selected candidate profiles from your workspace?',
-
     noCandidates: isFrench
       ? 'Aucun candidat trouvé'
       : 'No candidates found',
@@ -89,7 +93,53 @@ export default function CandidateGridView({
     next: isFrench
       ? 'Suivant'
       : 'Next',
+
+    sortScore: isFrench
+      ? 'Score'
+      : 'Score',
+
+    defaultSort: isFrench
+      ? 'Ordre par défaut'
+      : 'Default order',
+
+    scoreHigh: isFrench
+      ? 'Score : élevé → faible'
+      : 'Score: high → low',
+
+    scoreLow: isFrench
+      ? 'Score : faible → élevé'
+      : 'Score: low → high',
   };
+
+  /* =====================================================
+     SORT CANDIDATES
+     ===================================================== */
+
+  const sortedCandidates = useMemo(() => {
+    const list = [...candidates];
+
+    if (scoreSort === 'high') {
+      return list.sort(
+        (a, b) =>
+          (Number(b.matchScore) || 0) -
+          (Number(a.matchScore) || 0)
+      );
+    }
+
+    if (scoreSort === 'low') {
+      return list.sort(
+        (a, b) =>
+          (Number(a.matchScore) || 0) -
+          (Number(b.matchScore) || 0)
+      );
+    }
+
+    return list;
+  }, [candidates, scoreSort]);
+
+  /* =====================================================
+     SELECTION
+     ===================================================== */
 
   const handleToggleSelect = (candidateId) => {
     setSelectedIds((prev) => {
@@ -109,6 +159,10 @@ export default function CandidateGridView({
     setSelectedIds(new Set());
   };
 
+  /* =====================================================
+     BULK DELETE
+     ===================================================== */
+
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
 
@@ -116,14 +170,21 @@ export default function CandidateGridView({
 
     const confirmed = await confirm({
       title: isFrench
-        ? `Supprimer ${selectedCount} profil${selectedCount > 1 ? 's' : ''} candidat${selectedCount > 1 ? 's' : ''} ?`
-        : `Delete ${selectedCount} Candidate Profile${selectedCount > 1 ? 's' : ''}?`,
+        ? `Supprimer ${selectedCount} profil${selectedCount > 1 ? 's' : ''
+        } candidat${selectedCount > 1 ? 's' : ''
+        } ?`
+        : `Delete ${selectedCount} Candidate Profile${selectedCount > 1 ? 's' : ''
+        }?`,
 
       message: isFrench
-        ? `Êtes-vous sûr de vouloir supprimer ces ${selectedCount} profil${selectedCount > 1 ? 's' : ''} candidat${selectedCount > 1 ? 's' : ''} sélectionné${selectedCount > 1 ? 's' : ''} de votre espace de travail ?`
-        : `Are you sure you want to delete these ${selectedCount} selected candidate profile${selectedCount > 1 ? 's' : ''} from your workspace?`,
+        ? `Êtes - vous sûr de vouloir supprimer ces ${selectedCount} profil${selectedCount > 1 ? 's' : ''
+        } candidat${selectedCount > 1 ? 's' : ''
+        } sélectionné${selectedCount > 1 ? 's' : ''
+        } de votre espace de travail ? `
+        : `Are you sure you want to delete these ${selectedCount} selected candidate profile${selectedCount > 1 ? 's' : ''
+        } from your workspace ? `,
 
-      itemBadge: `${selectedCount} ${text.selectedProfiles}`,
+      itemBadge: `${selectedCount} ${text.selectedProfiles} `,
 
       confirmText: text.deleteSelected,
 
@@ -147,12 +208,10 @@ export default function CandidateGridView({
     setSelectedIds(new Set());
   };
 
-  /*
-   * Bulk shortlist should be additive: candidates already saved for the
-   * selected job must stay saved. Toggling everything in the selection
-   * would instead un-shortlist any already-saved candidate whenever the
-   * selection contains a mix of saved and unsaved candidates.
-   */
+  /* =====================================================
+     BULK SHORTLIST
+     ===================================================== */
+
   const handleBulkShortlist = async () => {
     if (!selectedJobId) {
       return;
@@ -171,20 +230,31 @@ export default function CandidateGridView({
     }
 
     if (onBulkToggleSaveForJob) {
-      await onBulkToggleSaveForJob(idsToSave, selectedJobId);
+      await onBulkToggleSaveForJob(
+        idsToSave,
+        selectedJobId
+      );
     } else if (onToggleSaveForJob) {
       for (const id of idsToSave) {
-        onToggleSaveForJob(id, selectedJobId);
+        onToggleSaveForJob(
+          id,
+          selectedJobId
+        );
       }
     }
 
     setSelectedIds(new Set());
   };
 
+  /* =====================================================
+     BULK COMPARE
+     ===================================================== */
+
   const handleBulkCompare = () => {
-    const selectedCandidates = candidates.filter((candidate) =>
-      selectedIds.has(candidate.id)
-    );
+    const selectedCandidates =
+      candidates.filter((candidate) =>
+        selectedIds.has(candidate.id)
+      );
 
     if (
       onOpenComparator &&
@@ -196,40 +266,122 @@ export default function CandidateGridView({
 
   const selectedCount = selectedIds.size;
 
-  /*
-   * Pagination
-   */
+  /* =====================================================
+     PAGINATION
+     ===================================================== */
+
   const totalPages = Math.ceil(
-    candidates.length / PAGE_SIZE
+    sortedCandidates.length / PAGE_SIZE
   );
 
-  const paginatedCandidates = candidates.slice(
-    page * PAGE_SIZE,
-    page * PAGE_SIZE + PAGE_SIZE
-  );
+  const paginatedCandidates =
+    sortedCandidates.slice(
+      page * PAGE_SIZE,
+      page * PAGE_SIZE + PAGE_SIZE
+    );
 
-  /*
-   * Reset to first page when candidate count changes.
-   */
+  /* =====================================================
+     RESET PAGE WHEN DATA / SORT CHANGES
+     ===================================================== */
+
   useEffect(() => {
     setPage(0);
-  }, [candidates.length]);
+  }, [candidates.length, scoreSort]);
 
-  /*
-   * Make sure the current page remains valid if
-   * candidates are removed.
-   */
   useEffect(() => {
-    if (totalPages > 0 && page >= totalPages) {
+    if (
+      totalPages > 0 &&
+      page >= totalPages
+    ) {
       setPage(totalPages - 1);
     }
   }, [page, totalPages]);
 
+  /* =====================================================
+     RENDER
+     ===================================================== */
+
   return (
     <div>
-      {/* =====================================================
+
+      {/* =================================================
+          FILTER / SORT BAR
+          ================================================= */}
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          padding: '0 20px 12px',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <ArrowDownUp
+            size={14}
+            color="#8A8F98"
+          />
+
+          <label
+            htmlFor="candidate-score-sort"
+            style={{
+              fontFamily:
+                "'Inter', system-ui, sans-serif",
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#63666E',
+            }}
+          >
+            {text.sortScore}
+          </label>
+
+          <select
+            id="candidate-score-sort"
+            value={scoreSort}
+            onChange={(event) =>
+              setScoreSort(event.target.value)
+            }
+            style={{
+              height: 34,
+              padding: '0 30px 0 10px',
+              border:
+                '1px solid #E4E1D9',
+              borderRadius: 8,
+              background: '#FFFFFF',
+              color: '#12151B',
+              fontFamily:
+                "'Inter', system-ui, sans-serif",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              outline: 'none',
+              appearance: 'auto',
+            }}
+          >
+            <option value="default">
+              {text.defaultSort}
+            </option>
+
+            <option value="high">
+              {text.scoreHigh}
+            </option>
+
+            <option value="low">
+              {text.scoreLow}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      {/* =================================================
           BULK ACTION BAR
-          ===================================================== */}
+          ================================================= */}
 
       {selectedCount > 0 && (
         <div
@@ -237,14 +389,19 @@ export default function CandidateGridView({
             position: 'sticky',
             top: 0,
             zIndex: 100,
-            marginBottom: 16,
-            padding: '12px 20px',
-            background: '#FFFFFF',
-            border: '1px solid #E4E1D9',
+            margin:
+              '0 20px 16px',
+            padding:
+              '12px 20px',
+            background:
+              '#FFFFFF',
+            border:
+              '1px solid #E4E1D9',
             borderRadius: 12,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent:
+              'space-between',
             boxShadow:
               '0 4px 12px rgba(18,21,27,0.06)',
           }}
@@ -265,9 +422,12 @@ export default function CandidateGridView({
                   "'JetBrains Mono', monospace",
                 fontSize: 12,
                 fontWeight: 700,
-                background: '#E85D3D',
-                color: '#FFFFFF',
-                padding: '4px 10px',
+                background:
+                  '#E85D3D',
+                color:
+                  '#FFFFFF',
+                padding:
+                  '4px 10px',
                 borderRadius: 6,
               }}
             >
@@ -281,8 +441,8 @@ export default function CandidateGridView({
               }}
             >
               {selectedCount === 1
-                ? `${text.candidate} ${text.selected}`
-                : `${text.candidates} ${text.selected}`}
+                ? `${text.candidate} ${text.selected} `
+                : `${text.candidates} ${text.selected} `}
             </span>
           </div>
 
@@ -293,7 +453,9 @@ export default function CandidateGridView({
               gap: 8,
             }}
           >
+
             {/* SHORTLIST */}
+
             <button
               type="button"
               onClick={handleBulkShortlist}
@@ -302,24 +464,29 @@ export default function CandidateGridView({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                padding: '8px 14px',
+                padding:
+                  '8px 14px',
                 border:
                   '1px solid #E4E1D9',
                 borderRadius: 8,
-                background: 'transparent',
-                color: !selectedJobId
-                  ? '#9B9C9E'
-                  : '#12151B',
+                background:
+                  'transparent',
+                color:
+                  !selectedJobId
+                    ? '#9B9C9E'
+                    : '#12151B',
                 fontSize: 12,
                 fontWeight: 600,
-                cursor: !selectedJobId
-                  ? 'not-allowed'
-                  : 'pointer',
+                cursor:
+                  !selectedJobId
+                    ? 'not-allowed'
+                    : 'pointer',
                 transition:
                   'all 0.15s ease',
-                opacity: !selectedJobId
-                  ? 0.6
-                  : 1,
+                opacity:
+                  !selectedJobId
+                    ? 0.6
+                    : 1,
               }}
               onMouseEnter={(e) => {
                 if (selectedJobId) {
@@ -332,27 +499,37 @@ export default function CandidateGridView({
                   'transparent';
               }}
             >
-              <BookmarkCheck size={14} />
+              <BookmarkCheck
+                size={14}
+              />
+
               {text.shortlist}
             </button>
 
             {/* COMPARE */}
+
             <button
               type="button"
-              onClick={handleBulkCompare}
+              onClick={
+                handleBulkCompare
+              }
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                padding: '8px 14px',
+                padding:
+                  '8px 14px',
                 border:
                   '1px solid #E4E1D9',
                 borderRadius: 8,
-                background: 'transparent',
-                color: '#12151B',
+                background:
+                  'transparent',
+                color:
+                  '#12151B',
                 fontSize: 12,
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor:
+                  'pointer',
                 transition:
                   'all 0.15s ease',
               }}
@@ -365,27 +542,37 @@ export default function CandidateGridView({
                   'transparent';
               }}
             >
-              <ArrowRightLeft size={14} />
+              <ArrowRightLeft
+                size={14}
+              />
+
               {text.compare}
             </button>
 
             {/* DELETE */}
+
             <button
               type="button"
-              onClick={handleBulkDelete}
+              onClick={
+                handleBulkDelete
+              }
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                padding: '8px 14px',
+                padding:
+                  '8px 14px',
                 border:
                   '1px solid #F3C9C4',
                 borderRadius: 8,
-                background: 'transparent',
-                color: '#C1361F',
+                background:
+                  'transparent',
+                color:
+                  '#C1361F',
                 fontSize: 12,
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor:
+                  'pointer',
                 transition:
                   'all 0.15s ease',
               }}
@@ -398,14 +585,20 @@ export default function CandidateGridView({
                   'transparent';
               }}
             >
-              <Trash2 size={14} />
+              <Trash2
+                size={14}
+              />
+
               {text.delete}
             </button>
 
-            {/* CLEAR SELECTION */}
+            {/* CLEAR */}
+
             <button
               type="button"
-              onClick={handleClearSelection}
+              onClick={
+                handleClearSelection
+              }
               aria-label={
                 isFrench
                   ? 'Effacer la sélection'
@@ -418,16 +611,21 @@ export default function CandidateGridView({
               }
               style={{
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                alignItems:
+                  'center',
+                justifyContent:
+                  'center',
                 width: 32,
                 height: 32,
                 border:
                   '1px solid #E4E1D9',
                 borderRadius: 8,
-                background: 'transparent',
-                color: '#9B9C9E',
-                cursor: 'pointer',
+                background:
+                  'transparent',
+                color:
+                  '#9B9C9E',
+                cursor:
+                  'pointer',
                 transition:
                   'all 0.15s ease',
                 marginLeft: 8,
@@ -449,17 +647,22 @@ export default function CandidateGridView({
             >
               <X size={16} />
             </button>
+
           </div>
         </div>
       )}
 
-      {/* =====================================================
+      {/* =================================================
           CANDIDATE GRID
-          ===================================================== */}
+          ================================================= */}
 
       <div
         style={{
           padding: 20,
+          paddingTop:
+            selectedCount > 0
+              ? 0
+              : 8,
           display: 'grid',
           gridTemplateColumns:
             'repeat(2, 1fr)',
@@ -470,6 +673,7 @@ export default function CandidateGridView({
               : '200px',
         }}
       >
+
         {paginatedCandidates.length > 0 ? (
           paginatedCandidates.map(
             (candidate, idx) => (
@@ -478,10 +682,14 @@ export default function CandidateGridView({
                 index={
                   page * PAGE_SIZE + idx
                 }
-                candidate={candidate}
-                selected={selectedIds.has(
-                  candidate.id
-                )}
+                candidate={
+                  candidate
+                }
+                selected={
+                  selectedIds.has(
+                    candidate.id
+                  )
+                }
                 onToggleSelect={
                   handleToggleSelect
                 }
@@ -496,10 +704,13 @@ export default function CandidateGridView({
                 }
                 onEdit={onEdit}
                 onDelete={onDelete}
-                isShortlisted={shortlist.some(
-                  (c) =>
-                    c.id === candidate.id
-                )}
+                isShortlisted={
+                  shortlist.some(
+                    (c) =>
+                      c.id ===
+                      candidate.id
+                  )
+                }
                 selectedJobId={
                   selectedJobId
                 }
@@ -526,13 +737,18 @@ export default function CandidateGridView({
         ) : (
           <div
             style={{
-              gridColumn: '1 / -1',
+              gridColumn:
+                '1 / -1',
               display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
+              flexDirection:
+                'column',
+              alignItems:
+                'center',
+              justifyContent:
+                'center',
               padding: '40px',
-              color: '#9B9C9E',
+              color:
+                '#9B9C9E',
               fontSize: 13,
             }}
           >
@@ -546,37 +762,49 @@ export default function CandidateGridView({
             </div>
           </div>
         )}
+
       </div>
 
-      {/* =====================================================
+      {/* =================================================
           PAGINATION
-          ===================================================== */}
+          ================================================= */}
 
       {totalPages > 1 && (
         <div
           style={{
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            alignItems:
+              'center',
+            justifyContent:
+              'center',
             gap: 12,
             padding: '20px',
             marginTop: 10,
           }}
         >
+
           {/* PREVIOUS */}
+
           <button
             type="button"
             onClick={() =>
               setPage((p) =>
-                Math.max(0, p - 1)
+                Math.max(
+                  0,
+                  p - 1
+                )
               )
             }
-            disabled={page === 0}
+            disabled={
+              page === 0
+            }
             style={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems:
+                'center',
               gap: 6,
-              padding: '8px 12px',
+              padding:
+                '8px 12px',
               border:
                 '1px solid #E4E1D9',
               borderRadius: 8,
@@ -616,11 +844,15 @@ export default function CandidateGridView({
               }
             }}
           >
-            <ChevronLeft size={14} />
+            <ChevronLeft
+              size={14}
+            />
+
             {text.previous}
           </button>
 
           {/* PAGE NUMBERS */}
+
           <div
             style={{
               display: 'flex',
@@ -628,7 +860,10 @@ export default function CandidateGridView({
             }}
           >
             {Array.from(
-              { length: totalPages },
+              {
+                length:
+                  totalPages,
+              },
               (_, i) => (
                 <button
                   type="button"
@@ -636,15 +871,15 @@ export default function CandidateGridView({
                   onClick={() =>
                     setPage(i)
                   }
-                  aria-label={
-                    isFrench
-                      ? `Page ${i + 1}`
-                      : `Page ${i + 1}`
-                  }
+                  aria-label={`Page ${i + 1
+                    } `}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    display:
+                      'flex',
+                    alignItems:
+                      'center',
+                    justifyContent:
+                      'center',
                     width: 32,
                     height: 32,
                     border:
@@ -662,12 +897,15 @@ export default function CandidateGridView({
                         : '#12151B',
                     fontSize: 12,
                     fontWeight: 600,
-                    cursor: 'pointer',
+                    cursor:
+                      'pointer',
                     transition:
                       'all 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
-                    if (page !== i) {
+                    if (
+                      page !== i
+                    ) {
                       e.currentTarget.style.background =
                         '#F7F5F1';
 
@@ -676,7 +914,9 @@ export default function CandidateGridView({
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (page !== i) {
+                    if (
+                      page !== i
+                    ) {
                       e.currentTarget.style.background =
                         '#FFFFFF';
 
@@ -692,6 +932,7 @@ export default function CandidateGridView({
           </div>
 
           {/* NEXT */}
+
           <button
             type="button"
             onClick={() =>
@@ -703,28 +944,34 @@ export default function CandidateGridView({
               )
             }
             disabled={
-              page >= totalPages - 1
+              page >=
+              totalPages - 1
             }
             style={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems:
+                'center',
               gap: 6,
-              padding: '8px 12px',
+              padding:
+                '8px 12px',
               border:
                 '1px solid #E4E1D9',
               borderRadius: 8,
               background:
-                page >= totalPages - 1
+                page >=
+                  totalPages - 1
                   ? '#F7F5F1'
                   : '#FFFFFF',
               color:
-                page >= totalPages - 1
+                page >=
+                  totalPages - 1
                   ? '#9B9C9E'
                   : '#12151B',
               fontSize: 12,
               fontWeight: 600,
               cursor:
-                page >= totalPages - 1
+                page >=
+                  totalPages - 1
                   ? 'not-allowed'
                   : 'pointer',
               transition:
@@ -756,10 +1003,15 @@ export default function CandidateGridView({
             }}
           >
             {text.next}
-            <ChevronRight size={14} />
+
+            <ChevronRight
+              size={14}
+            />
           </button>
+
         </div>
       )}
+
     </div>
   );
 }
