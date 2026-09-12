@@ -25,11 +25,10 @@ jobs:
           exit-code: '0'
 
       - name: Run Checkov IaC Security Scanner
-        uses: bridgecrewio/checkov-action@v12
-        with:
-          framework: dockerfile,secrets
-          output_format: cli
-          soft_fail: true
+        run: |
+          pip install checkov --quiet
+          checkov -d . --framework dockerfile --soft-fail --compact
+
 
   sbom-generation:
     name: Generate Software Bill of Materials (SBOM)
