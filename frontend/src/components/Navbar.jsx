@@ -53,24 +53,40 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
   const isAdmin = user?.role === 'HR_ADMIN' || user?.role === 'SUPER_ADMIN';
 
   const TABS = [
-    { id: 'dashboard', icon: LayoutDashboard, label: t('dashboard') || 'Dashboard' },
+    { id: 'dashboard', icon: LayoutDashboard, label: isFR ? 'Tableau de bord' : 'Dashboard' },
     { id: 'sourcing', icon: Users, label: t('sourcingHub') || 'Sourcing' },
     { id: 'pipeline', icon: Kanban, label: 'Pipeline' },
     { id: 'notes', icon: NotebookPen, label: 'Notes', badge: notesCount, pulse: notesPulse },
   ];
 
   if (isAdmin) {
-    TABS.push({ id: 'team', icon: ShieldCheck, label: isFR ? 'Équipe & Droits' : 'Team & Privileges' });
+    TABS.push({ id: 'team', icon: ShieldCheck, label: isFR ? 'Équipe' : 'Team & Privileges' });
   }
 
   useLayoutEffect(() => {
-    const el = btnRefs.current[activeTab];
-    const container = navRef.current;
-    if (el && container) {
-      const elRect = el.getBoundingClientRect(), containerRect = container.getBoundingClientRect();
-      setIndicator({ left: elRect.left - containerRect.left, width: elRect.width });
-    }
-  }, [activeTab, shortlistCount, notesCount, isAdmin]);
+    const updateIndicator = () => {
+      const el = btnRefs.current[activeTab];
+      const container = navRef.current;
+      if (el && container) {
+        const elRect = el.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        setIndicator({
+          left: Math.round(elRect.left - containerRect.left),
+          width: Math.round(elRect.width),
+        });
+      }
+    };
+
+    updateIndicator();
+
+    const rafId = requestAnimationFrame(updateIndicator);
+    window.addEventListener('resize', updateIndicator);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', updateIndicator);
+    };
+  }, [activeTab, shortlistCount, notesCount, isAdmin, lang]);
 
   useEffect(() => {
     function handleClick(e) { if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenuOpen(false); }
@@ -87,32 +103,32 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
         @keyframes nbMenuIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform:translateY(0); } }
         @keyframes nbMobileIn { from { opacity:0; max-height:0; } to { opacity:1; max-height:360px; } }
 
-        .nb-wrapper { position:sticky; top:0; z-index:50; padding:12px 0; background:rgba(251,250,247,0.88); backdrop-filter:blur(12px); font-family:'Inter', system-ui, sans-serif; }
-        .nb-container { max-width:1200px; margin:0 auto; padding:0 24px; }
-        .nb-bar { background:#fff; border:1px solid #E4E1D9; border-radius:18px; padding:8px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; box-shadow:0 2px 10px -4px rgba(18,21,27,0.06); }
+        .nb-wrapper { position:sticky; top:0; z-index:50; padding:10px 0; background:rgba(251,250,247,0.88); backdrop-filter:blur(12px); font-family:'Inter', system-ui, sans-serif; }
+        .nb-container { max-width:1380px; margin:0 auto; padding:0 20px; }
+        .nb-bar { background:#fff; border:1px solid #E4E1D9; border-radius:18px; padding:4px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 2px 10px -4px rgba(18,21,27,0.06); }
 
-        .nb-brand { display:flex; align-items:center; cursor:pointer; transition: transform .15s ease; }
+        .nb-brand { display:flex; align-items:center; cursor:pointer; transition: transform .15s ease; flex-shrink:0; }
         .nb-brand:hover { transform: scale(1.02); }
         .nb-logo-icon { height:70px; width:auto; object-fit:contain; flex-shrink:0; }
 
-        .nb-nav { position:relative; display:flex; align-items:center; gap:2px; background:#F6F5F1; border:1px solid #E4E1D9; border-radius:13px; padding:4px; }
-        .nb-nav-indicator { position:absolute; top:4px; bottom:4px; background:#fff; border-radius:9px; box-shadow:0 1px 3px rgba(18,21,27,0.08); transition: left .25s cubic-bezier(0.22,1,0.36,1), width .25s cubic-bezier(0.22,1,0.36,1); z-index:0; }
-        .nb-nav-item { position:relative; z-index:1; display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; padding:7px 14px; border-radius:9px; border:none; background:none; color:#9B9C9E; cursor:pointer; transition: color .15s ease; }
+        .nb-nav { position:relative; display:flex; align-items:center; gap:2px; background:#F6F5F1; border:1px solid #E4E1D9; border-radius:13px; padding:3px; flex-shrink:0; }
+        .nb-nav-indicator { position:absolute; top:3px; bottom:3px; background:#fff; border-radius:9px; box-shadow:0 1px 3px rgba(18,21,27,0.08); transition: left .25s cubic-bezier(0.22,1,0.36,1), width .25s cubic-bezier(0.22,1,0.36,1); z-index:0; }
+        .nb-nav-item { position:relative; z-index:1; display:flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; padding:6px 11px; border-radius:9px; border:none; background:none; color:#9B9C9E; cursor:pointer; transition: color .15s ease; white-space:nowrap; flex-shrink:0; }
         .nb-nav-item:hover { color:#12151B; }
         .nb-nav-item.active { color:#0A7E96; }
 
         .nb-count-badge { font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700; background:#0A7E96; color:#fff; padding:1px 6px; border-radius:999px; margin-left:2px; display:inline-block; }
         .nb-count-badge.pulse { animation: nbBadgePulse .5s ease; }
 
-        .nb-right { display:flex; align-items:center; gap:12px; }
-        .nb-lang-btn { display:flex; align-items:center; gap:4px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; background:#F6F5F1; border:1px solid #E4E1D9; border-radius:999px; padding:5px 12px; color:#3A3D44; cursor:pointer; transition: background .15s ease; }
+        .nb-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+        .nb-lang-btn { display:flex; align-items:center; gap:4px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; background:#F6F5F1; border:1px solid #E4E1D9; border-radius:999px; padding:5px 12px; color:#3A3D44; cursor:pointer; transition: background .15s ease; flex-shrink:0; }
         .nb-lang-btn:hover { background:#F1F1EC; }
 
-        .nb-user-wrap { position:relative; padding-left:12px; border-left:1px solid #E4E1D9; }
+        .nb-user-wrap { position:relative; padding-left:10px; border-left:1px solid #E4E1D9; }
         .nb-user-box { display:flex; align-items:center; gap:8px; cursor:pointer; background:none; border:none; padding:2px; border-radius:10px; }
         .nb-user-box:hover { background:#F6F5F1; }
         .nb-avatar { width:32px; height:32px; border-radius:9px; background:#0A7E96; color:#fff; display:flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:800; flex-shrink:0; }
-        .nb-user-info { display:flex; flex-direction:column; align-items:flex-start; }
+        .nb-user-info { display:flex; flex-direction:column; align-items:flex-start; white-space:nowrap; }
         .nb-user-name { font-size:12px; font-weight:700; color:#12151B; line-height:1.2; }
         .nb-role-badge { font-family:'JetBrains Mono',monospace; font-size:8.5px; font-weight:700; text-transform:uppercase; padding:1px 5px; border-radius:4px; margin-top:2px; display:inline-block; }
         .nb-role-admin { background:#FFF3E0; color:#9A5B0A; }
@@ -126,13 +142,13 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
         .nb-dropdown-item:hover { background:#F1F1EC; }
         .nb-dropdown-item.danger:hover { background:#FDEEE9; color:#B3261E; }
 
-        .nb-signin-btn { font-size:12px; font-weight:700; background:#12151B; color:#fff; border:none; border-radius:10px; padding:8px 16px; cursor:pointer; }
+        .nb-signin-btn { font-size:12px; font-weight:700; background:#12151B; color:#fff; border:none; border-radius:10px; padding:8px 16px; cursor:pointer; white-space:nowrap; }
         .nb-signin-btn:hover { background:#2A2E37; }
 
         .nb-hamburger { display:none; background:none; border:none; color:#3A3D44; cursor:pointer; padding:6px; }
         .nb-mobile-menu { display:none; }
 
-        @media (max-width: 860px) {
+        @media (max-width: 960px) {
           .nb-nav { display:none; }
           .nb-hamburger { display:flex; }
           .nb-user-info { display:none; }
