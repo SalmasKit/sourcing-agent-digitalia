@@ -197,16 +197,16 @@ async def rerank_pool(job_query: str, limit: int = 10) -> list[dict[str, Any]]:
                 params.append(f"%{kw}%")
             where_clause = " OR ".join(conditions) or "TRUE"
             params.append(limit)
-            rows = await conn.fetch(
-                f"""  # nosec B608 — where_clause built from hardcoded column+operator only; values go through parameterized *params
+            # nosec B608 — where_clause contains only hardcoded column names/operators (profile_json::text ILIKE $n);
+            # user-supplied keyword values are passed exclusively through asyncpg parameterized *params, never interpolated.
+            fallback_sql = f"""
                 SELECT profile_json, 0.75 AS similarity
                 FROM candidate_embeddings
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT ${len(params)};
-                """,
-                *params,
-            )
+                """
+            rows = await conn.fetch(fallback_sql, *params)
             results = []
             for r in rows:
                 profile = json.loads(r["profile_json"])
