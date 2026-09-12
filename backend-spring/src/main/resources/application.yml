@@ -33,7 +33,10 @@ spring:
     enabled: true
     baseline-on-migrate: true
     validate-on-migrate: false
+    repair-on-migrate: true   # Repair checksum mismatches automatically (replaces FlywayConfig bean)
     locations: classpath:db/migration
+
+
 
   mail:
     host: ${SPRING_MAIL_HOST:localhost}
