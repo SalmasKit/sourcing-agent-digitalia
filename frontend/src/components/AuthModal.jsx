@@ -117,7 +117,7 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                     onChange={(e) => setRole(e.target.value)}
                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-600"
                   >
-                    <option value="RECRUITER">Technical Recruiter (RECRUITER)</option>
+                    <option value="RECRUITER">Talent Recruiter (RECRUITER)</option>
                     <option value="HR_ADMIN">HR Administrator (HR_ADMIN)</option>
                   </select>
                 </div>
