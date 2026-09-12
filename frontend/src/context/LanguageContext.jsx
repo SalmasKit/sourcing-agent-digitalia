@@ -1,10 +1,31 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translations } from '../locales';
 
 const LanguageContext = createContext(null);
+const STORAGE_KEY = 'targetalent_language';
 
 export const LanguageProvider = ({ children }) => {
-  const [lang, setLang] = useState('EN');
+  const [lang, setLang] = useState(() => {
+    try {
+      const saved =
+        localStorage.getItem(STORAGE_KEY) ||
+        localStorage.getItem('digitalia_language');
+      if (saved && (saved === 'FR' || saved === 'EN')) {
+        return saved;
+      }
+    } catch (e) {
+      // ignore storage access errors
+    }
+    return 'EN';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+    } catch (e) {
+      // ignore storage access errors
+    }
+  }, [lang]);
 
   const toggleLanguage = () => {
     setLang(prev => (prev === 'EN' ? 'FR' : 'EN'));

@@ -167,7 +167,21 @@ function Terminal({ lang }) {
    ------------------------------------------------------------------ */
 
 export default function AuthPage({ onAccepted, onClearInvite }) {
-  const [lang, setLang] = useState('EN');
+  const [lang, setLang] = useState(() => {
+    try {
+      const saved =
+        localStorage.getItem('targetalent_language') ||
+        localStorage.getItem('digitalia_language');
+      if (saved && (saved === 'FR' || saved === 'EN')) return saved;
+    } catch (e) {}
+    return 'EN';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('targetalent_language', lang);
+    } catch (e) {}
+  }, [lang]);
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
