@@ -40,7 +40,6 @@ import {
   Check,
   ArrowUpRight,
   Clock,
-  Users,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -73,14 +72,14 @@ function useFonts() {
    Score tiers
 ────────────────────────────────────────────────────────── */
 
-function scoreTier(score) {
+function scoreTier(score, lang = 'EN') {
   const value = Number(score) || 0;
 
   if (value >= 90) {
     return {
       color: '#E85D3D',
       soft: '#FCE9E4',
-      label: 'hot lead',
+      label: lang === 'FR' ? 'profil prioritaire' : 'hot lead',
       shortLabel: 'HOT',
     };
   }
@@ -89,7 +88,7 @@ function scoreTier(score) {
     return {
       color: '#08AFCB',
       soft: '#E4F7FB',
-      label: 'strong match',
+      label: lang === 'FR' ? 'forte correspondance' : 'strong match',
       shortLabel: 'STRONG',
     };
   }
@@ -98,7 +97,7 @@ function scoreTier(score) {
     return {
       color: '#5B5BD6',
       soft: '#ECECFC',
-      label: 'good fit',
+      label: lang === 'FR' ? 'bonne correspondance' : 'good fit',
       shortLabel: 'GOOD',
     };
   }
@@ -107,7 +106,7 @@ function scoreTier(score) {
     return {
       color: '#C58A22',
       soft: '#FBF2DE',
-      label: 'partial fit',
+      label: lang === 'FR' ? 'correspondance partielle' : 'partial fit',
       shortLabel: 'PARTIAL',
     };
   }
@@ -115,7 +114,7 @@ function scoreTier(score) {
   return {
     color: '#8A8F98',
     soft: '#EEF0F2',
-    label: 'low fit',
+    label: lang === 'FR' ? 'faible correspondance' : 'low fit',
     shortLabel: 'LOW',
   };
 }
@@ -140,7 +139,7 @@ function avatarUrl(name, avatar) {
    Reasoning
 ────────────────────────────────────────────────────────── */
 
-function buildReasoning(candidate) {
+function buildReasoning(candidate, lang = 'EN') {
   const matchedSkills =
     candidate.matched_skills || [];
 
@@ -171,14 +170,14 @@ function buildReasoning(candidate) {
 
   return [
     {
-      label: 'Skills',
+      label: lang === 'FR' ? 'Compétences' : 'Skills',
       value: `${skillMatchCount}/${totalRequired}`,
       detail:
         matchedSkills.length > 0
           ? matchedSkills
-              .slice(0, 4)
-              .join(' · ')
-          : 'No matched skills',
+            .slice(0, 4)
+            .join(' · ')
+          : lang === 'FR' ? 'Aucune compétence correspondante' : 'No matched skills',
       weight: Math.min(
         100,
         70 + skillMatchCount * 6
@@ -186,22 +185,22 @@ function buildReasoning(candidate) {
     },
 
     {
-      label: 'Experience',
-      value: `${expYears} yrs`,
+      label: lang === 'FR' ? 'Expérience' : 'Experience',
+      value: `${expYears} ${lang === 'FR' ? 'ans' : 'yrs'}`,
       detail: expFits
-        ? `Fits ${minExp}+ yr requirement`
-        : `Below ${minExp} yr requirement`,
+        ? (lang === 'FR' ? `Respecte le minimum de ${minExp} ans` : `Fits ${minExp}+ yr requirement`)
+        : (lang === 'FR' ? `En dessous du minimum de ${minExp} ans` : `Below ${minExp} yr requirement`),
       weight: expFits ? 100 : 50,
     },
 
     {
-      label: 'Location',
+      label: lang === 'FR' ? 'Localisation' : 'Location',
       value: locationFits
-        ? 'Match'
-        : 'Partial',
+        ? (lang === 'FR' ? 'Correspondance' : 'Match')
+        : (lang === 'FR' ? 'Partielle' : 'Partial'),
       detail:
         candidate.location ||
-        'Location not specified',
+        (lang === 'FR' ? 'Localisation non renseignée' : 'Location not specified'),
       weight: locationScore,
     },
   ];
@@ -217,6 +216,7 @@ function MatchSignal({
   color,
   expanded,
   onClick,
+  lang = 'EN',
 }) {
   const [progress, setProgress] =
     useState(0);
@@ -234,9 +234,8 @@ function MatchSignal({
   return (
     <button
       type="button"
-      className={`cc-signal ${
-        expanded ? 'is-expanded' : ''
-      }`}
+      className={`cc-signal ${expanded ? 'is-expanded' : ''
+        }`}
       onClick={onClick}
       aria-expanded={expanded}
       style={{
@@ -247,7 +246,7 @@ function MatchSignal({
       <div className="cc-signal-top">
         <span className="cc-signal-label">
           <Sparkles size={11} />
-          MATCH SIGNAL
+          {lang === 'FR' ? 'SIGNAL DE CORRESPONDANCE' : 'MATCH SIGNAL'}
         </span>
 
         <span className="cc-signal-score">
@@ -262,15 +261,14 @@ function MatchSignal({
       <div className="cc-signal-bottom">
         <span>
           {expanded
-            ? 'Hide reasoning'
-            : 'Why this match'}
+            ? (lang === 'FR' ? "Masquer l'analyse" : 'Hide reasoning')
+            : (lang === 'FR' ? 'Pourquoi cette correspondance' : 'Why this match')}
         </span>
 
         <ChevronDown
           size={12}
-          className={`cc-signal-chevron ${
-            expanded ? 'rotate' : ''
-          }`}
+          className={`cc-signal-chevron ${expanded ? 'rotate' : ''
+            }`}
         />
       </div>
     </button>
@@ -287,14 +285,14 @@ export function CandidateCard({
   index = 0,
 
   selected = false,
-  onToggleSelect = () => {},
+  onToggleSelect = () => { },
 
-  onViewDetails = () => {},
-  onEdit = () => {},
-  onDelete = () => {},
+  onViewDetails = () => { },
+  onEdit = () => { },
+  onDelete = () => { },
 
   isSavedForJob = false,
-  onSaveForJob = () => {},
+  onSaveForJob = () => { },
 
   selectedJobId = null,
 }) {
@@ -317,12 +315,13 @@ export function CandidateCard({
   ] = useState(false);
 
   const tier = scoreTier(
-    candidate.matchScore
+    candidate.matchScore,
+    lang
   );
 
   const reasoning = useMemo(
-    () => buildReasoning(candidate),
-    [candidate]
+    () => buildReasoning(candidate, lang),
+    [candidate, lang]
   );
 
   const skills =
@@ -336,7 +335,7 @@ export function CandidateCard({
   const hiddenSkills = Math.max(
     0,
     skills.length -
-      visibleSkills.length
+    visibleSkills.length
   );
 
   const cardNumber = String(
@@ -359,19 +358,16 @@ export function CandidateCard({
 
   return (
     <div
-      className={`cc-root ${
-        selected ? 'is-selected' : ''
-      } ${
-        reasoningOpen
+      className={`cc-root ${selected ? 'is-selected' : ''
+        } ${reasoningOpen
           ? 'is-reasoning'
           : ''
-      }`}
+        }`}
       style={{
         '--tier-color': tier.color,
         '--tier-soft': tier.soft,
-        '--entry-delay': `${
-          Math.min(index, 20) * 35
-        }ms`,
+        '--entry-delay': `${Math.min(index, 20) * 35
+          }ms`,
       }}
     >
 
@@ -1496,15 +1492,9 @@ export function CandidateCard({
         ───────────────────────────────────────────── */
 
         .cc-checkbox {
-          position: absolute;
-
-          top: 13px;
-          left: 13px;
-
-          width: 19px;
-          height: 19px;
-
-          z-index: 10;
+          width: 18px;
+          height: 18px;
+          flex-shrink: 0;
 
           display: flex;
           align-items: center;
@@ -1514,13 +1504,14 @@ export function CandidateCard({
             1.5px solid
             #C9C5BA;
 
-          border-radius: 6px;
+          border-radius: 5px;
 
           background: #FFFFFF;
 
           cursor: pointer;
+          padding: 0;
 
-          opacity: 0;
+          opacity: 0.35;
 
           transition:
             opacity .15s ease,
@@ -1533,12 +1524,19 @@ export function CandidateCard({
           opacity: 1;
         }
 
+        .cc-checkbox:hover {
+          border-color:
+            var(--tier-color);
+        }
+
         .cc-checkbox.checked {
           background:
             var(--tier-color);
 
           border-color:
             var(--tier-color);
+
+          opacity: 1;
         }
 
 
@@ -1585,6 +1583,19 @@ export function CandidateCard({
 
           <div className="cc-index">
 
+            <button
+              type="button"
+              className={`cc-checkbox ${selected ? 'checked' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect(candidate.id);
+              }}
+              aria-label={selected ? 'Deselect candidate' : 'Select candidate'}
+              title={selected ? 'Deselect candidate' : 'Select candidate'}
+            >
+              {selected && <Check size={11} color="#FFFFFF" strokeWidth={3} />}
+            </button>
+
             <span className="cc-index-number">
               {cardNumber}
             </span>
@@ -1593,7 +1604,7 @@ export function CandidateCard({
 
             <span className="cc-index-meta">
               <span className="cc-index-label">
-                CANDIDATE
+                {lang === 'FR' ? 'CANDIDAT' : 'CANDIDATE'}
               </span>
             </span>
 
@@ -1610,12 +1621,6 @@ export function CandidateCard({
                   <span>{t?.badgePrevious || (lang === 'FR' ? 'PRÉCÉDENT' : 'PREVIOUS')}</span>
                 </span>
               )}
-              {candidate.source === 'talent_pool' && (
-                <span className="cc-badge cc-badge-pool" title={lang === 'FR' ? 'Candidat du vivier talent interne' : 'Internal talent pool candidate'}>
-                  <Users size={9} />
-                  <span>{t?.badgePool || (lang === 'FR' ? 'VIVIER' : 'POOL')}</span>
-                </span>
-              )}
             </div>
 
           </div>
@@ -1629,7 +1634,7 @@ export function CandidateCard({
                 href={candidate.linkedin}
                 target="_blank"
                 rel="noopener noreferrer"
-                title="Open LinkedIn profile"
+                title={lang === 'FR' ? 'Ouvrir le profil LinkedIn' : 'Open LinkedIn profile'}
               >
                 <ExternalLink size={12} />
               </a>
@@ -1641,7 +1646,7 @@ export function CandidateCard({
               onClick={() =>
                 onEdit(candidate)
               }
-              title="Edit candidate"
+              title={lang === 'FR' ? 'Modifier le candidat' : 'Edit candidate'}
             >
               <Edit2 size={12} />
             </button>
@@ -1652,7 +1657,7 @@ export function CandidateCard({
               onClick={() =>
                 onDelete(candidate.id)
               }
-              title="Remove candidate"
+              title={lang === 'FR' ? 'Supprimer le candidat' : 'Remove candidate'}
             >
               <Trash2 size={12} />
             </button>
@@ -1742,8 +1747,7 @@ export function CandidateCard({
             <Briefcase size={11} />
 
             <span>
-              {candidate.experienceYears} yrs
-              experience
+              {candidate.experienceYears} {lang === 'FR' ? "ans d'expérience" : 'yrs experience'}
             </span>
 
           </div>
@@ -1773,6 +1777,7 @@ export function CandidateCard({
               value => !value
             )
           }
+          lang={lang}
         />
 
 
@@ -1822,11 +1827,10 @@ export function CandidateCard({
             (skill, i) => (
               <span
                 key={skill}
-                className={`cc-skill ${
-                  i === 0
+                className={`cc-skill ${i === 0
                     ? 'primary'
                     : ''
-                }`}
+                  }`}
                 style={{
                   animationDelay:
                     `${i * 25}ms`,
@@ -1866,11 +1870,10 @@ export function CandidateCard({
 
             <button
               type="button"
-              className={`cc-shortlist ${
-                isSavedForJob
+              className={`cc-shortlist ${isSavedForJob
                   ? 'active'
                   : ''
-              }`}
+                }`}
               onClick={handleSave}
             >
 
@@ -1895,8 +1898,8 @@ export function CandidateCard({
               </span>
 
               {isSavedForJob
-                ? 'Shortlisted'
-                : 'Shortlist'}
+                ? (lang === 'FR' ? 'Présélectionné' : 'Shortlisted')
+                : (lang === 'FR' ? 'Présélectionner' : 'Shortlist')}
 
             </button>
 
@@ -1909,7 +1912,7 @@ export function CandidateCard({
                 fontStyle: 'italic',
               }}
             >
-              Select a role to save
+              {lang === 'FR' ? 'Sélectionnez un poste pour enregistrer' : 'Select a role to save'}
             </span>
 
           )}
@@ -1925,47 +1928,13 @@ export function CandidateCard({
               )
             }
           >
-            Profile
+            {lang === 'FR' ? 'Profil' : 'Profile'}
 
             <ArrowUpRight size={12} />
 
           </button>
 
         </div>
-
-
-        {/* ─────────────────────────────────────────────
-            SELECTION CHECKBOX
-        ───────────────────────────────────────────── */}
-
-        <button
-          type="button"
-          className={`cc-checkbox ${
-            selected
-              ? 'checked'
-              : ''
-          }`}
-          onClick={() =>
-            onToggleSelect(
-              candidate.id
-            )
-          }
-          aria-label={
-            selected
-              ? 'Deselect candidate'
-              : 'Select candidate'
-          }
-        >
-
-          {selected && (
-            <Check
-              size={11}
-              color="#FFFFFF"
-              strokeWidth={3}
-            />
-          )}
-
-        </button>
 
       </div>
 

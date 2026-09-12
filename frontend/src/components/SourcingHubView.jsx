@@ -74,6 +74,12 @@ const SourcingHubView = ({
   allCandidates = [],
 }) => {
   /*
+   * Small translation helper.
+   * The component already receives lang from the parent.
+   */
+  const ui = (en, fr) => (lang === "FR" ? fr : en);
+
+  /*
    * The role opened in the sourcing workspace.
    */
   const [workspaceJobId, setWorkspaceJobId] = useState(null);
@@ -199,34 +205,8 @@ const SourcingHubView = ({
     return [];
   };
 
-  const getJobPoolCandidates = (jobId) => {
-    if (!jobId) return [];
-
-    const poolKey = `${jobId}:pool`;
-    const cachedPool = jobResultsCache?.[poolKey];
-
-    if (Array.isArray(cachedPool)) {
-      return cachedPool;
-    }
-
-    if (Array.isArray(cachedPool?.candidates)) {
-      return cachedPool.candidates;
-    }
-
-    const cached = jobResultsCache?.[jobId];
-    if (Array.isArray(cached?.pool)) {
-      return cached.pool;
-    }
-
-    return [];
-  };
-
   const displayCandidates = activeJob
     ? getJobCandidates(activeJob.id)
-    : [];
-
-  const poolCandidates = activeJob
-    ? getJobPoolCandidates(activeJob.id)
     : [];
 
   /*
@@ -266,10 +246,6 @@ const SourcingHubView = ({
           Array.isArray(cached?.sourced)
         ) {
           indexList(cached.sourced);
-        } else if (
-          Array.isArray(cached?.pool)
-        ) {
-          indexList(cached.pool);
         }
       }
     );
@@ -300,8 +276,6 @@ const SourcingHubView = ({
   const visibleCandidates =
     workspaceTab === "shortlisted"
       ? shortlistedCandidates
-      : workspaceTab === "pool"
-      ? poolCandidates
       : displayCandidates;
 
   const avgShortlistScore = useMemo(
@@ -344,17 +318,19 @@ const SourcingHubView = ({
   ]);
 
   /*
-   * Keep workspace open to selectedJobId when it changes externally
+   * Keep workspace open to selectedJobId when it changes externally.
    */
   useEffect(() => {
-    if (selectedJobId && selectedJobId !== workspaceJobId) {
+    if (
+      selectedJobId &&
+      selectedJobId !== workspaceJobId
+    ) {
       setWorkspaceJobId(selectedJobId);
     }
   }, [selectedJobId]);
 
   /*
-   * Keep pagination valid when roles are deleted or
-   * filtered.
+   * Keep pagination valid when roles are deleted or filtered.
    */
   useEffect(() => {
     if (totalPages === 0) {
@@ -368,10 +344,13 @@ const SourcingHubView = ({
   }, [totalPages]);
 
   const handleRefresh = () => {
-    const currentMode = workspaceTab === "pool" ? "pool" : (searchMode || "ai");
+    const currentMode = searchMode || "ai";
 
     if (onRefresh) {
-      onRefresh(activeJob?.id, currentMode);
+      onRefresh(
+        activeJob?.id,
+        currentMode
+      );
       return;
     }
 
@@ -383,7 +362,7 @@ const SourcingHubView = ({
           searchMode: currentMode,
         },
         activeJob?.id ||
-          lastSearch.jobId
+        lastSearch.jobId
       );
 
       return;
@@ -392,8 +371,8 @@ const SourcingHubView = ({
     if (activeJob && onSearch) {
       onSearch(
         activeJob.description ||
-          activeJob.prompt ||
-          "",
+        activeJob.prompt ||
+        "",
         {
           maxResults:
             activeJob.maxResults || 10,
@@ -414,12 +393,18 @@ const SourcingHubView = ({
 
         <header className="sourcing-page-header">
           <div>
-            <h1>Your hiring roles</h1>
+            <h1>
+              {ui(
+                "Your hiring roles",
+                "Vos postes"
+              )}
+            </h1>
 
             <p>
-              Manage role descriptions and the
-              sourcing activity connected to each
-              one.
+              {ui(
+                "Manage role descriptions and the sourcing activity connected to each one.",
+                "Gérez vos fiches de poste et l’activité de sourcing associée à chacune."
+              )}
             </p>
           </div>
 
@@ -435,8 +420,14 @@ const SourcingHubView = ({
                     event.target.value
                   )
                 }
-                placeholder="Search roles..."
-                aria-label="Search job descriptions"
+                placeholder={ui(
+                  "Search roles...",
+                  "Rechercher des postes..."
+                )}
+                aria-label={ui(
+                  "Search job descriptions",
+                  "Rechercher des fiches de poste"
+                )}
               />
 
               {roleSearch && (
@@ -446,7 +437,10 @@ const SourcingHubView = ({
                   onClick={() =>
                     setRoleSearch("")
                   }
-                  aria-label="Clear role search"
+                  aria-label={ui(
+                    "Clear role search",
+                    "Effacer la recherche de postes"
+                  )}
                 >
                   ×
                 </button>
@@ -459,7 +453,11 @@ const SourcingHubView = ({
                 onClick={onNewDescription}
               >
                 <Plus size={16} />
-                New description
+
+                {ui(
+                  "New description",
+                  "Nouvelle fiche"
+                )}
               </button>
             )}
           </div>
@@ -472,6 +470,7 @@ const SourcingHubView = ({
           }
           selectedJobId={selectedJobId}
           isSearching={isSearching}
+          lang={lang}
         />
 
         <section className="role-library">
@@ -495,7 +494,7 @@ const SourcingHubView = ({
 
                     const isLoneTrailingCard =
                       index ===
-                        pagedJobs.length - 1 &&
+                      pagedJobs.length - 1 &&
                       pagedJobs.length % 2 !== 0;
 
                     return (
@@ -520,14 +519,15 @@ const SourcingHubView = ({
                         onEdit={
                           onEditDescription
                             ? () =>
-                                onEditDescription(
-                                  job
-                                )
+                              onEditDescription(
+                                job
+                              )
                             : undefined
                         }
                         onDeleteJob={
                           onDeleteJob
                         }
+                        lang={lang}
                       />
                     );
                   }
@@ -552,7 +552,11 @@ const SourcingHubView = ({
                     className="pagination-button"
                   >
                     <ChevronLeft size={14} />
-                    Previous
+
+                    {ui(
+                      "Previous",
+                      "Précédent"
+                    )}
                   </button>
 
                   <div className="pagination-pages">
@@ -568,12 +572,11 @@ const SourcingHubView = ({
                               index
                             )
                           }
-                          className={`pagination-page ${
-                            libraryPage ===
+                          className={`pagination-page ${libraryPage ===
                             index
-                              ? "active"
-                              : ""
-                          }`}
+                            ? "active"
+                            : ""
+                            }`}
                         >
                           {index + 1}
                         </button>
@@ -597,7 +600,11 @@ const SourcingHubView = ({
                     }
                     className="pagination-button"
                   >
-                    Next
+                    {ui(
+                      "Next",
+                      "Suivant"
+                    )}
+
                     <ChevronRight
                       size={14}
                     />
@@ -612,11 +619,17 @@ const SourcingHubView = ({
               </div>
 
               <h3>
-                No roles found
+                {ui(
+                  "No roles found",
+                  "Aucun poste trouvé"
+                )}
               </h3>
 
               <p>
-                No job descriptions match{" "}
+                {ui(
+                  "No job descriptions match",
+                  "Aucune fiche de poste ne correspond à"
+                )}{" "}
                 <strong>
                   "{roleSearch}"
                 </strong>
@@ -629,7 +642,10 @@ const SourcingHubView = ({
                   setRoleSearch("")
                 }
               >
-                Clear search
+                {ui(
+                  "Clear search",
+                  "Effacer la recherche"
+                )}
               </button>
             </div>
           ) : (
@@ -641,13 +657,17 @@ const SourcingHubView = ({
               </div>
 
               <h3>
-                No role descriptions yet
+                {ui(
+                  "No role descriptions yet",
+                  "Aucune fiche de poste"
+                )}
               </h3>
 
               <p>
-                Create a description first,
-                then sourcing activity and
-                candidates will appear here.
+                {ui(
+                  "Create a description first, then sourcing activity and candidates will appear here.",
+                  "Créez d’abord une fiche de poste, puis l’activité de sourcing et les candidats apparaîtront ici."
+                )}
               </p>
 
               {onNewDescription && (
@@ -658,7 +678,11 @@ const SourcingHubView = ({
                   }
                 >
                   <Plus size={16} />
-                  Create description
+
+                  {ui(
+                    "Create description",
+                    "Créer une fiche"
+                  )}
                 </button>
               )}
             </div>
@@ -680,7 +704,11 @@ const SourcingHubView = ({
         onClick={closeWorkspace}
       >
         <ArrowLeft size={15} />
-        All descriptions
+
+        {ui(
+          "All descriptions",
+          "Toutes les fiches"
+        )}
       </button>
 
       <section className="role-workspace-card">
@@ -692,7 +720,10 @@ const SourcingHubView = ({
           <div className="role-title-row">
             <h1>
               {activeJob?.title ||
-                "Untitled role"}
+                ui(
+                  "Untitled role",
+                  "Poste sans titre"
+                )}
             </h1>
 
             {activeJob?.status && (
@@ -703,7 +734,10 @@ const SourcingHubView = ({
             )}
           </div>
 
-          <RoleMeta job={activeJob} />
+          <RoleMeta
+            job={activeJob}
+            lang={lang}
+          />
         </div>
 
         <div className="role-header-actions">
@@ -717,7 +751,11 @@ const SourcingHubView = ({
               }
             >
               <Edit3 size={15} />
-              Edit description
+
+              {ui(
+                "Edit description",
+                "Modifier la fiche"
+              )}
             </button>
           )}
 
@@ -731,7 +769,14 @@ const SourcingHubView = ({
                     activeJob.id
                   )
                 }
-                title="Delete description"
+                title={ui(
+                  "Delete description",
+                  "Supprimer la fiche"
+                )}
+                aria-label={ui(
+                  "Delete description",
+                  "Supprimer la fiche"
+                )}
               >
                 <Trash2 size={15} />
               </button>
@@ -762,7 +807,10 @@ const SourcingHubView = ({
             <div>
               <div className="candidate-heading-line">
                 <h2>
-                  Candidate profiles
+                  {ui(
+                    "Candidate profiles",
+                    "Profils candidats"
+                  )}
                 </h2>
 
                 <span className="candidate-count">
@@ -772,29 +820,46 @@ const SourcingHubView = ({
                 </span>
 
                 {workspaceTab ===
-                    "shortlisted" &&
+                  "shortlisted" &&
                   shortlistedCandidates.length >
-                    0 && (
+                  0 && (
                     <span
                       className={`avg-match-badge avg-match-${getScoreBand(
                         avgShortlistScore
                       )}`}
                     >
                       {avgShortlistScore}%
-                      {" "}avg match
+                      {" "}
+                      {ui(
+                        "avg match",
+                        "score moyen"
+                      )}
                     </span>
                   )}
               </div>
 
               <p>
                 {workspaceTab === "shortlisted"
-                  ? (t?.shortlistedTab || (lang === "FR" ? "Sélectionnés pour" : "Shortlisted for"))
-                  : workspaceTab === "pool"
-                  ? (t?.poolTab || (lang === "FR" ? "Vivier talent pour" : "Talent pool for"))
-                  : (t?.sourcedTab || (lang === "FR" ? "Sourcés pour" : "Sourced for"))}{" "}
+                  ? (
+                    t?.shortlistedTab ||
+                    ui(
+                      "Shortlisted for",
+                      "Sélectionnés pour"
+                    )
+                  )
+                  : (
+                    t?.sourcedTab ||
+                    ui(
+                      "Sourced for",
+                      "Sourcés pour"
+                    )
+                  )}{" "}
                 <strong>
                   {activeJob?.title ||
-                    "this role"}
+                    ui(
+                      "this role",
+                      "ce poste"
+                    )}
                 </strong>
               </p>
             </div>
@@ -814,36 +879,24 @@ const SourcingHubView = ({
               }}
             >
               <Sparkles size={13} />
-              {t?.sourcedTab || (lang === "FR" ? "Sourcés" : "Sourced")}
+
+              {t?.sourcedTab ||
+                ui(
+                  "Sourced",
+                  "Sourcés"
+                )}
+
               <span className="candidate-view-tab-count">
                 {displayCandidates.length}
               </span>
             </button>
 
-            <button
-              type="button"
-              className={
-                workspaceTab === "pool"
-                  ? "candidate-view-tab active"
-                  : "candidate-view-tab"
-              }
-              onClick={() => {
-                setWorkspaceTab("pool");
-                onSearchModeChange?.("pool");
-              }}
-            >
-              <Users size={13} />
-              {t?.poolTab || (lang === "FR" ? "Vivier" : "Talent Pool")}
-              <span className="candidate-view-tab-count">
-                {poolCandidates.length}
-              </span>
-            </button>
 
             <button
               type="button"
               className={
                 workspaceTab ===
-                "shortlisted"
+                  "shortlisted"
                   ? "candidate-view-tab active"
                   : "candidate-view-tab"
               }
@@ -853,7 +906,12 @@ const SourcingHubView = ({
                 )
               }
             >
-              {t?.shortlistedTab || (lang === "FR" ? "Sélectionnés" : "Shortlisted")}
+              {t?.shortlistedTab ||
+                ui(
+                  "Shortlisted",
+                  "Sélectionnés"
+                )}
+
               <span className="candidate-view-tab-count">
                 {
                   shortlistedCandidates.length
@@ -865,21 +923,32 @@ const SourcingHubView = ({
           <div className="candidate-actions">
             {visibleCandidates.length >
               1 && (
-              <button
-                className="workspace-action-button"
-                onClick={onCompare}
-              >
-                <GitCompare size={15} />
-                Compare
-              </button>
-            )}
+                <button
+                  className="workspace-action-button"
+                  onClick={() =>
+                    onCompare?.(
+                      visibleCandidates
+                    )
+                  }
+                >
+                  <GitCompare size={15} />
 
-            {(workspaceTab === "sourced" || workspaceTab === "pool") && (
+                  {ui(
+                    "Compare",
+                    "Comparer"
+                  )}
+                </button>
+              )}
+
+            {workspaceTab === "sourced" && (
               <button
                 className="workspace-action-button workspace-action-primary"
                 onClick={handleRefresh}
                 disabled={isSearching}
-                title={workspaceTab === "pool" ? "Refresh pool search" : "Refresh sourcing search"}
+                title={ui(
+                  "Refresh sourcing search",
+                  "Actualiser la recherche de sourcing"
+                )}
               >
                 <RefreshCw
                   size={15}
@@ -891,8 +960,14 @@ const SourcingHubView = ({
                 />
 
                 {isSearching
-                  ? "Searching"
-                  : "Refresh"}
+                  ? ui(
+                    "Searching",
+                    "Recherche en cours"
+                  )
+                  : ui(
+                    "Refresh",
+                    "Actualiser"
+                  )}
               </button>
             )}
           </div>
@@ -909,7 +984,7 @@ const SourcingHubView = ({
 
         <div className="candidate-grid-area">
           {visibleCandidates.length >
-          0 ? (
+            0 ? (
             <CandidateGridView
               candidates={
                 visibleCandidates
@@ -941,16 +1016,13 @@ const SourcingHubView = ({
             workspaceTab === "shortlisted" ? (
               <EmptyShortlistState
                 activeJob={activeJob}
-              />
-            ) : workspaceTab === "pool" ? (
-              <EmptyPoolCandidateState
-                activeJob={activeJob}
-                onSearch={onSearch}
+                lang={lang}
               />
             ) : (
               <EmptyCandidateState
                 activeJob={activeJob}
                 onSearch={onSearch}
+                lang={lang}
               />
             )
           ) : null}
@@ -969,7 +1041,11 @@ const LibrarySummary = ({
   getJobCandidates,
   selectedJobId,
   isSearching,
+  lang,
 }) => {
+  const ui = (en, fr) =>
+    lang === "FR" ? fr : en;
+
   const totalCandidates = jobs.reduce(
     (sum, job) =>
       sum +
@@ -986,7 +1062,10 @@ const LibrarySummary = ({
   return (
     <div className="library-summary">
       <SummaryItem
-        label="Descriptions"
+        label={ui(
+          "Descriptions",
+          "Fiches"
+        )}
         value={jobs.length}
         icon={
           <BriefcaseBusiness size={14} />
@@ -996,7 +1075,10 @@ const LibrarySummary = ({
       <SummaryDivider />
 
       <SummaryItem
-        label="Sourced roles"
+        label={ui(
+          "Sourced roles",
+          "Postes sourcés"
+        )}
         value={sourcedRoles}
         icon={<Check size={14} />}
       />
@@ -1004,7 +1086,10 @@ const LibrarySummary = ({
       <SummaryDivider />
 
       <SummaryItem
-        label="Candidates"
+        label={ui(
+          "Candidates",
+          "Candidats"
+        )}
         value={totalCandidates}
         icon={<Users size={14} />}
       />
@@ -1016,11 +1101,17 @@ const LibrarySummary = ({
 
             <div>
               <strong>
-                Search running
+                {ui(
+                  "Search running",
+                  "Recherche en cours"
+                )}
               </strong>
+
               <span>
-                Candidate sourcing is
-                active
+                {ui(
+                  "Candidate sourcing is active",
+                  "Le sourcing de candidats est actif"
+                )}
               </span>
             </div>
           </div>
@@ -1060,32 +1151,40 @@ const RoleCard = ({
   onOpen,
   onEdit,
   onDeleteJob,
+  lang,
 }) => {
-  const meta = getRoleMeta(job);
+  const ui = (en, fr) =>
+    lang === "FR" ? fr : en;
+
+  const meta = getRoleMeta(job, lang);
 
   return (
     <article
-      className={`role-card ${
-        isSelected
-          ? "role-card-selected"
-          : ""
-      } ${
-        isSpanning
+      className={`role-card ${isSelected
+        ? "role-card-selected"
+        : ""
+        } ${isSpanning
           ? "role-card-span"
           : ""
-      }`}
+        }`}
       onClick={onOpen}
     >
       <div className="role-card-top">
         <div className="role-card-title-block">
           <h3>
             {job.title ||
-              "Untitled role"}
+              ui(
+                "Untitled role",
+                "Poste sans titre"
+              )}
           </h3>
 
           {isSelected && (
             <span className="current-role-label">
-              Current
+              {ui(
+                "Current",
+                "Actuel"
+              )}
             </span>
           )}
         </div>
@@ -1098,7 +1197,14 @@ const RoleCard = ({
                 event.stopPropagation();
                 onEdit();
               }}
-              title="Edit description"
+              title={ui(
+                "Edit description",
+                "Modifier la fiche"
+              )}
+              aria-label={ui(
+                "Edit description",
+                "Modifier la fiche"
+              )}
             >
               <Edit3 size={14} />
             </button>
@@ -1109,12 +1215,20 @@ const RoleCard = ({
               className="role-card-icon-button role-card-icon-button-danger"
               onClick={(event) => {
                 event.stopPropagation();
+
                 onDeleteJob(
                   event,
                   job.id
                 );
               }}
-              title="Delete description"
+              title={ui(
+                "Delete description",
+                "Supprimer la fiche"
+              )}
+              aria-label={ui(
+                "Delete description",
+                "Supprimer la fiche"
+              )}
             >
               <Trash2 size={14} />
             </button>
@@ -1140,11 +1254,11 @@ const RoleCard = ({
       {job.description && (
         <p className="role-card-description">
           {job.description.length >
-          140
+            140
             ? `${job.description.slice(
-                0,
-                140
-              )}…`
+              0,
+              140
+            )}…`
             : job.description}
         </p>
       )}
@@ -1156,7 +1270,10 @@ const RoleCard = ({
           </strong>
 
           <span>
-            candidates
+            {ui(
+              "candidates",
+              "candidats"
+            )}
           </span>
         </div>
 
@@ -1164,22 +1281,34 @@ const RoleCard = ({
           {isSearching ? (
             <>
               <span className="status-orb status-orb-live" />
+
               <span>
-                Searching
+                {ui(
+                  "Searching",
+                  "Recherche en cours"
+                )}
               </span>
             </>
           ) : candidateCount > 0 ? (
             <>
               <span className="status-orb" />
+
               <span>
-                Ready
+                {ui(
+                  "Ready",
+                  "Prêt"
+                )}
               </span>
             </>
           ) : (
             <>
               <span className="status-orb status-orb-neutral" />
+
               <span>
-                Not sourced
+                {ui(
+                  "Not sourced",
+                  "Non sourcé"
+                )}
               </span>
             </>
           )}
@@ -1192,7 +1321,11 @@ const RoleCard = ({
             onOpen();
           }}
         >
-          Open
+          {ui(
+            "Open",
+            "Ouvrir"
+          )}
+
           <ArrowRight size={13} />
         </button>
       </div>
@@ -1204,8 +1337,14 @@ const RoleCard = ({
 /*                                ROLE DETAILS                                */
 /* -------------------------------------------------------------------------- */
 
-const RoleMeta = ({ job }) => {
-  const meta = getRoleMeta(job);
+const RoleMeta = ({
+  job,
+  lang,
+}) => {
+  const meta = getRoleMeta(
+    job,
+    lang
+  );
 
   if (!meta.length) {
     return null;
@@ -1227,7 +1366,10 @@ const RoleMeta = ({ job }) => {
   );
 };
 
-const getRoleMeta = (job = {}) => {
+const getRoleMeta = (
+  job = {},
+  lang
+) => {
   const items = [];
 
   if (job.seniority) {
@@ -1244,7 +1386,10 @@ const getRoleMeta = (job = {}) => {
   ) {
     items.push(
       job.experience ||
-        `${job.minExperience}+ years`
+      `${job.minExperience}+ ${lang === "FR"
+        ? "ans"
+        : "years"
+      }`
     );
   }
 
@@ -1267,38 +1412,10 @@ const getRoleMeta = (job = {}) => {
 
 const EmptyShortlistState = ({
   activeJob,
-}) => (
-  <div className="candidate-empty">
-    <div className="empty-search-visual">
-      <div className="empty-circle empty-circle-one" />
-      <div className="empty-circle empty-circle-two" />
-
-      <Users size={22} />
-    </div>
-
-    <h3>
-      No candidates shortlisted yet
-    </h3>
-
-    <p>
-      Save candidates from the{" "}
-      <strong>Sourced</strong> tab for{" "}
-      <strong>
-        {activeJob?.title ||
-          "this role"}
-      </strong>{" "}
-      to build a talent pool here.
-    </p>
-  </div>
-);
-
-const EmptyPoolCandidateState = ({
-  activeJob,
-  onSearch,
+  lang,
 }) => {
-  const queryText = activeJob?.description || activeJob?.prompt || activeJob?.title || "";
-  const skillsList = activeJob?.skills || activeJob?.requiredSkills || activeJob?.technologies || [];
-  const loc = activeJob?.location && activeJob.location !== 'All Locations' ? activeJob.location : '';
+  const ui = (en, fr) =>
+    lang === "FR" ? fr : en;
 
   return (
     <div className="candidate-empty">
@@ -1310,47 +1427,70 @@ const EmptyPoolCandidateState = ({
       </div>
 
       <h3>
-        No talent pool candidates yet
+        {ui(
+          "No candidates shortlisted yet",
+          "Aucun candidat sélectionné"
+        )}
       </h3>
 
       <p>
-        Search verified internal profiles from your talent pool for{" "}
+        {ui(
+          "Save candidates from the",
+          "Enregistrez des candidats depuis l’onglet"
+        )}{" "}
         <strong>
-          {activeJob?.title || "this role"}
-        </strong>
-        .
+          {ui(
+            "Sourced",
+            "Sourcés"
+          )}
+        </strong>{" "}
+        {ui(
+          "tab for",
+          "pour"
+        )}{" "}
+        <strong>
+          {activeJob?.title ||
+            ui(
+              "this role",
+              "ce poste"
+            )}
+        </strong>{" "}
+        {ui(
+          "to build your shortlist here.",
+          "afin de constituer votre shortlist ici."
+        )}
       </p>
-
-      <button
-        className="sourcing-primary-button"
-        onClick={() =>
-          onSearch?.(
-            queryText,
-            {
-              location: loc,
-              minExp: Number(activeJob?.minExperience) || 0,
-              tech: Array.isArray(skillsList) ? skillsList : [],
-              maxResults: Number(activeJob?.maxResults) || 10,
-              searchMode: "pool",
-            },
-            activeJob?.id
-          )
-        }
-      >
-        <Users size={15} />
-        Search talent pool
-      </button>
     </div>
   );
 };
 
+
 const EmptyCandidateState = ({
   activeJob,
   onSearch,
+  lang,
 }) => {
-  const queryText = activeJob?.description || activeJob?.prompt || activeJob?.title || "";
-  const skillsList = activeJob?.skills || activeJob?.requiredSkills || activeJob?.technologies || [];
-  const loc = activeJob?.location && activeJob.location !== 'All Locations' ? activeJob.location : '';
+  const ui = (en, fr) =>
+    lang === "FR" ? fr : en;
+
+  const queryText =
+    activeJob?.description ||
+    activeJob?.prompt ||
+    activeJob?.title ||
+    "";
+
+  const skillsList =
+    activeJob?.skills ||
+    activeJob?.requiredSkills ||
+    activeJob?.technologies ||
+    [];
+
+  const loc =
+    activeJob?.location &&
+      activeJob.location !==
+      "All Locations"
+      ? activeJob.location
+      : "";
 
   return (
     <div className="candidate-empty">
@@ -1362,17 +1502,28 @@ const EmptyCandidateState = ({
       </div>
 
       <h3>
-        No candidates sourced yet
+        {ui(
+          "No candidates sourced yet",
+          "Aucun candidat sourcé"
+        )}
       </h3>
 
       <p>
-        Run sourcing using the{" "}
+        {ui(
+          "Run sourcing using the",
+          "Lancez le sourcing à partir de la fiche du poste"
+        )}{" "}
         <strong>
           {activeJob?.title ||
-            "role"}
+            ui(
+              "role",
+              "poste"
+            )}
         </strong>{" "}
-        description, or add a refinement
-        first.
+        {ui(
+          "description, or add a refinement first.",
+          "ou ajoutez d’abord une précision."
+        )}
       </p>
 
       <button
@@ -1382,9 +1533,19 @@ const EmptyCandidateState = ({
             queryText,
             {
               location: loc,
-              minExp: Number(activeJob?.minExperience) || 0,
-              tech: Array.isArray(skillsList) ? skillsList : [],
-              maxResults: Number(activeJob?.maxResults) || 10,
+              minExp:
+                Number(
+                  activeJob?.minExperience
+                ) || 0,
+              tech: Array.isArray(
+                skillsList
+              )
+                ? skillsList
+                : [],
+              maxResults:
+                Number(
+                  activeJob?.maxResults
+                ) || 10,
               searchMode: "ai",
             },
             activeJob?.id
@@ -1392,7 +1553,11 @@ const EmptyCandidateState = ({
         }
       >
         <Sparkles size={15} />
-        Start sourcing
+
+        {ui(
+          "Start sourcing",
+          "Lancer le sourcing"
+        )}
       </button>
     </div>
   );

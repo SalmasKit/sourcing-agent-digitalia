@@ -16,7 +16,6 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Braces,
   Briefcase,
   Check,
   ChevronDown,
@@ -25,10 +24,10 @@ import {
   Search,
   SlidersHorizontal,
   Sparkles,
-  Users,
   X,
 } from "lucide-react";
 
+import { useLanguage } from "../context/LanguageContext";
 import { searchLocations } from "../utils/geocoding";
 
 const getMinExperienceFromSeniority = (seniorityStr) => {
@@ -69,12 +68,12 @@ const normalizeRequirementValues = (value) => {
         if (item && typeof item === "object") {
           return [
             item.name ||
-              item.label ||
-              item.title ||
-              item.value ||
-              item.skill ||
-              item.requirement ||
-              "",
+            item.label ||
+            item.title ||
+            item.value ||
+            item.skill ||
+            item.requirement ||
+            "",
           ];
         }
 
@@ -87,12 +86,12 @@ const normalizeRequirementValues = (value) => {
   if (typeof value === "object") {
     return [
       value.name ||
-        value.label ||
-        value.title ||
-        value.value ||
-        value.skill ||
-        value.requirement ||
-        "",
+      value.label ||
+      value.title ||
+      value.value ||
+      value.skill ||
+      value.requirement ||
+      "",
     ]
       .map((item) => String(item).trim())
       .filter(Boolean);
@@ -198,6 +197,77 @@ const SearchConsole = ({
   onSearchModeChange,
   sourcedCandidateCount = 0,
 }) => {
+  const { lang } = useLanguage();
+
+  const isFrench = lang === "FR";
+
+  const text = {
+    promptPlaceholder: isFrench
+      ? "Décrivez votre candidat idéal..."
+      : "Describe your ideal candidate...",
+    noJobPlaceholder: isFrench
+      ? "Sélectionnez un poste pour commencer le sourcing..."
+      : "Select a job to start sourcing...",
+    clearSearchPrompt: isFrench
+      ? "Effacer la description de recherche"
+      : "Clear search prompt",
+    filters: isFrench ? "Filtres" : "Filters",
+    searching: isFrench ? "Recherche..." : "Searching...",
+    searchCandidates: isFrench
+      ? "Rechercher des candidats"
+      : "Search candidates",
+    searchContext: isFrench
+      ? "CONTEXTE DE RECHERCHE"
+      : "SEARCH CONTEXT",
+    years: isFrench ? "ans" : "years",
+    more: isFrench ? "de plus" : "more",
+    sourced: isFrench ? "sourcés" : "sourced",
+    sourcingRefinement: isFrench
+      ? "AFFINAGE DU SOURCING"
+      : "SOURCING REFINEMENT",
+    editRequirements: isFrench
+      ? "Modifier les critères de recherche"
+      : "Edit the search requirements",
+    editableWithoutReopening: isFrench
+      ? "Tout ici est modifiable sans rouvrir la description du poste."
+      : "Everything here is editable without reopening the job description.",
+    reset: isFrench ? "Réinitialiser" : "Reset",
+    location: isFrench ? "LOCALISATION" : "LOCATION",
+    anyLocation: isFrench ? "Toute localisation" : "Any location",
+    searchingLocations: isFrench
+      ? "Recherche de localisations..."
+      : "Searching locations...",
+    minimumExperience: isFrench
+      ? "EXPÉRIENCE MINIMALE"
+      : "MINIMUM EXPERIENCE",
+    sourcedLabel: isFrench ? "SOURCÉS" : "SOURCED",
+    candidates: isFrench ? "candidats" : "candidates",
+    resultLimit: isFrench ? "LIMITE DE RÉSULTATS" : "RESULT LIMIT",
+    results: isFrench ? "résultats" : "results",
+    requirements: isFrench ? "CRITÈRES" : "REQUIREMENTS",
+    skillsRequirements: isFrench
+      ? "Compétences et critères"
+      : "Skills & requirements",
+    selected: isFrench ? "sélectionnés" : "selected",
+    remove: isFrench ? "Supprimer" : "Remove",
+    addAnotherRequirement: isFrench
+      ? "Ajouter un autre critère..."
+      : "Add another requirement...",
+    addSkillRequirement: isFrench
+      ? "Ajouter une compétence ou un critère..."
+      : "Add a skill or requirement...",
+    fromThisJob: isFrench ? "ISSUS DE CE POSTE" : "FROM THIS JOB",
+    requirementHelper: isFrench
+      ? "Saisissez votre propre critère et appuyez sur Entrée, ou choisissez un critère extrait de ce poste."
+      : "Type your own requirement and press Enter, or choose requirements extracted from this job.",
+    enterToAdd: isFrench ? "ENTRÉE pour ajouter" : "ENTER to add",
+    changesApply: isFrench
+      ? "Les modifications s'appliqueront à la prochaine recherche de candidats."
+      : "Changes apply to the next candidate search.",
+    done: isFrench ? "Terminé" : "Done",
+    technicalSourcing: isFrench ? "Sourcing technique" : "Technical Sourcing",
+  };
+
   const defaultLocation = selectedJob?.location || "";
 
   const defaultMinExp =
@@ -297,10 +367,10 @@ const SearchConsole = ({
 
     setMinExp(
       Number(selectedJob?.minExperience) ||
-        getMinExperienceFromSeniority(
-          selectedJob?.seniority
-        ) ||
-        3
+      getMinExperienceFromSeniority(
+        selectedJob?.seniority
+      ) ||
+      3
     );
 
     setMaxResults(
@@ -545,7 +615,7 @@ const SearchConsole = ({
       selectedJob?.description ||
       selectedJob?.prompt ||
       selectedJob?.title ||
-      "Technical Sourcing";
+      text.technicalSourcing;
 
     const finalQuery =
       query.trim() || baseDescription;
@@ -605,11 +675,10 @@ const SearchConsole = ({
       <style>{styles}</style>
 
       <form
-        className={`refine-command ${
-          showFilters
+        className={`refine-command ${showFilters
             ? "refine-command-open"
             : ""
-        }`}
+          }`}
         onSubmit={submitSearch}
       >
         {/* -------------------------------------------------
@@ -634,8 +703,8 @@ const SearchConsole = ({
             onInput={resizePrompt}
             placeholder={
               selectedJob
-                ? "Describe your ideal candidate..."
-                : "Select a job to start sourcing..."
+                ? text.promptPlaceholder
+                : text.noJobPlaceholder
             }
             disabled={!selectedJob}
             rows={3}
@@ -653,7 +722,8 @@ const SearchConsole = ({
                   resizePrompt
                 );
               }}
-              aria-label="Clear search prompt"
+              aria-label={text.clearSearchPrompt}
+              title={text.clearSearchPrompt}
             >
               <X size={13} />
             </button>
@@ -667,16 +737,16 @@ const SearchConsole = ({
         <div className="refine-command-actions">
           <button
             type="button"
-            className={`refine-control ${
-              showFilters ? "active" : ""
-            }`}
+            className={`refine-control ${showFilters ? "active" : ""
+              }`}
             onClick={() =>
               setShowFilters((value) => !value)
             }
+            aria-expanded={showFilters}
           >
             <SlidersHorizontal size={14} />
 
-            <span>Filters</span>
+            <span>{text.filters}</span>
 
             {activeFilterCount > 0 && (
               <span className="filter-count">
@@ -694,42 +764,6 @@ const SearchConsole = ({
             />
           </button>
 
-          {/* Search mode */}
-          <div className="search-mode-control">
-            <button
-              type="button"
-              className={
-                searchMode === "ai"
-                  ? "mode-button active"
-                  : "mode-button"
-              }
-              onClick={() =>
-                onSearchModeChange?.("ai")
-              }
-              title="Autonomous live AI web candidate sourcing"
-            >
-              <Sparkles size={12} />
-              AI Sourcing
-            </button>
-
-            <button
-              type="button"
-              className={
-                searchMode === "pool"
-                  ? "mode-button active"
-                  : "mode-button"
-              }
-              onClick={() =>
-                onSearchModeChange?.(
-                  "pool"
-                )
-              }
-              title="Search within internal verified talent pool"
-            >
-              <Users size={12} />
-              Talent Pool
-            </button>
-          </div>
 
           <button
             type="submit"
@@ -741,12 +775,12 @@ const SearchConsole = ({
             {isSearching ? (
               <>
                 <span className="search-spinner" />
-                Searching...
+                {text.searching}
               </>
             ) : (
               <>
                 <Search size={14} />
-                Search candidates
+                {text.searchCandidates}
               </>
             )}
           </button>
@@ -759,7 +793,7 @@ const SearchConsole = ({
 
       <div className="active-refinements">
         <span className="refinement-label">
-          SEARCH CONTEXT
+          {text.searchContext}
         </span>
 
         {location && (
@@ -773,7 +807,7 @@ const SearchConsole = ({
         <ContextChip
           icon={<Briefcase size={11} />}
         >
-          {minExp}+ years
+          {minExp}+ {text.years}
         </ContextChip>
 
         {selectedTech
@@ -789,14 +823,16 @@ const SearchConsole = ({
 
         {selectedTech.length > 4 && (
           <span className="more-context">
-            +{selectedTech.length - 4} more
+            +{selectedTech.length - 4} {text.more}
           </span>
         )}
 
         {sourcedCandidateCount > 0 && (
           <span className="sourced-context">
-            {sourcedCandidateCount.toLocaleString()}{" "}
-            sourced
+            {sourcedCandidateCount.toLocaleString(
+              isFrench ? "fr-FR" : "en-US"
+            )}{" "}
+            {text.sourced}
           </span>
         )}
       </div>
@@ -810,16 +846,15 @@ const SearchConsole = ({
           <div className="filter-panel-header">
             <div>
               <span className="filter-eyebrow">
-                SOURCING REFINEMENT
+                {text.sourcingRefinement}
               </span>
 
               <h3>
-                Edit the search requirements
+                {text.editRequirements}
               </h3>
 
               <p>
-                Everything here is editable without
-                reopening the job description.
+                {text.editableWithoutReopening}
               </p>
             </div>
 
@@ -829,7 +864,7 @@ const SearchConsole = ({
               onClick={resetFilters}
             >
               <RotateCcw size={12} />
-              Reset
+              {text.reset}
             </button>
           </div>
 
@@ -840,7 +875,7 @@ const SearchConsole = ({
           <div className="filter-grid">
             {/* Location */}
             <div className="filter-field location-field">
-              <label>LOCATION</label>
+              <label>{text.location}</label>
 
               <div className="location-input-wrap">
                 <MapPin size={14} />
@@ -865,7 +900,8 @@ const SearchConsole = ({
                       150
                     )
                   }
-                  placeholder="Any location"
+                  placeholder={text.anyLocation}
+                  aria-label={text.location}
                   autoComplete="off"
                 />
 
@@ -882,6 +918,8 @@ const SearchConsole = ({
                         []
                       );
                     }}
+                    aria-label={`${text.remove} ${text.location}`}
+                    title={`${text.remove} ${text.location}`}
                   >
                     <X size={12} />
                   </button>
@@ -890,12 +928,12 @@ const SearchConsole = ({
                 {showLocationDropdown &&
                   (isLoadingLocations ||
                     locationSuggestions.length >
-                      0) && (
+                    0) && (
                     <div className="location-dropdown">
                       {isLoadingLocations ? (
                         <div className="location-loading">
                           <span className="mini-spinner" />
-                          Searching locations...
+                          {text.searchingLocations}
                         </div>
                       ) : (
                         locationSuggestions.map(
@@ -937,7 +975,7 @@ const SearchConsole = ({
             {/* Experience */}
             <div className="filter-field">
               <label>
-                MINIMUM EXPERIENCE
+                {text.minimumExperience}
               </label>
 
               <div className="number-input-wrap">
@@ -956,30 +994,33 @@ const SearchConsole = ({
                       )
                     )
                   }
+                  aria-label={text.minimumExperience}
                 />
 
-                <span>years</span>
+                <span>{text.years}</span>
               </div>
             </div>
 
             {/* Sourced */}
             <div className="filter-field">
-              <label>SOURCED</label>
+              <label>{text.sourcedLabel}</label>
 
               <div className="sourced-field">
                 <span className="sourced-number">
-                  {sourcedCandidateCount.toLocaleString()}
+                  {sourcedCandidateCount.toLocaleString(
+                    isFrench ? "fr-FR" : "en-US"
+                  )}
                 </span>
 
                 <span className="sourced-label">
-                  candidates
+                  {text.candidates}
                 </span>
               </div>
             </div>
 
             {/* Result limit */}
             <div className="filter-field">
-              <label>RESULT LIMIT</label>
+              <label>{text.resultLimit}</label>
 
               <div className="number-input-wrap">
                 <input
@@ -1000,9 +1041,10 @@ const SearchConsole = ({
                       )
                     )
                   }
+                  aria-label={text.resultLimit}
                 />
 
-                <span>results</span>
+                <span>{text.results}</span>
               </div>
             </div>
           </div>
@@ -1015,16 +1057,16 @@ const SearchConsole = ({
             <div className="requirements-heading">
               <div>
                 <span className="filter-eyebrow">
-                  REQUIREMENTS
+                  {text.requirements}
                 </span>
 
                 <h4>
-                  Skills &amp; requirements
+                  {text.skillsRequirements}
                 </h4>
               </div>
 
               <span className="requirement-count">
-                {selectedTech.length} selected
+                {selectedTech.length} {text.selected}
               </span>
             </div>
 
@@ -1047,7 +1089,8 @@ const SearchConsole = ({
                           technology
                         )
                       }
-                      aria-label={`Remove ${technology}`}
+                      aria-label={`${text.remove} ${technology}`}
+                      title={`${text.remove} ${technology}`}
                     >
                       <X size={11} />
                     </button>
@@ -1085,17 +1128,22 @@ const SearchConsole = ({
                   }
                   placeholder={
                     selectedTech.length
-                      ? "Add another requirement..."
-                      : "Add a skill or requirement..."
+                      ? text.addAnotherRequirement
+                      : text.addSkillRequirement
+                  }
+                  aria-label={
+                    selectedTech.length
+                      ? text.addAnotherRequirement
+                      : text.addSkillRequirement
                   }
                 />
 
                 {showTechSuggestions &&
                   availableTechSuggestions.length >
-                    0 && (
+                  0 && (
                     <div className="requirements-suggestions">
                       <div className="suggestions-label">
-                        FROM THIS JOB
+                        {text.fromThisJob}
                       </div>
 
                       {availableTechSuggestions.map(
@@ -1130,13 +1178,11 @@ const SearchConsole = ({
 
             <div className="requirements-helper">
               <span>
-                Type your own requirement and press
-                Enter, or choose requirements extracted
-                from this job.
+                {text.requirementHelper}
               </span>
 
               <span className="requirement-shortcut">
-                ENTER to add
+                {text.enterToAdd}
               </span>
             </div>
           </div>
@@ -1147,8 +1193,7 @@ const SearchConsole = ({
 
           <div className="filter-panel-footer">
             <span>
-              Changes apply to the next candidate
-              search.
+              {text.changesApply}
             </span>
 
             <button
@@ -1159,7 +1204,7 @@ const SearchConsole = ({
               }
             >
               <Check size={13} />
-              Done
+              {text.done}
             </button>
           </div>
         </div>
@@ -1370,43 +1415,6 @@ const styles = `
 
   .chevron-open {
     transform: rotate(180deg);
-  }
-
-  .search-mode-control {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 3px;
-    border: 1px solid #E2DFD7;
-    border-radius: 9px;
-    background: #FFFFFF;
-  }
-
-  .mode-button {
-    height: 27px;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 0 9px;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: #8A8F98;
-    font-family: inherit;
-    font-size: 10.5px;
-    font-weight: 650;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .mode-button.active {
-    background: #12151B;
-    color: #FFFFFF;
-  }
-
-  .mode-button:not(.active):hover {
-    color: #12151B;
-    background: #F5F4EF;
   }
 
   .run-search-button {
@@ -2028,10 +2036,6 @@ const styles = `
       width: 100%;
     }
 
-    .search-mode-control {
-      margin-left: auto;
-    }
-
     .filter-grid {
       grid-template-columns: 1fr;
     }
@@ -2066,15 +2070,6 @@ const styles = `
     }
 
     .refine-control {
-      flex: 1;
-      justify-content: center;
-    }
-
-    .search-mode-control {
-      flex: 1;
-    }
-
-    .mode-button {
       flex: 1;
       justify-content: center;
     }

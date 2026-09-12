@@ -314,6 +314,10 @@ function DashboardContent() {
 
   // Comparator & Auth modals
   const [isComparatorOpen, setIsComparatorOpen] = useState(false);
+  // Holds whichever candidates the comparator should currently show — either
+  // an explicit selection (bulk-select compare, workspace compare button) or,
+  // if nothing was passed in, falls back to the team shortlist.
+  const [comparatorCandidates, setComparatorCandidates] = useState([]);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -322,6 +326,38 @@ function DashboardContent() {
   const triggerToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Single entry point for opening the comparator from anywhere: the
+  // workspace-level "Compare" button, or the bulk-select action bar.
+  // Both pass the candidates to compare; the full candidate list is passed
+  // as the pool so recruiters can toggle additional candidates in the modal.
+  const [comparatorInitialIds, setComparatorInitialIds] = useState([]);
+
+  const openComparator = (candidatesToCompare) => {
+    const allAvailable =
+      candidates.length > 0
+        ? candidates
+        : Array.isArray(candidatesToCompare) && candidatesToCompare.length > 0
+          ? candidatesToCompare
+          : shortlist;
+
+    let initialIds = [];
+    if (Array.isArray(candidatesToCompare) && candidatesToCompare.length > 0) {
+      initialIds = candidatesToCompare.map((c) => c.id);
+      // Ensure any candidate in candidatesToCompare is present in the pool
+      const poolIds = new Set(allAvailable.map((c) => c.id));
+      const missing = candidatesToCompare.filter((c) => !poolIds.has(c.id));
+      if (missing.length > 0) {
+        allAvailable.push(...missing);
+      }
+    } else {
+      initialIds = allAvailable.slice(0, Math.min(allAvailable.length, 3)).map((c) => c.id);
+    }
+
+    setComparatorCandidates([...allAvailable]);
+    setComparatorInitialIds(initialIds);
+    setIsComparatorOpen(true);
   };
 
   const executeSearch = async (query, filters = {}, targetJobId = null, action = 'replace') => {
@@ -667,6 +703,61 @@ function DashboardContent() {
     });
   };
 
+  /*
+   * Batched shortlist handler for bulk selection.
+   *
+   * CandidateGridView's bulk-select bar already gathers the full set of
+   * candidate ids to shortlist before calling this. Previously, bulk
+   * actions looped over `handleToggleSaveForJob` per id — but that handler
+   * awaits its own confirm() dialog per call. Since only one confirm
+   * dialog can be open/resolved at a time, firing N of them back-to-back
+   * meant only the last one in the loop actually got confirmed and
+   * applied; the rest silently never resolved. This version does a single
+   * state update for the whole batch, with no per-item confirmation.
+   */
+  const handleBulkToggleSaveForJob = async (candidateIds = [], jobId) => {
+    if (!jobId || !candidateIds.length) return;
+
+    if (!hasPrivilege('shortlist_candidates')) {
+      await showAlert({
+        title: lang === 'FR' ? 'Action restreinte' : 'Action Restricted',
+        message: lang === 'FR' ? 'Privilège requis : Sélection de candidats.' : 'Action restricted: Requires Shortlist Candidates privilege.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    const job = jobDescriptions.find(j => j.id === jobId);
+    let addedCount = 0;
+
+    setSavedRoleCandidates(prev => {
+      const current = prev[jobId] || [];
+      const currentSet = new Set(current);
+      const toAdd = candidateIds.filter(id => !currentSet.has(id));
+      addedCount = toAdd.length;
+
+      if (toAdd.length === 0) {
+        return prev;
+      }
+
+      return { ...prev, [jobId]: [...current, ...toAdd] };
+    });
+
+    if (addedCount > 0) {
+      recordActivity(
+        'CANDIDATE_SHORTLISTED',
+        job?.title || 'Role',
+        `Saved ${addedCount} candidate(s) to role: ${job?.title || 'position'}`
+      );
+    }
+
+    triggerToast(
+      lang === 'FR'
+        ? `${addedCount} candidat(s) enregistré(s) au poste.`
+        : `${addedCount} candidate(s) saved to role.`
+    );
+  };
+
   const toggleShortlist = async (candidate) => {
     if (!hasPrivilege('shortlist_candidates')) {
       await showAlert({
@@ -832,6 +923,66 @@ function DashboardContent() {
       recordActivity('PROFILE_DELETED', candidateName, 'Deleted candidate profile');
       triggerToast(lang === 'FR' ? 'Profil supprimé.' : 'Profile deleted.');
     }
+  };
+
+  /*
+   * Batched delete handler for bulk selection.
+   *
+   * CandidateGridView's bulk-select bar already shows a single confirm
+   * dialog for the whole batch before calling this — so this function
+   * performs the deletion for every id directly, with no additional
+   * per-item confirmation. (See handleBulkToggleSaveForJob above for why
+   * looping over the single-candidate handler was the bug.)
+   */
+  const handleBulkDeleteCandidates = async (candidateIds = []) => {
+    if (!candidateIds.length) return;
+
+    const idSet = new Set(candidateIds);
+
+    setCandidates(prev => prev.filter(c => !idSet.has(c.id)));
+    setShortlist(prev => prev.filter(c => !idSet.has(c.id)));
+
+    setJobResultsCache(prev => {
+      const next = {};
+      Object.entries(prev).forEach(([key, val]) => {
+        if (Array.isArray(val)) {
+          next[key] = val.filter(c => !idSet.has(c.id));
+        } else if (val && typeof val === 'object') {
+          const nextVal = { ...val };
+          if (Array.isArray(val.candidates)) nextVal.candidates = val.candidates.filter(c => !idSet.has(c.id));
+          if (Array.isArray(val.sourced)) nextVal.sourced = val.sourced.filter(c => !idSet.has(c.id));
+          if (Array.isArray(val.pool)) nextVal.pool = val.pool.filter(c => !idSet.has(c.id));
+          next[key] = nextVal;
+        } else {
+          next[key] = val;
+        }
+      });
+      return next;
+    });
+
+    setSavedRoleCandidates(prev => {
+      const next = {};
+      Object.entries(prev).forEach(([jobId, ids]) => {
+        next[jobId] = Array.isArray(ids) ? ids.filter(candId => !idSet.has(candId)) : [];
+      });
+      return next;
+    });
+
+    setSelectedCandidate(prev => (prev && idSet.has(prev.id) ? null : prev));
+
+    recordActivity(
+      'PROFILE_DELETED',
+      candidateIds.length === 1 ? 'Candidate' : `${candidateIds.length} candidates`,
+      candidateIds.length === 1
+        ? 'Deleted candidate profile'
+        : `Bulk deleted ${candidateIds.length} candidate profiles`
+    );
+
+    triggerToast(
+      lang === 'FR'
+        ? `${candidateIds.length} profil(s) supprimé(s).`
+        : `${candidateIds.length} profile(s) deleted.`
+    );
   };
 
   const handleAddNote = async (candidateId, noteText) => {
@@ -1005,9 +1156,22 @@ function DashboardContent() {
             onDelete={handleDeleteCandidate}
             onOpenJobModal={() => setIsJobModalOpen(true)}
             onOpenEditJobModal={(job) => { setEditingJob(job); setIsJobModalOpen(true); }}
-            onOpenComparator={() => setIsComparatorOpen(true)}
+            // Workspace-level "Compare" button (shown above the grid).
+            onCompare={openComparator}
+            // Bulk-select action bar's "Compare" button (shown when 2+ cards
+            // are checked). Both routes go through the same openComparator
+            // so the modal always receives the candidates actually chosen.
+            onOpenComparator={openComparator}
             onNewDescription={() => setIsJobModalOpen(true)}
             onEditDescription={(job) => { setEditingJob(job); setIsJobModalOpen(true); }}
+            // Batched handlers for the grid's bulk-select bar — a single
+            // confirm + single state update per action, instead of looping
+            // the single-candidate handlers (which each await their own
+            // confirm dialog and would race/clobber each other).
+            candidateGridProps={{
+              onBulkDelete: handleBulkDeleteCandidates,
+              onBulkToggleSaveForJob: handleBulkToggleSaveForJob,
+            }}
           />
         )}
 
@@ -1125,7 +1289,8 @@ function DashboardContent() {
       {/* Candidate Comparator */}
       {isComparatorOpen && (
         <CandidateComparator
-          candidates={shortlist}
+          candidates={comparatorCandidates}
+          initialSelectedIds={comparatorInitialIds}
           onClose={() => setIsComparatorOpen(false)}
           onViewCandidate={setSelectedCandidate}
         />

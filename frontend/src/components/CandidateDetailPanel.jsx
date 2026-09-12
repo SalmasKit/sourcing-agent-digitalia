@@ -15,6 +15,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useLanguage } from "../context/LanguageContext";
 import {
   X,
   ChevronLeft,
@@ -45,8 +46,8 @@ import {
    HELPERS
 ========================================================= */
 
-function useLanguage() {
-  return { lang: "EN" };
+function uiText(lang, en, fr) {
+  return lang === "FR" ? fr : en;
 }
 
 function getAvatarUrl(name = "", avatar = "") {
@@ -59,12 +60,12 @@ function getAvatarUrl(name = "", avatar = "") {
   )}&backgroundColor=12151b&fontFamily=Arial`;
 }
 
-function formatNoteTimestamp(note) {
+function formatNoteTimestamp(note, lang = "EN") {
   if (!note) return "";
 
   if (note.createdAt) {
     try {
-      return new Date(note.createdAt).toLocaleDateString(undefined, {
+      return new Date(note.createdAt).toLocaleDateString(lang === "FR" ? "fr-FR" : undefined, {
         month: "short",
         day: "numeric",
         year: "numeric",
@@ -77,19 +78,19 @@ function formatNoteTimestamp(note) {
   return note.timestamp || "";
 }
 
-function formatExperiencePeriod(start, end) {
+function formatExperiencePeriod(start, end, lang = "EN") {
   if (!start && !end) return "";
 
   const startText = start || "—";
-  const endText = end || "Present";
+  const endText = end || uiText(lang, "Present", "Présent");
 
   return `${startText} → ${endText}`;
 }
 
-function scoreTier(score = 0) {
+function scoreTier(score = 0, lang = "EN") {
   if (score >= 90) {
     return {
-      label: "Hot lead",
+      label: uiText(lang, "Hot lead", "Profil prioritaire"),
       color: "#E85D3D",
       soft: "rgba(232,93,61,.12)",
     };
@@ -97,14 +98,14 @@ function scoreTier(score = 0) {
 
   if (score >= 80) {
     return {
-      label: "Good match",
+      label: uiText(lang, "Good match", "Bonne correspondance"),
       color: "#0BA5C9",
       soft: "rgba(11,165,201,.12)",
     };
   }
 
   return {
-    label: "Possible fit",
+    label: uiText(lang, "Possible fit", "Correspondance possible"),
     color: "#8A8F98",
     soft: "rgba(138,143,152,.12)",
   };
@@ -236,7 +237,7 @@ function SectionTitle({ eyebrow, title, count }) {
   );
 }
 
-function SignalCard({ icon: Icon, label, value, tone = "default" }) {
+function SignalCard({ icon: Icon, label, value, tone = "default", lang = "EN" }) {
   return (
     <div className={`cdp-signal cdp-signal-${tone}`}>
       <div className="cdp-signal-icon">
@@ -245,7 +246,7 @@ function SignalCard({ icon: Icon, label, value, tone = "default" }) {
 
       <div className="cdp-signal-copy">
         <span>{label}</span>
-        <strong>{value || "Not specified"}</strong>
+        <strong>{value || uiText(lang, "Not specified", "Non renseigné")}</strong>
       </div>
     </div>
   );
@@ -279,9 +280,6 @@ function IconAction({
 export default function CandidateDetailPanel({
   candidate = null,
   onClose,
-  onToggleShortlist,
-  isShortlisted = false,
-
   // Role-based shortlist logic — same as CandidateCard
   onToggleSaveForJob,
   isSavedForJob = false,
@@ -443,7 +441,7 @@ export default function CandidateDetailPanel({
   ------------------------------------------------------- */
 
   const tier = useMemo(
-    () => scoreTier(Number(candidate?.matchScore || candidate?.score || 0)),
+    () => scoreTier(Number(candidate?.matchScore || candidate?.score || 0), lang),
     [candidate]
   );
 
@@ -550,7 +548,7 @@ export default function CandidateDetailPanel({
 
   if (!candidate) return null;
 
-  const name = candidate.fullName || candidate.name || "Unnamed candidate";
+  const name = candidate.fullName || candidate.name || uiText(lang, "Unnamed candidate", "Candidat sans nom");
 
   return (
     <div
@@ -565,7 +563,7 @@ export default function CandidateDetailPanel({
         className={`cdp-panel cdp-panel-${resolvedSide}`}
         role="dialog"
         aria-modal="true"
-        aria-label={`${name} candidate details`}
+        aria-label={`${name} — ${uiText(lang, "candidate details", "détails du candidat")}`}
         style={{
           "--tier-color": tier.color,
           "--tier-soft": tier.soft,
@@ -597,8 +595,8 @@ export default function CandidateDetailPanel({
                   type="button"
                   className="cdp-nav-btn"
                   onClick={onPrev}
-                  aria-label="Previous candidate"
-                  data-tooltip="Previous candidate"
+                  aria-label={uiText(lang, "Previous candidate", "Candidat précédent")}
+                  data-tooltip={uiText(lang, "Previous candidate", "Candidat précédent")}
                 >
                   <ChevronLeft size={17} />
                 </button>
@@ -609,8 +607,8 @@ export default function CandidateDetailPanel({
                   type="button"
                   className="cdp-nav-btn"
                   onClick={onNext}
-                  aria-label="Next candidate"
-                  data-tooltip="Next candidate"
+                  aria-label={uiText(lang, "Next candidate", "Candidat suivant")}
+                  data-tooltip={uiText(lang, "Next candidate", "Candidat suivant")}
                 >
                   <ChevronRight size={17} />
                 </button>
@@ -620,8 +618,8 @@ export default function CandidateDetailPanel({
                 type="button"
                 className="cdp-nav-btn cdp-close"
                 onClick={onClose}
-                aria-label="Close candidate details"
-                data-tooltip="Close"
+                aria-label={uiText(lang, "Close candidate details", "Fermer les détails du candidat")}
+                data-tooltip={uiText(lang, "Close", "Fermer")}
               >
                 <X size={18} />
               </button>
@@ -652,7 +650,7 @@ export default function CandidateDetailPanel({
                   <CheckCircle2
                     size={18}
                     className="cdp-verified"
-                    aria-label="Verified"
+                    aria-label={uiText(lang, "Verified", "Vérifié")}
                   />
                 )}
               </div>
@@ -660,7 +658,7 @@ export default function CandidateDetailPanel({
               <p className="cdp-headline">
                 {candidate.headline ||
                   candidate.title ||
-                  "No headline available"}
+                  uiText(lang, "No headline available", "Aucun titre disponible")}
               </p>
 
               <div className="cdp-meta-row">
@@ -719,7 +717,7 @@ export default function CandidateDetailPanel({
             )}
 
             <span>
-              {isSavedForJob ? "Shortlisted" : "Shortlist"}
+              {isSavedForJob ? uiText(lang, "Shortlisted", "Dans la sélection") : uiText(lang, "Shortlist", "Sélectionner")}
             </span>
 
             {justSaved && (
@@ -733,7 +731,7 @@ export default function CandidateDetailPanel({
             {candidate.linkedin && (
               <IconAction
                 icon={ExternalLink}
-                label="Open LinkedIn"
+                label={uiText(lang, "Open LinkedIn", "Ouvrir LinkedIn")}
                 onClick={() => {
                   window.open(
                     candidate.linkedin,
@@ -747,7 +745,7 @@ export default function CandidateDetailPanel({
             {candidate.github_url && (
               <IconAction
                 icon={ExternalLink}
-                label="Open GitHub"
+                label={uiText(lang, "Open GitHub", "Ouvrir GitHub")}
                 onClick={() => {
                   window.open(
                     candidate.github_url,
@@ -761,7 +759,7 @@ export default function CandidateDetailPanel({
             {hasEmail && (
               <IconAction
                 icon={Mail}
-                label="Email candidate"
+                label={uiText(lang, "Email candidate", "E-mail du candidat")}
                 onClick={() => handleDraftOutreach("email")}
               />
             )}
@@ -775,7 +773,7 @@ export default function CandidateDetailPanel({
               }
             >
               <Sparkles size={16} />
-              <span>Draft</span>
+              <span>{uiText(lang, "Draft", "Rédiger")}</span>
             </button>
           </div>
 
@@ -784,8 +782,8 @@ export default function CandidateDetailPanel({
               type="button"
               className={`cdp-more-btn ${moreOpen ? "is-open" : ""}`}
               onClick={() => setMoreOpen((value) => !value)}
-              aria-label="More candidate actions"
-              data-tooltip="More actions"
+              aria-label={uiText(lang, "More candidate actions", "Plus d’actions pour le candidat")}
+              data-tooltip={uiText(lang, "More actions", "Plus d’actions")}
             >
               <MoreHorizontal size={19} />
             </button>
@@ -801,7 +799,7 @@ export default function CandidateDetailPanel({
                     }}
                   >
                     <Pencil size={16} />
-                    Edit candidate
+                    {uiText(lang, "Edit candidate", "Modifier le candidat")}
                   </button>
                 )}
 
@@ -815,7 +813,7 @@ export default function CandidateDetailPanel({
                     }}
                   >
                     <Trash2 size={16} />
-                    Remove candidate
+                    {uiText(lang, "Remove candidate", "Supprimer le candidat")}
                   </button>
                 )}
               </div>
@@ -831,7 +829,7 @@ export default function CandidateDetailPanel({
           <section className="cdp-outreach">
             <div className="cdp-outreach-head">
               <div>
-                <div className="cdp-eyebrow">OUTREACH STUDIO</div>
+                <div className="cdp-eyebrow">{uiText(lang, "OUTREACH STUDIO", "STUDIO DE CONTACT")}</div>
                 <h3>
                   {isDrafting
                     ? "Building a tailored message…"
@@ -843,7 +841,7 @@ export default function CandidateDetailPanel({
                 type="button"
                 className="cdp-outreach-close"
                 onClick={() => setOutreachOpen(false)}
-                aria-label="Close outreach studio"
+                aria-label={uiText(lang, "Close outreach studio", "Fermer le studio de contact")}
               >
                 <X size={15} />
               </button>
@@ -858,7 +856,7 @@ export default function CandidateDetailPanel({
                 onClick={() => handleDraftOutreach("email")}
               >
                 <Mail size={14} />
-                Email
+                {uiText(lang, "Email", "E-mail")}
               </button>
 
               <button
@@ -869,7 +867,7 @@ export default function CandidateDetailPanel({
                 onClick={() => handleDraftOutreach("linkedin")}
               >
                 <ExternalLink size={14} />
-                LinkedIn
+                {uiText(lang, "LinkedIn", "LinkedIn")}
               </button>
             </div>
 
@@ -888,7 +886,7 @@ export default function CandidateDetailPanel({
                     onChange={(event) =>
                       setOutreachSubject(event.target.value)
                     }
-                    placeholder="Subject"
+                    placeholder={uiText(lang, "Subject", "Objet")}
                   />
                 )}
 
@@ -898,14 +896,14 @@ export default function CandidateDetailPanel({
                   onChange={(event) =>
                     setOutreachDraft(event.target.value)
                   }
-                  placeholder="Your message…"
+                  placeholder={uiText(lang, "Your message…", "Votre message…")}
                   rows={6}
                 />
 
                 <div className="cdp-outreach-footer">
                   <span>
                     <Sparkles size={13} />
-                    AI-assisted draft
+                    {uiText(lang, "AI-assisted draft", "Brouillon assisté par IA")}
                   </span>
 
                   <div className="cdp-outreach-actions">
@@ -917,12 +915,12 @@ export default function CandidateDetailPanel({
                       {copied ? (
                         <>
                           <Check size={14} />
-                          Copied
+                          {uiText(lang, "Copied", "Copié")}
                         </>
                       ) : (
                         <>
                           <Copy size={14} />
-                          Copy
+                          {uiText(lang, "Copy", "Copier")}
                         </>
                       )}
                     </button>
@@ -938,7 +936,7 @@ export default function CandidateDetailPanel({
                         }}
                       >
                         <Send size={14} />
-                        Open email
+                        {uiText(lang, "Open email", "Ouvrir l’e-mail")}
                       </button>
                     )}
 
@@ -956,7 +954,7 @@ export default function CandidateDetailPanel({
                           }}
                         >
                           <ExternalLink size={14} />
-                          Open LinkedIn
+                          {uiText(lang, "Open LinkedIn", "Ouvrir LinkedIn")}
                         </button>
                       )}
                   </div>
@@ -970,18 +968,22 @@ export default function CandidateDetailPanel({
             TABS
         ================================================= */}
 
-        <nav className="cdp-tabs" aria-label="Candidate sections">
-          {["Overview", "Experience", "Contacts & Notes"].map(
+        <nav className="cdp-tabs" aria-label={uiText(lang, "Candidate sections", "Sections du candidat")}>
+          {[
+            { key: "Overview", label: uiText(lang, "Overview", "Vue d’ensemble") },
+            { key: "Experience", label: uiText(lang, "Experience", "Expérience") },
+            { key: "Contacts & Notes", label: uiText(lang, "Contacts & Notes", "Contacts et notes") },
+          ].map(
             (item) => (
               <button
-                key={item}
+                key={item.key}
                 type="button"
-                className={tab === item ? "is-active" : ""}
-                onClick={() => setTab(item)}
+                className={tab === item.key ? "is-active" : ""}
+                onClick={() => setTab(item.key)}
               >
-                {item}
+                {item.label}
 
-                {item === "Contacts & Notes" && notesCount > 0 && (
+                {item.key === "Contacts & Notes" && notesCount > 0 && (
                   <span>{notesCount}</span>
                 )}
               </button>
@@ -1002,66 +1004,71 @@ export default function CandidateDetailPanel({
             <div className="cdp-content-stack">
               <section className="cdp-section">
                 <SectionTitle
-                  eyebrow="PROFILE"
-                  title="Professional summary"
+                  eyebrow={uiText(lang, "PROFILE", "PROFIL")}
+                  title={uiText(lang, "Professional summary", "Résumé professionnel")}
                 />
 
                 <div className="cdp-summary">
                   {candidate.summary ||
                     candidate.about ||
-                    "No professional summary has been added for this candidate yet."}
+                    uiText(lang, "No professional summary has been added for this candidate yet.", "Aucun résumé professionnel n’a encore été ajouté pour ce candidat.")}
                 </div>
               </section>
 
               <section className="cdp-section">
                 <SectionTitle
-                  eyebrow="MATCH SIGNALS"
-                  title="Candidate snapshot"
+                  eyebrow={uiText(lang, "MATCH SIGNALS", "INDICATEURS DE COMPATIBILITÉ")}
+                  title={uiText(lang, "Candidate snapshot", "Aperçu du candidat")}
                 />
 
                 <div className="cdp-signal-grid">
                   <SignalCard
+                    lang={lang}
                     icon={WalletCards}
-                    label="Salary expectation"
+                    label={uiText(lang, "Salary expectation", "Prétentions salariales")}
                     value={
                       candidate.salaryExpectation ||
                       candidate.expectedSalary ||
-                      "Not specified"
+                      uiText(lang, "Not specified", "Non renseigné")
                     }
                     tone="orange"
                   />
 
                   <SignalCard
+                    lang={lang}
                     icon={Clock3}
-                    label="Availability"
+                    label={uiText(lang, "Availability", "Disponibilité")}
                     value={
                       candidate.availability ||
                       candidate.noticePeriod ||
-                      "Not specified"
+                      uiText(lang, "Not specified", "Non renseigné")
                     }
                     tone="cyan"
                   />
 
                   <SignalCard
+                    lang={lang}
                     icon={BriefcaseBusiness}
-                    label="Experience"
+                    label={uiText(lang, "Experience", "Expérience")}
                     value={
                       candidate.yearsExperience !== undefined || candidate.experienceYears !== undefined
-                        ? `${candidate.yearsExperience ?? candidate.experienceYears} years`
-                        : "Not specified"
+                        ? `${candidate.yearsExperience ?? candidate.experienceYears} ${uiText(lang, "years", "ans")}`
+                        : uiText(lang, "Not specified", "Non renseigné")
                     }
                   />
 
                   <SignalCard
+                    lang={lang}
                     icon={MapPin}
-                    label="Location"
-                    value={candidate.location || "Not specified"}
+                    label={uiText(lang, "Location", "Localisation")}
+                    value={candidate.location || uiText(lang, "Not specified", "Non renseigné")}
                   />
 
                   {candidate.organization_name && (
                     <SignalCard
+                      lang={lang}
                       icon={BriefcaseBusiness}
-                      label="Company"
+                      label={uiText(lang, "Company", "Entreprise")}
                       value={candidate.organization_name}
                       tone="purple"
                     />
@@ -1069,8 +1076,9 @@ export default function CandidateDetailPanel({
 
                   {candidate.organization_domain && (
                     <SignalCard
+                      lang={lang}
                       icon={BriefcaseBusiness}
-                      label="Company Domain"
+                      label={uiText(lang, "Company Domain", "Domaine de l’entreprise")}
                       value={candidate.organization_domain}
                       tone="purple"
                     />
@@ -1087,14 +1095,14 @@ export default function CandidateDetailPanel({
 
                     <div>
                       <div className="cdp-eyebrow">
-                        AI MATCH EVALUATION
+                        {uiText(lang, "AI MATCH EVALUATION", "ÉVALUATION DE LA COMPATIBILITÉ IA")}
                       </div>
                       <h3>
                         {score >= 90
-                          ? "Strong candidate signal"
+                          ? uiText(lang, "Strong candidate signal", "Profil très pertinent")
                           : score >= 80
-                            ? "Promising candidate signal"
-                            : "Worth reviewing"}
+                            ? uiText(lang, "Promising candidate signal", "Profil prometteur")
+                            : uiText(lang, "Worth reviewing", "À examiner")}
                       </h3>
                     </div>
 
@@ -1121,19 +1129,19 @@ export default function CandidateDetailPanel({
                       {Array.isArray(candidate.matched_skills) && (
                         <div className="cdp-reason">
                           <CheckCircle2 size={15} />
-                          <span>Skills: {candidate.matched_skills.length}/{(candidate.matched_skills || []).length + (candidate.missing_skills || []).length} matched</span>
+                          <span>{uiText(lang, "Skills", "Compétences")}: {candidate.matched_skills.length}/{(candidate.matched_skills || []).length + (candidate.missing_skills || []).length} {uiText(lang, "matched", "correspondantes")}</span>
                         </div>
                       )}
                       {candidate.experience_years !== undefined && candidate.min_experience_years !== undefined && (
                         <div className="cdp-reason">
                           <CheckCircle2 size={15} />
-                          <span>Experience: {candidate.experience_years} yrs {candidate.experience_years >= candidate.min_experience_years ? '✓' : '✗'}</span>
+                          <span>{uiText(lang, "Experience", "Expérience")}: {candidate.experience_years} {uiText(lang, "yrs", "ans")} {candidate.experience_years >= candidate.min_experience_years ? '✓' : '✗'}</span>
                         </div>
                       )}
                       {candidate.location_score !== undefined && (
                         <div className="cdp-reason">
                           <CheckCircle2 size={15} />
-                          <span>Location: {candidate.location_score >= 80 ? 'Match' : 'Partial'}</span>
+                          <span>{uiText(lang, "Location", "Localisation")}: {candidate.location_score >= 80 ? uiText(lang, "Match", "Correspondance") : uiText(lang, "Partial", "Partielle")}</span>
                         </div>
                       )}
                     </div>
@@ -1144,8 +1152,8 @@ export default function CandidateDetailPanel({
               <section className="cdp-section">
                 <div className="cdp-section-heading">
                   <div>
-                    <div className="cdp-eyebrow">EXPERTISE</div>
-                    <h3>Skills</h3>
+                    <div className="cdp-eyebrow">{uiText(lang, "EXPERTISE", "EXPERTISE")}</div>
+                    <h3>{uiText(lang, "Skills", "Compétences")}</h3>
                   </div>
 
                   {skills.length > 0 && (
@@ -1175,12 +1183,12 @@ export default function CandidateDetailPanel({
                       >
                         {skillsExpanded ? (
                           <>
-                            Show less
+                            {uiText(lang, "Show less", "Afficher moins")}
                             <ChevronUp size={15} />
                           </>
                         ) : (
                           <>
-                            Show all {skills.length} skills
+                            {uiText(lang, "Show all", "Afficher toutes les")} {skills.length} {uiText(lang, "skills", "compétences")}
                             <ChevronDown size={15} />
                           </>
                         )}
@@ -1189,7 +1197,7 @@ export default function CandidateDetailPanel({
                   </>
                 ) : (
                   <div className="cdp-empty">
-                    No skills have been added.
+                    {uiText(lang, "No skills have been added.", "Aucune compétence n’a été ajoutée.")}
                   </div>
                 )}
               </section>
@@ -1204,8 +1212,8 @@ export default function CandidateDetailPanel({
             <div className="cdp-content-stack">
               <section className="cdp-section">
                 <SectionTitle
-                  eyebrow="CAREER"
-                  title="Experience timeline"
+                  eyebrow={uiText(lang, "CAREER", "PARCOURS")}
+                  title={uiText(lang, "Experience timeline", "Parcours professionnel")}
                 />
 
                 {Array.isArray(experienceArray) &&
@@ -1224,18 +1232,19 @@ export default function CandidateDetailPanel({
                           <div className="cdp-timeline-period">
                             {formatExperiencePeriod(
                               item.startDate || item.start,
-                              item.endDate || item.end
+                              item.endDate || item.end,
+                              lang
                             )}
                           </div>
 
                           <h4>
                             {item.title ||
                               item.role ||
-                              "Position"}
+                              uiText(lang, "Position", "Poste")}
                           </h4>
 
                           <div className="cdp-company">
-                            {item.company || "Company"}
+                            {item.company || uiText(lang, "Company", "Entreprise")}
                           </div>
 
                           {item.location && (
@@ -1268,10 +1277,9 @@ export default function CandidateDetailPanel({
                 ) : (
                   <div className="cdp-empty-large">
                     <BriefcaseBusiness size={24} />
-                    <strong>No experience added</strong>
+                    <strong>{uiText(lang, "No experience added", "Aucune expérience ajoutée")}</strong>
                     <span>
-                      This candidate doesn't have a career timeline
-                      yet.
+                      {uiText(lang, "This candidate doesn't have a career timeline yet.", "Ce candidat n’a pas encore de parcours professionnel.")}
                     </span>
                   </div>
                 )}
@@ -1287,8 +1295,8 @@ export default function CandidateDetailPanel({
             <div className="cdp-content-stack">
               <section className="cdp-section">
                 <SectionTitle
-                  eyebrow="CONTACT"
-                  title="Reach this candidate"
+                  eyebrow={uiText(lang, "CONTACT", "CONTACT")}
+                  title={uiText(lang, "Reach this candidate", "Contacter ce candidat")}
                 />
 
                 <div className="cdp-contact-list">
@@ -1298,9 +1306,9 @@ export default function CandidateDetailPanel({
                     </div>
 
                     <div className="cdp-contact-copy">
-                      <span>Email</span>
+                      <span>{uiText(lang, "Email", "E-mail")}</span>
                       <strong>
-                        {hasEmail ? rawEmail : "No email available"}
+                        {hasEmail ? rawEmail : uiText(lang, "No email available", "Aucun e-mail disponible")}
                       </strong>
                     </div>
 
@@ -1313,14 +1321,14 @@ export default function CandidateDetailPanel({
                         }
                       >
                         <Mail size={15} />
-                        Draft
+                        {uiText(lang, "Draft", "Rédiger")}
                       </button>
                     )}
 
                     {hasEmail && !isEmailVerified && (
                       <span
                         className="cdp-unverified"
-                        title="Email has not been verified"
+                        title={uiText(lang, "Email has not been verified", "L’e-mail n’a pas été vérifié")}
                       >
                         <AlertCircle size={14} />
                       </span>
@@ -1334,8 +1342,8 @@ export default function CandidateDetailPanel({
                       </div>
 
                       <div className="cdp-contact-copy">
-                        <span>LinkedIn</span>
-                        <strong>Professional profile</strong>
+                        <span>{uiText(lang, "LinkedIn", "LinkedIn")}</span>
+                        <strong>{uiText(lang, "Professional profile", "Profil professionnel")}</strong>
                       </div>
 
                       <button
@@ -1350,7 +1358,7 @@ export default function CandidateDetailPanel({
                         }
                       >
                         <ExternalLink size={15} />
-                        Open
+                        {uiText(lang, "Open", "Ouvrir")}
                       </button>
                     </div>
                   )}
@@ -1358,12 +1366,12 @@ export default function CandidateDetailPanel({
                   {candidate.instagram && (
                     <div className="cdp-contact-row">
                       <div className="cdp-contact-icon">
-                        <Instagram size={17} />
+                        <ExternalLink size={17} />
                       </div>
 
                       <div className="cdp-contact-copy">
-                        <span>Instagram</span>
-                        <strong>Social profile</strong>
+                        <span>{uiText(lang, "Instagram", "Instagram")}</span>
+                        <strong>{uiText(lang, "Social profile", "Profil social")}</strong>
                       </div>
 
                       <button
@@ -1378,7 +1386,7 @@ export default function CandidateDetailPanel({
                         }
                       >
                         <ExternalLink size={15} />
-                        Open
+                        {uiText(lang, "Open", "Ouvrir")}
                       </button>
                     </div>
                   )}
@@ -1386,12 +1394,12 @@ export default function CandidateDetailPanel({
                   {candidate.github && (
                     <div className="cdp-contact-row">
                       <div className="cdp-contact-icon">
-                        <Github size={17} />
+                        <ExternalLink size={17} />
                       </div>
 
                       <div className="cdp-contact-copy">
-                        <span>GitHub</span>
-                        <strong>Code portfolio</strong>
+                        <span>{uiText(lang, "GitHub", "GitHub")}</span>
+                        <strong>{uiText(lang, "Code portfolio", "Portfolio de code")}</strong>
                       </div>
 
                       <button
@@ -1406,7 +1414,7 @@ export default function CandidateDetailPanel({
                         }
                       >
                         <ExternalLink size={15} />
-                        Open
+                        {uiText(lang, "Open", "Ouvrir")}
                       </button>
                     </div>
                   )}
@@ -1416,8 +1424,8 @@ export default function CandidateDetailPanel({
               <section className="cdp-section">
                 <div className="cdp-section-heading">
                   <div>
-                    <div className="cdp-eyebrow">RECRUITER MEMORY</div>
-                    <h3>Notes</h3>
+                    <div className="cdp-eyebrow">{uiText(lang, "RECRUITER MEMORY", "NOTES DU RECRUTEUR")}</div>
+                    <h3>{uiText(lang, "Notes", "Notes")}</h3>
                   </div>
 
                   <span className="cdp-section-count">
@@ -1434,17 +1442,17 @@ export default function CandidateDetailPanel({
                       onChange={(event) =>
                         setNote(event.target.value)
                       }
-                      placeholder="Add a private recruiter note…"
+                      placeholder={uiText(lang, "Add a private recruiter note…", "Ajouter une note privée au recruteur…")}
                       rows={4}
                     />
                   </div>
 
                   <div className="cdp-note-form-footer">
-                    <span>Private to your recruiting team</span>
+                    <span>{uiText(lang, "Private to your recruiting team", "Privé pour votre équipe de recrutement")}</span>
 
                     <button type="submit" disabled={!note.trim()}>
                       <Plus size={14} />
-                      Add note
+                      {uiText(lang, "Add note", "Ajouter une note")}
                     </button>
                   </div>
                 </form>
@@ -1462,7 +1470,7 @@ export default function CandidateDetailPanel({
                           <p>{item.text || item.content}</p>
 
                           <time>
-                            {formatNoteTimestamp(item)}
+                            {formatNoteTimestamp(item, lang)}
                           </time>
                         </div>
                       </article>
@@ -1470,10 +1478,9 @@ export default function CandidateDetailPanel({
                   </div>
                 ) : (
                   <div className="cdp-empty-notes">
-                    <span>No recruiter notes yet.</span>
+                    <span>{uiText(lang, "No recruiter notes yet.", "Aucune note de recruteur pour le moment.")}</span>
                     <small>
-                      Add context here so the next recruiter knows
-                      the story.
+                      {uiText(lang, "Add context here so the next recruiter knows the story.", "Ajoutez ici du contexte pour que le prochain recruteur comprenne l’historique.")}
                     </small>
                   </div>
                 )}

@@ -15,14 +15,15 @@
  *  - "Clear" removes the stage filter.
  *  - Candidate rows/cards are clickable.
  *  - Job rows are selectable.
- *  - Search history can be rerun.
- *  - Score distribution segments are clickable.
+ *  - Score distribution is displayed but not clickable.
  *
- * Layout fix:
- *  - "Highest matches" and "Match distribution" panels now stretch to
- *    equal height via CSS grid + flex, so the empty state in the
- *    candidates panel matches the score-distribution panel's height
- *    instead of collapsing to a small fixed box.
+ * Layout:
+ *  - "Highest matches" and "Match distribution" panels stretch
+ *    to equal height.
+ *  - Team Activity & Audit Feed has a fixed height.
+ *  - ActivityLogPanel owns the activity header and filters.
+ *  - Filters stay on the RIGHT side of the header.
+ *  - Only the activity entries scroll.
  */
 
 import React, {
@@ -37,22 +38,19 @@ import {
   FileText,
   TrendingUp,
   BookmarkCheck,
-  Search,
   Sparkles,
-  RotateCw,
-  ArrowUpRight,
   ChevronRight,
   SlidersHorizontal,
   Target,
-  BriefcaseBusiness,
-  Check,
   X,
 } from 'lucide-react';
-import ActivityLogPanel from './ActivityLogPanel';
 
-function useLanguage() {
-  return { lang: 'EN' };
-}
+import ActivityLogPanel from './ActivityLogPanel';
+import { useLanguage } from '../context/LanguageContext';
+
+/* -------------------------------------------------------
+   Avatar
+------------------------------------------------------- */
 
 function getAvatarUrl(name) {
   return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
@@ -60,13 +58,35 @@ function getAvatarUrl(name) {
   )}&backgroundColor=12151B&textColor=ffffff&fontWeight=600&fontSize=38`;
 }
 
+/* -------------------------------------------------------
+   Translations
+------------------------------------------------------- */
+
 const COPY = {
   EN: {
     eyebrow: 'RECRUITING OVERVIEW',
+
     welcome: (n) => `Good to see you, ${n}`,
+
     workspaceNote:
       'Your hiring workspace — aggregate insights across all roles',
+
+    workspaceActive: 'Workspace active',
+
+    hiringAtGlance: 'Hiring at a glance',
+
+    heroDescription:
+      'Your sourcing activity, candidate quality, and recruitment pipeline in one place.',
+
     matchQuality: 'Average match across all roles',
+
+    strongPipeline: 'Strong pipeline',
+    healthyPipeline: 'Healthy pipeline',
+    buildPipeline: 'Build your pipeline',
+
+    matchBasedOn:
+      'Based on sourced candidate match scores.',
+
     activeJDs: 'Total roles',
     sourced: 'Total candidates',
     shortlisted: 'Total shortlisted',
@@ -74,13 +94,20 @@ const COPY = {
     pipeline: 'Pipeline',
     allStages: 'All stages',
     clearFilter: 'Clear',
+
     candidates: 'candidates',
+    candidate: 'candidate',
+
+    inPipeline: 'in pipeline',
+    notInPipeline: 'not in pipeline',
 
     leaderboard: 'Highest matches',
     noCandidates: 'No candidates sourced yet',
 
     scoreDist: 'Match distribution',
     scoreHint: 'Overview of candidate match scores',
+
+    allRoles: 'All roles',
 
     activity: 'Workspace activity',
     jobsTab: 'Roles',
@@ -92,11 +119,30 @@ const COPY = {
 
     agent: 'AI sourcing',
     avgMatch: 'avg match',
-    inPipeline: 'in pipeline',
     profiles: 'profiles',
 
     selected: 'Selected',
     stage: 'Stage',
+
+    active: 'Active',
+    archived: 'Archived',
+
+    allLocations: 'All locations',
+
+    candidateProfile: 'Candidate profile',
+    profile: 'Profile',
+
+    showingCandidates:
+      'Showing candidates matching your current focus',
+
+    removeStageFilter: 'Remove stage filter',
+    removeScoreFilter: 'Remove score filter',
+
+    teamActivityTitle: 'Team Activity & Audit Feed',
+
+    aiPerformance: 'AI sourcing',
+    automatedPerformance:
+      'Automated sourcing performance',
 
     stages: {
       new: 'New',
@@ -116,10 +162,28 @@ const COPY = {
 
   FR: {
     eyebrow: 'VUE DU RECRUTEMENT',
+
     welcome: (n) => `Ravi de vous revoir, ${n}`,
+
     workspaceNote:
       'Votre espace de recrutement — vue globale de tous les postes',
+
+    workspaceActive: 'Espace actif',
+
+    hiringAtGlance: 'Le recrutement en un coup d’œil',
+
+    heroDescription:
+      'Votre activité de sourcing, la qualité des candidats et votre pipeline de recrutement au même endroit.',
+
     matchQuality: 'Score moyen tous postes confondus',
+
+    strongPipeline: 'Pipeline solide',
+    healthyPipeline: 'Pipeline sain',
+    buildPipeline: 'Développez votre pipeline',
+
+    matchBasedOn:
+      'Basé sur les scores de correspondance des candidats sourcés.',
+
     activeJDs: 'Total des postes',
     sourced: 'Total candidats',
     shortlisted: 'Total shortlistés',
@@ -127,13 +191,20 @@ const COPY = {
     pipeline: 'Pipeline',
     allStages: 'Toutes les étapes',
     clearFilter: 'Effacer',
+
     candidates: 'candidats',
+    candidate: 'candidat',
+
+    inPipeline: 'dans le pipeline',
+    notInPipeline: 'hors pipeline',
 
     leaderboard: 'Meilleures correspondances',
     noCandidates: 'Aucun candidat sourcé',
 
     scoreDist: 'Distribution des scores',
     scoreHint: 'Aperçu des scores de correspondance',
+
+    allRoles: 'Tous les postes',
 
     activity: 'Activité',
     jobsTab: 'Postes',
@@ -145,17 +216,36 @@ const COPY = {
 
     agent: 'Sourcing IA',
     avgMatch: 'score moyen',
-    inPipeline: 'pipeline',
     profiles: 'profils',
 
     selected: 'Sélectionné',
     stage: 'Étape',
 
+    active: 'Actif',
+    archived: 'Archivé',
+
+    allLocations: 'Toutes les localisations',
+
+    candidateProfile: 'Profil candidat',
+    profile: 'Profil',
+
+    showingCandidates:
+      'Affichage des candidats correspondant à votre sélection',
+
+    removeStageFilter: 'Supprimer le filtre par étape',
+    removeScoreFilter: 'Supprimer le filtre par score',
+
+    teamActivityTitle: 'Activité de l’équipe & journal d’audit',
+
+    aiPerformance: 'Sourcing IA',
+    automatedPerformance:
+      'Performance automatisée du sourcing',
+
     stages: {
       new: 'Nouveau',
       contacted: 'Contacté',
       interview: 'Entretien',
-      offer: 'Offre Proposée',
+      offer: 'Offre proposée',
       hired: 'Recruté',
     },
 
@@ -329,9 +419,16 @@ export function DashboardView({
 
   const langContext = useLanguage();
 
+  const currentLang =
+    langProp ||
+    langContext?.lang ||
+    'EN';
+
   const t =
-    COPY[langProp || langContext?.lang || 'EN'] ||
+    COPY[currentLang] ||
     COPY.EN;
+
+  const isFR = currentLang === 'FR';
 
   const [focusedStage, setFocusedStage] =
     useState(null);
@@ -342,50 +439,66 @@ export function DashboardView({
   const [selectedRange, setSelectedRange] =
     useState(null);
 
-  const [candidatePage, setCandidatePage] = useState(0);
+  const [candidatePage, setCandidatePage] =
+    useState(0);
 
   const CANDIDATE_PAGE_SIZE = 3;
+
+  /* -------------------------------------------------------
+     Role label
+  ------------------------------------------------------- */
+
+  const getRoleLabel = (role) => {
+    if (!role) {
+      return isFR ? 'Recruteur' : 'Recruiter';
+    }
+
+    if (role === 'SUPER_ADMIN') {
+      return 'Super Admin';
+    }
+
+    if (role === 'HR_ADMIN') {
+      return isFR ? 'Admin RH' : 'HR Admin';
+    }
+
+    if (role === 'RECRUITER') {
+      return isFR ? 'Recruteur' : 'Recruiter';
+    }
+
+    return role;
+  };
 
   /* -------------------------------------------------------
      Stats
   ------------------------------------------------------- */
 
   const stats = useMemo(() => {
-    const totalJDs = jobDescriptions.length;
+    const totalJDs =
+      jobDescriptions.length;
 
     const activeJDs =
       jobDescriptions.filter(
         (job) => job.status !== 'archived'
       ).length;
 
-    const totalCandidates = candidates.length;
+    const totalCandidates =
+      candidates.length;
 
-    /*
-     * IMPORTANT:
-     * Pipeline membership must come from savedRoleCandidates,
-     * not from every candidate in the global candidates array.
-     *
-     * A candidate is in the pipeline when they appear in at least
-     * one role's saved candidate list.
-     */
+    const pipelineCandidateIds =
+      new Set(
+        Object.values(savedRoleCandidates)
+          .flat()
+          .filter(Boolean)
+      );
 
-    const pipelineCandidateIds = new Set(
-      Object.values(savedRoleCandidates)
-        .flat()
-        .filter(Boolean)
-    );
-
-    const pipelineCandidates = candidates.filter(
-      (candidate) =>
+    const pipelineCandidates =
+      candidates.filter((candidate) =>
         pipelineCandidateIds.has(candidate.id)
-    );
-
-    /*
-     * Keep this EXACTLY aligned with KanbanPipeline.
-     */
+      );
 
     const getCandidateStage = (candidate) =>
-      candidatePipelineStage[candidate.id] || 'new';
+      candidatePipelineStage[candidate.id] ||
+      'new';
 
     const stages = [
       'new',
@@ -394,10 +507,11 @@ export function DashboardView({
       'offer',
       'hired',
     ].reduce((acc, key) => {
-      acc[key] = pipelineCandidates.filter(
-        (candidate) =>
-          getCandidateStage(candidate) === key
-      ).length;
+      acc[key] =
+        pipelineCandidates.filter(
+          (candidate) =>
+            getCandidateStage(candidate) === key
+        ).length;
 
       return acc;
     }, {});
@@ -409,31 +523,35 @@ export function DashboardView({
       stages.offer +
       stages.hired;
 
-    const uniqueSavedCount = totalInPipeline;
+    const uniqueSavedCount =
+      totalInPipeline;
 
     const avgScore =
       totalCandidates > 0
         ? Math.round(
           candidates.reduce(
             (sum, candidate) =>
-              sum + (candidate.matchScore || 0),
+              sum +
+              (candidate.matchScore || 0),
             0
           ) / totalCandidates
         )
         : 0;
 
-    const ranked = [...candidates].sort(
-      (a, b) =>
-        (b.matchScore || 0) -
-        (a.matchScore || 0)
-    );
+    const ranked =
+      [...candidates].sort(
+        (a, b) =>
+          (b.matchScore || 0) -
+          (a.matchScore || 0)
+      );
 
     const scoreDist = [
       {
         key: 'high',
         label: t.ranges.high,
         value: candidates.filter(
-          (c) => (c.matchScore || 0) >= 90
+          (c) =>
+            (c.matchScore || 0) >= 90
         ).length,
       },
       {
@@ -458,7 +576,8 @@ export function DashboardView({
         key: 'low',
         label: t.ranges.low,
         value: candidates.filter(
-          (c) => (c.matchScore || 0) < 70
+          (c) =>
+            (c.matchScore || 0) < 70
         ).length,
       },
     ];
@@ -539,14 +658,18 @@ export function DashboardView({
     if (focusedStage) {
       result = result.filter(
         (candidate) =>
-          (candidatePipelineStage[candidate.id] || 'new') ===
-          focusedStage
+          (
+            candidatePipelineStage[
+            candidate.id
+            ] || 'new'
+          ) === focusedStage
       );
     }
 
     if (selectedRange) {
       result = result.filter((candidate) => {
-        const score = candidate.matchScore || 0;
+        const score =
+          candidate.matchScore || 0;
 
         if (selectedRange === 'high') {
           return score >= 90;
@@ -572,7 +695,6 @@ export function DashboardView({
     candidatePipelineStage,
   ]);
 
-  // When no stage filter is active, use ranked candidates by match score
   const displayCandidates = useMemo(() => {
     return focusedStage
       ? filteredCandidates
@@ -583,32 +705,41 @@ export function DashboardView({
     stats.ranked,
   ]);
 
-  // Reset to page 0 when filters change
+  /* -------------------------------------------------------
+     Pagination
+  ------------------------------------------------------- */
+
   useEffect(() => {
     setCandidatePage(0);
-  }, [focusedStage]);
-
-  // Pagination for candidates - show top 3 matches per page
-  const totalCandidatePages = Math.ceil(
-    displayCandidates.length /
-    CANDIDATE_PAGE_SIZE
-  );
-
-  const paginatedCandidates = useMemo(() => {
-    const start =
-      candidatePage * CANDIDATE_PAGE_SIZE;
-
-    const end =
-      start + CANDIDATE_PAGE_SIZE;
-
-    return displayCandidates.slice(
-      start,
-      end
-    );
   }, [
-    displayCandidates,
-    candidatePage,
+    focusedStage,
+    selectedRange,
   ]);
+
+  const totalCandidatePages =
+    Math.ceil(
+      displayCandidates.length /
+      CANDIDATE_PAGE_SIZE
+    );
+
+  const paginatedCandidates =
+    useMemo(() => {
+      const start =
+        candidatePage *
+        CANDIDATE_PAGE_SIZE;
+
+      const end =
+        start +
+        CANDIDATE_PAGE_SIZE;
+
+      return displayCandidates.slice(
+        start,
+        end
+      );
+    }, [
+      displayCandidates,
+      candidatePage,
+    ]);
 
   /* -------------------------------------------------------
      Handlers
@@ -616,7 +747,9 @@ export function DashboardView({
 
   function handleStageClick(key) {
     const next =
-      focusedStage === key ? null : key;
+      focusedStage === key
+        ? null
+        : key;
 
     setFocusedStage(next);
 
@@ -625,14 +758,15 @@ export function DashboardView({
 
   function handleSelectJob(id) {
     setSelectedJobId((current) =>
-      current === id ? null : id
+      current === id
+        ? null
+        : id
     );
 
     onSelectJob?.(id);
   }
 
-  function handleRangeClick(key) {
-    // Disabled - match distribution is no longer clickable
+  function handleRangeClick() {
     return;
   }
 
@@ -644,7 +778,8 @@ export function DashboardView({
   }
 
   const hasFilters =
-    focusedStage || selectedRange;
+    focusedStage ||
+    selectedRange;
 
   /* -------------------------------------------------------
      Render
@@ -652,12 +787,14 @@ export function DashboardView({
 
   return (
     <div className="db3-root">
+
       <style>{`
         @keyframes db3Fade {
           from {
             opacity: 0;
             transform: translateY(8px);
           }
+
           to {
             opacity: 1;
             transform: translateY(0);
@@ -668,6 +805,7 @@ export function DashboardView({
           from {
             transform: scaleX(0);
           }
+
           to {
             transform: scaleX(1);
           }
@@ -728,18 +866,23 @@ export function DashboardView({
           font-family:
             'JetBrains Mono',
             monospace;
+
           font-size: 9px;
           font-weight: 600;
           letter-spacing: .12em;
+
           color: var(--cyan-dark);
+
           margin-bottom: 7px;
         }
 
         .db3-title {
           margin: 0;
+
           font-family:
             'Space Grotesk',
             sans-serif;
+
           font-size: 25px;
           line-height: 1.05;
           letter-spacing: -.03em;
@@ -756,17 +899,24 @@ export function DashboardView({
           display: flex;
           align-items: center;
           gap: 7px;
+
           font-size: 10px;
           color: var(--muted);
+
           white-space: nowrap;
         }
 
         .db3-live-dot {
           width: 6px;
           height: 6px;
+
           border-radius: 50%;
+
           background: var(--cyan);
-          box-shadow: 0 0 0 4px var(--cyan-soft);
+
+          box-shadow:
+            0 0 0 4px
+            var(--cyan-soft);
         }
 
         /* -----------------------------------------------
@@ -781,12 +931,15 @@ export function DashboardView({
           color: white;
 
           border-radius: 20px;
+
           padding: 25px 27px;
 
           display: grid;
+
           grid-template-columns:
             minmax(260px, 1.2fr)
             minmax(390px, 1fr);
+
           gap: 28px;
 
           min-height: 188px;
@@ -797,14 +950,19 @@ export function DashboardView({
 
         .db3-hero::after {
           content: '';
+
           position: absolute;
+
           right: -80px;
           bottom: -110px;
 
           width: 300px;
           height: 300px;
 
-          border: 1px solid rgba(11,165,201,.15);
+          border:
+            1px solid
+            rgba(11,165,201,.15);
+
           border-radius: 50%;
 
           pointer-events: none;
@@ -814,6 +972,7 @@ export function DashboardView({
           display: flex;
           flex-direction: column;
           justify-content: space-between;
+
           position: relative;
           z-index: 1;
         }
@@ -822,6 +981,7 @@ export function DashboardView({
           font-family:
             'Space Grotesk',
             sans-serif;
+
           font-size: 17px;
           font-weight: 700;
           letter-spacing: -.015em;
@@ -832,6 +992,7 @@ export function DashboardView({
           align-items: center;
 
           margin-left: 8px;
+
           padding: 3px 7px;
 
           border:
@@ -857,7 +1018,8 @@ export function DashboardView({
           font-size: 11px;
           line-height: 1.65;
 
-          color: rgba(255,255,255,.48);
+          color:
+            rgba(255,255,255,.48);
 
           margin-top: 13px;
         }
@@ -874,7 +1036,8 @@ export function DashboardView({
           gap: 7px;
 
           font-size: 9.5px;
-          color: rgba(255,255,255,.48);
+          color:
+            rgba(255,255,255,.48);
         }
 
         .db3-mini strong {
@@ -882,7 +1045,9 @@ export function DashboardView({
             'JetBrains Mono',
             monospace;
 
-          color: rgba(255,255,255,.86);
+          color:
+            rgba(255,255,255,.86);
+
           font-size: 10px;
         }
 
@@ -890,6 +1055,7 @@ export function DashboardView({
           display: flex;
           align-items: center;
           justify-content: flex-end;
+
           gap: 30px;
 
           position: relative;
@@ -908,7 +1074,9 @@ export function DashboardView({
 
         .db3-match-label {
           font-size: 10px;
-          color: rgba(255,255,255,.46);
+          color:
+            rgba(255,255,255,.46);
+
           margin-bottom: 5px;
         }
 
@@ -923,20 +1091,27 @@ export function DashboardView({
 
         .db3-match-sub {
           font-size: 9px;
-          color: rgba(255,255,255,.38);
+
+          color:
+            rgba(255,255,255,.38);
+
           line-height: 1.5;
+
           margin-top: 4px;
         }
 
         .db3-stat-stack {
           display: grid;
+
           grid-template-columns:
             repeat(3, minmax(80px, 1fr));
+
           min-width: 300px;
         }
 
         .db3-stat {
           padding-left: 18px;
+
           border-left:
             1px solid
             rgba(255,255,255,.10);
@@ -945,14 +1120,18 @@ export function DashboardView({
         .db3-stat-icon {
           width: 23px;
           height: 23px;
+
           display: flex;
           align-items: center;
           justify-content: center;
 
           border-radius: 7px;
-          background: rgba(255,255,255,.07);
 
-          color: rgba(255,255,255,.65);
+          background:
+            rgba(255,255,255,.07);
+
+          color:
+            rgba(255,255,255,.65);
 
           margin-bottom: 9px;
         }
@@ -969,12 +1148,15 @@ export function DashboardView({
 
         .db3-stat-label {
           font-size: 9px;
-          color: rgba(255,255,255,.42);
+
+          color:
+            rgba(255,255,255,.42);
+
           margin-top: 5px;
         }
 
         /* -----------------------------------------------
-           WORKSPACE FILTER BAR
+           FILTER BAR
         ----------------------------------------------- */
 
         .db3-context-bar {
@@ -993,7 +1175,11 @@ export function DashboardView({
             14px;
 
           background: white;
-          border: 1px solid var(--border);
+
+          border:
+            1px solid
+            var(--border);
+
           border-radius: 12px;
 
           animation:
@@ -1003,7 +1189,9 @@ export function DashboardView({
         .db3-context-left {
           display: flex;
           align-items: center;
+
           gap: 9px;
+
           min-width: 0;
         }
 
@@ -1035,9 +1223,13 @@ export function DashboardView({
         .db3-filter-pill {
           display: inline-flex;
           align-items: center;
+
           gap: 6px;
 
-          border: 1px solid var(--border);
+          border:
+            1px solid
+            var(--border);
+
           background: var(--paper);
 
           border-radius: 999px;
@@ -1056,6 +1248,7 @@ export function DashboardView({
           margin: 0;
 
           background: none;
+
           color: var(--soft);
 
           cursor: pointer;
@@ -1078,7 +1271,7 @@ export function DashboardView({
         }
 
         /* -----------------------------------------------
-           PIPELINE
+           SECTIONS
         ----------------------------------------------- */
 
         .db3-section {
@@ -1090,6 +1283,7 @@ export function DashboardView({
           display: flex;
           align-items: center;
           justify-content: space-between;
+
           gap: 15px;
 
           margin-bottom: 11px;
@@ -1098,6 +1292,7 @@ export function DashboardView({
         .db3-section-title {
           display: flex;
           align-items: center;
+
           gap: 7px;
 
           font-family:
@@ -1117,16 +1312,23 @@ export function DashboardView({
           color: var(--soft);
         }
 
+        /* -----------------------------------------------
+           PIPELINE
+        ----------------------------------------------- */
+
         .db3-pipeline {
           display: grid;
+
           grid-template-columns:
             repeat(5, minmax(0, 1fr));
 
           border-top:
-            1px solid var(--border);
+            1px solid
+            var(--border);
 
           border-bottom:
-            1px solid var(--border);
+            1px solid
+            var(--border);
 
           background: white;
         }
@@ -1141,7 +1343,8 @@ export function DashboardView({
             18px;
 
           border-right:
-            1px solid var(--border);
+            1px solid
+            var(--border);
 
           background: white;
 
@@ -1171,6 +1374,7 @@ export function DashboardView({
 
         .db3-stage-line {
           position: absolute;
+
           left: 18px;
           right: 18px;
           bottom: 0;
@@ -1182,10 +1386,12 @@ export function DashboardView({
           transform-origin: left;
           transform: scaleX(0);
 
-          transition: transform .25s ease;
+          transition:
+            transform .25s ease;
         }
 
-        .db3-stage.active .db3-stage-line {
+        .db3-stage.active
+        .db3-stage-line {
           transform: scaleX(1);
         }
 
@@ -1206,18 +1412,26 @@ export function DashboardView({
 
         .db3-stage-arrow {
           color: var(--soft);
+
           opacity: 0;
-          transform: translateX(-3px);
+
+          transform:
+            translateX(-3px);
 
           transition:
             opacity .18s ease,
             transform .18s ease;
         }
 
-        .db3-stage:hover .db3-stage-arrow,
-        .db3-stage.active .db3-stage-arrow {
+        .db3-stage:hover
+        .db3-stage-arrow,
+
+        .db3-stage.active
+        .db3-stage-arrow {
           opacity: 1;
-          transform: translateX(0);
+
+          transform:
+            translateX(0);
         }
 
         .db3-stage-number {
@@ -1235,14 +1449,14 @@ export function DashboardView({
 
         .db3-stage-label {
           font-size: 9.5px;
+
           color: var(--muted);
+
           margin-top: 5px;
         }
 
         /* -----------------------------------------------
-           MAIN GRID
-           NOTE: align-items changed from "start" to "stretch"
-           so the two panels below share the same row height.
+           CONTENT GRID
         ----------------------------------------------- */
 
         .db3-content-grid {
@@ -1258,21 +1472,22 @@ export function DashboardView({
         }
 
         /* -----------------------------------------------
-           CANDIDATES
+           PANELS
         ----------------------------------------------- */
 
         .db3-panel {
           background: white;
-          border: 1px solid var(--border);
+
+          border:
+            1px solid
+            var(--border);
 
           border-radius: 14px;
 
           overflow: hidden;
 
-          /* Panels stretch to fill their grid row and lay out
-             their content top-to-bottom so an empty state can
-             grow to fill remaining space. */
           height: 100%;
+
           display: flex;
           flex-direction: column;
         }
@@ -1288,7 +1503,8 @@ export function DashboardView({
             12px;
 
           border-bottom:
-            1px solid var(--border);
+            1px solid
+            var(--border);
 
           flex-shrink: 0;
         }
@@ -1296,6 +1512,7 @@ export function DashboardView({
         .db3-panel-head-left {
           display: flex;
           align-items: center;
+
           gap: 9px;
         }
 
@@ -1324,7 +1541,9 @@ export function DashboardView({
 
         .db3-panel-subtitle {
           font-size: 9px;
+
           color: var(--muted);
+
           margin-top: 2px;
         }
 
@@ -1334,34 +1553,22 @@ export function DashboardView({
             monospace;
 
           font-size: 8px;
+
           color: var(--soft);
 
           margin-top: 2px;
         }
 
-        .db3-view-all {
-          border: 0;
-          background: none;
-
-          color: var(--cyan-dark);
-
-          font-size: 9px;
-          font-weight: 600;
-
-          cursor: pointer;
-
-          display: flex;
-          align-items: center;
-          gap: 3px;
-        }
+        /* -----------------------------------------------
+           CANDIDATES
+        ----------------------------------------------- */
 
         .db3-candidate-list {
           display: flex;
           flex-direction: column;
 
-          /* Grow to fill the panel so the empty state can center
-             itself across the full remaining height. */
           flex: 1;
+
           min-height: 0;
         }
 
@@ -1384,7 +1591,8 @@ export function DashboardView({
             17px;
 
           border-bottom:
-            1px solid #EEECE7;
+            1px solid
+            #EEECE7;
 
           cursor: pointer;
 
@@ -1399,6 +1607,7 @@ export function DashboardView({
 
         .db3-candidate:hover {
           background: var(--paper);
+
           padding-left: 20px;
         }
 
@@ -1435,6 +1644,7 @@ export function DashboardView({
 
         .db3-candidate-headline {
           font-size: 9px;
+
           color: var(--soft);
 
           white-space: nowrap;
@@ -1446,6 +1656,7 @@ export function DashboardView({
 
         .db3-candidate-role {
           font-size: 9px;
+
           color: var(--muted);
 
           white-space: nowrap;
@@ -1482,17 +1693,16 @@ export function DashboardView({
             transform .15s ease;
         }
 
-        .db3-candidate:hover .db3-candidate-arrow {
+        .db3-candidate:hover
+        .db3-candidate-arrow {
           color: var(--cyan-dark);
-          transform: translateX(2px);
+
+          transform:
+            translateX(2px);
         }
 
         /* -----------------------------------------------
-           EMPTY STATE
-           NOTE: now flexes to fill the remaining panel
-           height and centers its content, instead of a
-           fixed small padding box, so it matches the
-           height of the score-distribution panel next to it.
+           EMPTY
         ----------------------------------------------- */
 
         .db3-empty {
@@ -1520,32 +1730,45 @@ export function DashboardView({
         }
 
         .db3-score-body {
-          padding: 15px 17px 0;
+          padding:
+            15px
+            17px
+            0;
 
           flex: 1;
+
           display: flex;
           flex-direction: column;
         }
 
         .db3-score-note {
           font-size: 9px;
+
           color: var(--soft);
+
           margin-bottom: 13px;
         }
 
         .db3-score-bars {
           display: flex;
           flex-direction: column;
+
           gap: 11px;
         }
 
         .db3-score-row {
           display: grid;
-          grid-template-columns: 48px 1fr 28px;
+
+          grid-template-columns:
+            48px
+            1fr
+            28px;
+
           align-items: center;
+
           gap: 9px;
 
-          cursor: pointer;
+          cursor: default;
         }
 
         .db3-score-label {
@@ -1554,6 +1777,7 @@ export function DashboardView({
             monospace;
 
           font-size: 8px;
+
           color: var(--muted);
         }
 
@@ -1596,56 +1820,18 @@ export function DashboardView({
             monospace;
 
           font-size: 8px;
+
           color: var(--ink);
+
           text-align: right;
         }
 
         /* -----------------------------------------------
-           ACTIVITY
+           ACTIVITY / ROLES
         ----------------------------------------------- */
 
         .db3-activity {
           margin-top: 22px;
-        }
-
-        .db3-activity-tabs {
-          display: flex;
-          align-items: center;
-
-          gap: 3px;
-
-          padding:
-            8px
-            10px;
-
-          border-bottom:
-            1px solid var(--border);
-        }
-
-        .db3-tab {
-          border: 0;
-          background: transparent;
-
-          color: var(--soft);
-
-          font-size: 9.5px;
-          font-weight: 600;
-
-          padding: 6px 9px;
-
-          border-radius: 7px;
-
-          cursor: pointer;
-        }
-
-        .db3-tab:hover {
-          color: var(--ink);
-        }
-
-        .db3-tab.active {
-          background: var(--paper);
-          border: 1px solid var(--border);
-          color: var(--ink);
         }
 
         .db3-role-row {
@@ -1666,7 +1852,8 @@ export function DashboardView({
             17px;
 
           border-bottom:
-            1px solid #EEECE7;
+            1px solid
+            #EEECE7;
 
           cursor: pointer;
 
@@ -1688,6 +1875,7 @@ export function DashboardView({
 
         .db3-role-title {
           font-size: 10.5px;
+
           font-weight: 700;
 
           white-space: nowrap;
@@ -1697,6 +1885,7 @@ export function DashboardView({
 
         .db3-role-meta {
           font-size: 8.5px;
+
           color: var(--soft);
 
           margin-top: 3px;
@@ -1712,6 +1901,7 @@ export function DashboardView({
             monospace;
 
           font-size: 8px;
+
           color: var(--muted);
 
           white-space: nowrap;
@@ -1720,6 +1910,7 @@ export function DashboardView({
         .db3-status {
           display: inline-flex;
           align-items: center;
+
           gap: 5px;
 
           font-size: 8px;
@@ -1733,7 +1924,9 @@ export function DashboardView({
         .db3-status-dot {
           width: 5px;
           height: 5px;
+
           border-radius: 50%;
+
           background: var(--cyan);
         }
 
@@ -1741,85 +1934,163 @@ export function DashboardView({
           color: #C7C6C2;
         }
 
-        .db3-search-row {
-          display: grid;
+        /* -----------------------------------------------
+           TEAM ACTIVITY & AUDIT FEED
 
-          grid-template-columns:
-            25px
-            minmax(0, 1fr)
-            auto
-            25px;
+           ActivityLogPanel owns:
+           - title
+           - subtitle
+           - filters
+           - activity list
 
-          align-items: center;
+           DashboardView only provides the fixed-height
+           container.
 
-          gap: 10px;
+           IMPORTANT:
+           The header stays fixed and the filters are
+           aligned to the RIGHT side of the header.
+           Only .alp-list scrolls.
+        ----------------------------------------------- */
 
-          padding:
-            11px
-            17px;
+        .db3-audit-section {
+          margin-top: 12px;
 
-          border-bottom:
-            1px solid #EEECE7;
-        }
+          height: 330px;
+          min-height: 330px;
+          max-height: 330px;
 
-        .db3-search-row:last-child {
-          border-bottom: 0;
-        }
-
-        .db3-search-icon {
-          width: 25px;
-          height: 25px;
+          overflow: hidden;
 
           display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border-radius: 7px;
-
-          background: var(--cyan-soft);
-          color: var(--cyan-dark);
+          flex-direction: column;
         }
 
-        .db3-search-query {
-          font-size: 9.5px;
-          font-weight: 600;
+        .db3-audit-scroll {
+          flex: 1;
 
-          white-space: nowrap;
+          min-height: 0;
+
           overflow: hidden;
-          text-overflow: ellipsis;
+
+          background: white;
+
+          display: flex;
+          flex-direction: column;
         }
 
-        .db3-search-meta {
-          font-size: 8px;
-          color: var(--soft);
-          margin-top: 2px;
-        }
+        .db3-audit-scroll > .alp-card {
+          height: 100%;
+          min-height: 0;
 
-        .db3-rerun {
-          width: 25px;
-          height: 25px;
+          display: flex;
+          flex-direction: column;
 
           border: 0;
-          background: transparent;
+          border-radius: 0;
+        }
 
-          color: var(--soft);
-
-          border-radius: 7px;
+        /*
+         * ActivityLogPanel header:
+         * title on the LEFT,
+         * filters on the RIGHT.
+         */
+        .db3-audit-scroll .alp-head {
+          flex-shrink: 0;
 
           display: flex;
           align-items: center;
-          justify-content: center;
+          justify-content: space-between;
 
-          cursor: pointer;
+          width: 100%;
+          min-width: 0;
         }
 
-        .db3-rerun:hover {
-          background: var(--paper);
-          color: var(--cyan-dark);
+        /*
+         * Keep the title section on the left.
+         */
+        .db3-audit-scroll .alp-head > div:first-child {
+          min-width: 0;
+          flex: 1;
+        }
+
+        /*
+         * Move the filter group to the right.
+         *
+         * This covers common ActivityLogPanel structures
+         * where the filters are the second child of the
+         * header.
+         */
+        .db3-audit-scroll .alp-head > div:last-child {
+          margin-left: auto;
+
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+
+          flex-shrink: 0;
+
+          gap: 6px;
+        }
+
+        /*
+         * If ActivityLogPanel uses a dedicated filter
+         * class, keep it aligned to the right as well.
+         */
+        .db3-audit-scroll .alp-filters {
+          margin-left: auto;
+
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+
+          flex-shrink: 0;
+
+          gap: 6px;
+        }
+
+        /*
+         * Only activity entries scroll.
+         */
+        .db3-audit-scroll .alp-list {
+          flex: 1;
+          min-height: 0;
+
+          overflow-y: auto;
+          overflow-x: hidden;
+
+          scrollbar-width: thin;
+          scrollbar-color:
+            #C9C8C4
+            transparent;
+        }
+
+        .db3-audit-scroll .alp-list::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .db3-audit-scroll .alp-list::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .db3-audit-scroll .alp-list::-webkit-scrollbar-thumb {
+          background: #C9C8C4;
+          border-radius: 999px;
+        }
+
+        .db3-audit-scroll .alp-list::-webkit-scrollbar-thumb:hover {
+          background: #A9A8A4;
+        }
+
+        /*
+         * Make individual filter buttons compact.
+         */
+        .db3-audit-scroll .alp-filters button {
+          flex-shrink: 0;
+          white-space: nowrap;
         }
 
         /* -----------------------------------------------
-           AI STRIP
+           AI
         ----------------------------------------------- */
 
         .db3-ai {
@@ -1836,7 +2107,8 @@ export function DashboardView({
           background: white;
 
           border:
-            1px solid var(--border);
+            1px solid
+            var(--border);
 
           border-radius: 12px;
         }
@@ -1844,6 +2116,7 @@ export function DashboardView({
         .db3-ai-left {
           display: flex;
           align-items: center;
+
           gap: 9px;
         }
 
@@ -1868,33 +2141,10 @@ export function DashboardView({
 
         .db3-ai-sub {
           font-size: 8px;
+
           color: var(--soft);
+
           margin-top: 2px;
-        }
-
-        .db3-ai-metrics {
-          display: flex;
-          align-items: center;
-
-          gap: 22px;
-        }
-
-        .db3-ai-metric {
-          display: flex;
-          align-items: baseline;
-          gap: 5px;
-
-          font-size: 8px;
-          color: var(--soft);
-        }
-
-        .db3-ai-metric strong {
-          font-family:
-            'JetBrains Mono',
-            monospace;
-
-          color: var(--ink);
-          font-size: 9px;
         }
 
         /* -----------------------------------------------
@@ -1945,7 +2195,10 @@ export function DashboardView({
 
           .db3-stage {
             border-right: 0;
-            border-bottom: 1px solid var(--border);
+
+            border-bottom:
+              1px solid
+              var(--border);
           }
 
           .db3-stage:last-child {
@@ -1973,7 +2226,27 @@ export function DashboardView({
             flex-direction: column;
           }
 
-          .db3-ai-metrics {
+          .db3-audit-section {
+            height: 300px;
+            min-height: 300px;
+            max-height: 300px;
+          }
+
+          /*
+           * On small screens, allow the filters to wrap
+           * instead of pushing the title out of the card.
+           */
+          .db3-audit-scroll .alp-head {
+            align-items: flex-start;
+            gap: 10px;
+            flex-wrap: wrap;
+          }
+
+          .db3-audit-scroll .alp-head > div:last-child,
+          .db3-audit-scroll .alp-filters {
+            width: 100%;
+            margin-left: 0;
+            justify-content: flex-start;
             flex-wrap: wrap;
           }
         }
@@ -1986,30 +2259,41 @@ export function DashboardView({
         ================================================= */}
 
         <header className="db3-page-head">
+
           <div>
+
             <div className="db3-eyebrow">
               {t.eyebrow}
             </div>
 
             <h1 className="db3-title">
+
               {t.welcome(
-                user?.fullName || 'User'
+                user?.fullName ||
+                (isFR ? 'Utilisateur' : 'User')
               )}
 
               <span className="db3-role">
-                {user?.role || 'RECRUITER'}
+                {getRoleLabel(user?.role)}
               </span>
+
             </h1>
 
             <div className="db3-page-note">
               {t.workspaceNote}
             </div>
+
           </div>
 
-          <div className="db3-head-status">
+          <div
+            className="db3-head-status"
+            aria-label={t.workspaceActive}
+          >
             <span className="db3-live-dot" />
-            Workspace active
+
+            {t.workspaceActive}
           </div>
+
         </header>
 
         {/* ================================================
@@ -2021,34 +2305,18 @@ export function DashboardView({
           <div className="db3-hero-left">
 
             <div>
+
               <div className="db3-hero-welcome">
-                Hiring at a glance
+                {t.hiringAtGlance}
               </div>
 
               <div className="db3-hero-description">
-                Your sourcing activity, candidate quality,
-                and recruitment pipeline in one place.
+                {t.heroDescription}
               </div>
-            </div>
-
-            <div className="db3-hero-mini">
-
-              {/* FIXED:
-                  Search history metric removed because
-                  DashboardView no longer receives searchHistory.
-              */}
-
-              {/* <div className="db3-mini">
-                <Target size={11} />
-
-                <strong>
-                  {stats.totalInPipeline}
-                </strong>
-
-                {t.inPipeline}
-              </div> */}
 
             </div>
+
+            <div className="db3-hero-mini" />
 
           </div>
 
@@ -2067,16 +2335,17 @@ export function DashboardView({
                 </div>
 
                 <div className="db3-match-title">
+
                   {stats.avgScore >= 80
-                    ? 'Strong pipeline'
+                    ? t.strongPipeline
                     : stats.avgScore >= 60
-                      ? 'Healthy pipeline'
-                      : 'Build your pipeline'}
+                      ? t.healthyPipeline
+                      : t.buildPipeline}
+
                 </div>
 
                 <div className="db3-match-sub">
-                  Based on sourced candidate
-                  match scores.
+                  {t.matchBasedOn}
                 </div>
 
               </div>
@@ -2144,6 +2413,7 @@ export function DashboardView({
         ================================================= */}
 
         {hasFilters && (
+
           <div className="db3-context-bar">
 
             <div className="db3-context-left">
@@ -2153,11 +2423,11 @@ export function DashboardView({
               </div>
 
               <div className="db3-context-text">
-                Showing candidates matching your
-                current focus
+                {t.showingCandidates}
               </div>
 
               {focusedStage && (
+
                 <span className="db3-filter-pill">
 
                   {t.stages[focusedStage]}
@@ -2168,21 +2438,26 @@ export function DashboardView({
                         focusedStage
                       )
                     }
-                    aria-label="Remove stage filter"
+                    aria-label={
+                      t.removeStageFilter
+                    }
                   >
                     <X size={10} />
                   </button>
 
                 </span>
+
               )}
 
               {selectedRange && (
+
                 <span className="db3-filter-pill">
 
                   {
                     stats.scoreDist.find(
                       (item) =>
-                        item.key === selectedRange
+                        item.key ===
+                        selectedRange
                     )?.label
                   }
 
@@ -2192,12 +2467,15 @@ export function DashboardView({
                         selectedRange
                       )
                     }
-                    aria-label="Remove score filter"
+                    aria-label={
+                      t.removeScoreFilter
+                    }
                   >
                     <X size={10} />
                   </button>
 
                 </span>
+
               )}
 
             </div>
@@ -2210,6 +2488,7 @@ export function DashboardView({
             </button>
 
           </div>
+
         )}
 
         {/* ================================================
@@ -2226,69 +2505,101 @@ export function DashboardView({
             </div>
 
             <div className="db3-section-note">
+
               {hasFilters
                 ? `${displayCandidates.length} ${t.candidates}`
-                : `${stats.totalInPipeline} ${t.inPipeline} (${candidates.length - stats.totalInPipeline} not in pipeline)`}
+                : `${stats.totalInPipeline} ${t.inPipeline} (${Math.max(
+                  0,
+                  candidates.length -
+                  stats.totalInPipeline
+                )} ${t.notInPipeline})`}
+
             </div>
 
           </div>
 
           <div className="db3-pipeline">
 
-            {funnel.map((stage, index) => {
+            {funnel.map(
+              (stage, index) => {
 
-              const isActive =
-                focusedStage === stage.key;
+                const isActive =
+                  focusedStage ===
+                  stage.key;
 
-              const isDimmed =
-                focusedStage &&
-                focusedStage !== stage.key;
+                const isDimmed =
+                  focusedStage &&
+                  focusedStage !==
+                  stage.key;
 
-              return (
-                <div
-                  key={stage.key}
-                  className={[
-                    'db3-stage',
-                    isActive
-                      ? 'active'
-                      : '',
-                    isDimmed
-                      ? 'dimmed'
-                      : '',
-                  ].join(' ')}
-                  onClick={() =>
-                    handleStageClick(
-                      stage.key
-                    )
-                  }
-                >
+                return (
 
-                  <div className="db3-stage-top">
+                  <div
+                    key={stage.key}
+                    className={[
+                      'db3-stage',
+                      isActive
+                        ? 'active'
+                        : '',
+                      isDimmed
+                        ? 'dimmed'
+                        : '',
+                    ].join(' ')}
+                    onClick={() =>
+                      handleStageClick(
+                        stage.key
+                      )
+                    }
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={
+                      isActive
+                    }
+                    aria-label={`${stage.label}: ${stage.value} ${t.candidates}`}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key ===
+                        'Enter' ||
+                        event.key ===
+                        ' '
+                      ) {
+                        event.preventDefault();
 
-                    <span className="db3-stage-index">
-                      0{index + 1}
-                    </span>
+                        handleStageClick(
+                          stage.key
+                        );
+                      }
+                    }}
+                  >
 
-                    <ChevronRight
-                      size={12}
-                      className="db3-stage-arrow"
-                    />
+                    <div className="db3-stage-top">
+
+                      <span className="db3-stage-index">
+                        0{index + 1}
+                      </span>
+
+                      <ChevronRight
+                        size={12}
+                        className="db3-stage-arrow"
+                      />
+
+                    </div>
+
+                    <div className="db3-stage-number">
+                      {stage.value}
+                    </div>
+
+                    <div className="db3-stage-label">
+                      {stage.label}
+                    </div>
+
+                    <div className="db3-stage-line" />
 
                   </div>
 
-                  <div className="db3-stage-number">
-                    {stage.value}
-                  </div>
-
-                  <div className="db3-stage-label">
-                    {stage.label}
-                  </div>
-
-                  <div className="db3-stage-line" />
-
-                </div>
-              );
-            })}
+                );
+              }
+            )}
 
           </div>
 
@@ -2300,9 +2611,7 @@ export function DashboardView({
 
         <div className="db3-content-grid">
 
-          {/* -----------------------------------------------
-              CANDIDATES
-          ------------------------------------------------ */}
+          {/* CANDIDATES */}
 
           <section className="db3-panel">
 
@@ -2333,7 +2642,8 @@ export function DashboardView({
 
             <div className="db3-candidate-list">
 
-              {displayCandidates.length === 0 ? (
+              {displayCandidates.length ===
+                0 ? (
 
                 <div className="db3-empty">
                   {t.noCandidates}
@@ -2350,6 +2660,7 @@ export function DashboardView({
                       index;
 
                     return (
+
                       <div
                         key={candidate.id}
                         className="db3-candidate"
@@ -2358,6 +2669,22 @@ export function DashboardView({
                             candidate
                           )
                         }
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (
+                            event.key ===
+                            'Enter' ||
+                            event.key ===
+                            ' '
+                          ) {
+                            event.preventDefault();
+
+                            onSelectCandidate?.(
+                              candidate
+                            );
+                          }
+                        }}
                       >
 
                         <div className="db3-rank">
@@ -2370,19 +2697,21 @@ export function DashboardView({
                             candidate.fullName
                           )}
                           alt={
-                            candidate.fullName
+                            candidate.fullName ||
+                            t.candidateProfile
                           }
                         />
 
                         <div className="db3-candidate-main">
 
                           <div className="db3-candidate-name">
-                            {candidate.fullName}
+                            {candidate.fullName ||
+                              t.candidateProfile}
                           </div>
 
                           <div className="db3-candidate-headline">
                             {candidate.headline ||
-                              'Candidate profile'}
+                              t.candidateProfile}
                           </div>
 
                         </div>
@@ -2390,11 +2719,13 @@ export function DashboardView({
                         <div className="db3-candidate-role">
                           {candidate.currentRole ||
                             candidate.location ||
-                            'Profile'}
+                            t.profile}
                         </div>
 
                         <span className="db3-candidate-score">
-                          {candidate.matchScore || 0}%
+                          {candidate.matchScore ||
+                            0}
+                          %
                         </span>
 
                         <ChevronRight
@@ -2403,6 +2734,7 @@ export function DashboardView({
                         />
 
                       </div>
+
                     );
                   }
                 )
@@ -2411,11 +2743,134 @@ export function DashboardView({
 
             </div>
 
+            {totalCandidatePages > 1 && (
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: 6,
+                  padding: '9px',
+                  borderTop:
+                    '1px solid var(--border)',
+                }}
+              >
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCandidatePage(
+                      (page) =>
+                        Math.max(
+                          0,
+                          page - 1
+                        )
+                    )
+                  }
+                  disabled={
+                    candidatePage === 0
+                  }
+                  aria-label={
+                    isFR
+                      ? 'Page précédente'
+                      : 'Previous page'
+                  }
+                  style={{
+                    border:
+                      '1px solid var(--border)',
+                    background:
+                      'var(--paper)',
+                    borderRadius: 6,
+                    padding:
+                      '4px 8px',
+                    cursor:
+                      candidatePage ===
+                        0
+                        ? 'default'
+                        : 'pointer',
+                    opacity:
+                      candidatePage ===
+                        0
+                        ? 0.4
+                        : 1,
+                    fontSize: 9,
+                  }}
+                >
+                  ‹
+                </button>
+
+                <span
+                  style={{
+                    fontFamily:
+                      "'JetBrains Mono', monospace",
+                    fontSize: 8,
+                    color:
+                      'var(--soft)',
+                    display: 'flex',
+                    alignItems:
+                      'center',
+                  }}
+                >
+                  {candidatePage + 1}
+                  {' / '}
+                  {totalCandidatePages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCandidatePage(
+                      (page) =>
+                        Math.min(
+                          totalCandidatePages -
+                          1,
+                          page + 1
+                        )
+                    )
+                  }
+                  disabled={
+                    candidatePage >=
+                    totalCandidatePages -
+                    1
+                  }
+                  aria-label={
+                    isFR
+                      ? 'Page suivante'
+                      : 'Next page'
+                  }
+                  style={{
+                    border:
+                      '1px solid var(--border)',
+                    background:
+                      'var(--paper)',
+                    borderRadius: 6,
+                    padding:
+                      '4px 8px',
+                    cursor:
+                      candidatePage >=
+                        totalCandidatePages -
+                        1
+                        ? 'default'
+                        : 'pointer',
+                    opacity:
+                      candidatePage >=
+                        totalCandidatePages -
+                        1
+                        ? 0.4
+                        : 1,
+                    fontSize: 9,
+                  }}
+                >
+                  ›
+                </button>
+
+              </div>
+
+            )}
+
           </section>
 
-          {/* -----------------------------------------------
-              SCORE DISTRIBUTION
-          ------------------------------------------------ */}
+          {/* SCORE DISTRIBUTION */}
 
           <section className="db3-panel db3-score-panel">
 
@@ -2434,7 +2889,8 @@ export function DashboardView({
                   </div>
 
                   <div className="db3-panel-subtitle">
-                    {stats.totalCandidates} candidates across all roles
+                    {stats.totalCandidates}{' '}
+                    {t.candidates}
                   </div>
 
                 </div>
@@ -2455,37 +2911,19 @@ export function DashboardView({
                   (item, index) => {
 
                     const percentage =
-                      stats.totalCandidates > 0
-                        ? (item.value /
-                          stats.totalCandidates) *
-                        100
+                      stats.totalCandidates >
+                        0
+                        ? (
+                          item.value /
+                          stats.totalCandidates
+                        ) * 100
                         : 0;
 
-                    const active =
-                      selectedRange ===
-                      item.key;
-
-                    const dimmed =
-                      selectedRange &&
-                      selectedRange !== item.key;
-
                     return (
+
                       <div
                         key={item.key}
-                        className={[
-                          'db3-score-row',
-                          active
-                            ? 'active'
-                            : '',
-                          dimmed
-                            ? 'dimmed'
-                            : '',
-                        ].join(' ')}
-                        onClick={() =>
-                          handleRangeClick(
-                            item.key
-                          )
-                        }
+                        className="db3-score-row"
                       >
 
                         <span className="db3-score-label">
@@ -2510,6 +2948,7 @@ export function DashboardView({
                         </span>
 
                       </div>
+
                     );
                   }
                 )}
@@ -2523,12 +2962,37 @@ export function DashboardView({
         </div>
 
         {/* ================================================
-            ACTIVITY
+            ROLES / WORKSPACE ACTIVITY
         ================================================= */}
 
         <section className="db3-panel db3-activity">
 
-          {jobDescriptions.length === 0 ? (
+          <div className="db3-panel-head">
+
+            <div className="db3-panel-head-left">
+
+              <div className="db3-panel-icon">
+                <FileText size={12} />
+              </div>
+
+              <div>
+
+                <div className="db3-panel-title">
+                  {t.activity}
+                </div>
+
+                <div className="db3-panel-subtitle">
+                  {t.jobsTab}
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {jobDescriptions.length ===
+            0 ? (
 
             <div className="db3-empty">
               {t.noJDs}
@@ -2538,8 +3002,18 @@ export function DashboardView({
 
             [...jobDescriptions]
               .sort((a, b) => {
-                const tA = Number(String(a.id).replace(/\D/g, '')) || 0;
-                const tB = Number(String(b.id).replace(/\D/g, '')) || 0;
+                const tA =
+                  Number(
+                    String(a.id)
+                      .replace(/\D/g, '')
+                  ) || 0;
+
+                const tB =
+                  Number(
+                    String(b.id)
+                      .replace(/\D/g, '')
+                  ) || 0;
+
                 return tB - tA;
               })
               .slice(0, 4)
@@ -2553,15 +3027,19 @@ export function DashboardView({
                   ).length;
 
                 const isSelected =
-                  selectedJobId === job.id;
+                  selectedJobId ===
+                  job.id;
 
                 const jobStatus =
-                  job.status || 'active';
+                  job.status ||
+                  'active';
 
                 const isArchived =
-                  jobStatus === 'archived';
+                  jobStatus ===
+                  'archived';
 
                 return (
+
                   <div
                     key={job.id}
                     className="db3-role-row"
@@ -2578,17 +3056,39 @@ export function DashboardView({
                         job.id
                       )
                     }
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={
+                      isSelected
+                    }
+                    onKeyDown={(event) => {
+                      if (
+                        event.key ===
+                        'Enter' ||
+                        event.key ===
+                        ' '
+                      ) {
+                        event.preventDefault();
+
+                        handleSelectJob(
+                          job.id
+                        );
+                      }
+                    }}
                   >
 
                     <div className="db3-role-main">
 
                       <div className="db3-role-title">
-                        {job.title}
+                        {job.title ||
+                          (isFR
+                            ? 'Poste sans titre'
+                            : 'Untitled role')}
                       </div>
 
                       <div className="db3-role-meta">
                         {job.location ||
-                          'All locations'}
+                          t.allLocations}
                       </div>
 
                     </div>
@@ -2611,8 +3111,8 @@ export function DashboardView({
                       />
 
                       {isArchived
-                        ? 'Archived'
-                        : 'Active'}
+                        ? t.archived
+                        : t.active}
 
                     </div>
 
@@ -2622,6 +3122,7 @@ export function DashboardView({
                     />
 
                   </div>
+
                 );
               })
 
@@ -2631,10 +3132,22 @@ export function DashboardView({
 
         {/* ================================================
             TEAM ACTIVITY & AUDIT LOG FEED
+
+            ActivityLogPanel owns the complete header,
+            title, subtitle and filters.
         ================================================= */}
-        <div style={{ gridColumn: '1 / -1', marginTop: 12 }}>
-          <ActivityLogPanel activities={activities} />
-        </div>
+
+        <section className="db3-panel db3-audit-section">
+
+          <div className="db3-audit-scroll">
+
+            <ActivityLogPanel
+              activities={activities}
+            />
+
+          </div>
+
+        </section>
 
         {/* ================================================
             AI PERFORMANCE
@@ -2651,11 +3164,11 @@ export function DashboardView({
             <div>
 
               <div className="db3-ai-title">
-                {t.agent}
+                {t.aiPerformance}
               </div>
 
               <div className="db3-ai-sub">
-                Automated sourcing performance
+                {t.automatedPerformance}
               </div>
 
             </div>

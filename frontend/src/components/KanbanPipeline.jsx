@@ -26,9 +26,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 
-function useLanguage() {
-  return { lang: 'EN' };
-}
+import { useLanguage } from '../context/LanguageContext';
 
 function getAvatarUrl(name) {
   return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
@@ -37,8 +35,18 @@ function getAvatarUrl(name) {
 }
 
 export const STAGES = [
-  { id: 'new', labelFR: 'Nouveau', labelEN: 'New', icon: Users },
-  { id: 'contacted', labelFR: 'Contacté', labelEN: 'Contacted', icon: Mail },
+  {
+    id: 'new',
+    labelFR: 'Nouveau',
+    labelEN: 'New',
+    icon: Users,
+  },
+  {
+    id: 'contacted',
+    labelFR: 'Contacté',
+    labelEN: 'Contacted',
+    icon: Mail,
+  },
   {
     id: 'interview',
     labelFR: 'Entretien',
@@ -47,7 +55,7 @@ export const STAGES = [
   },
   {
     id: 'offer',
-    labelFR: 'Offre Proposée',
+    labelFR: 'Offre proposée',
     labelEN: 'Offer Extended',
     icon: Award,
   },
@@ -74,15 +82,30 @@ const COPY = {
     viewProfile: 'Profile',
     advanceNext: 'Next',
     searchPh: 'Filter by name, role, or skill…',
+
+    expandColumn: 'Expand column',
+    collapseColumn: 'Collapse column',
+
+    previousPage: 'Previous page',
+    nextPage: 'Next page',
+    page: 'Page',
   },
+
   FR: {
     title: 'Pipeline de recrutement',
-    sub: 'Faites évoluer les candidats dans votre processus',
+    sub: 'Faites évoluer les candidats dans votre processus de recrutement',
     allRoles: 'Tous les postes',
-    dropHere: 'Déposer ici',
+    dropHere: 'Déposez le candidat ici',
     viewProfile: 'Profil',
     advanceNext: 'Suivant',
     searchPh: 'Filtrer par nom, poste ou compétence…',
+
+    expandColumn: 'Développer la colonne',
+    collapseColumn: 'Réduire la colonne',
+
+    previousPage: 'Page précédente',
+    nextPage: 'Page suivante',
+    page: 'Page',
   },
 };
 
@@ -95,7 +118,9 @@ function useFonts() {
     loaded.current = true;
 
     const link = document.createElement('link');
+
     link.rel = 'stylesheet';
+
     link.href =
       'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap';
 
@@ -108,28 +133,52 @@ export function KanbanPipeline({
   jobDescriptions = [],
   savedRoleCandidates = {},
   candidatePipelineStage = {},
-  onUpdateStage = () => {},
-  onViewDetails = () => {},
+  onUpdateStage = () => { },
+  onViewDetails = () => { },
 }) {
   useFonts();
 
+  /*
+   * IMPORTANT:
+   * Use the real LanguageContext from the application.
+   * The previous version had a fake useLanguage() returning EN,
+   * which prevented the UI from switching to French.
+   */
   const { lang } = useLanguage();
+
   const isFR = lang === 'FR';
+
   const t = COPY[lang] || COPY.EN;
 
   const [selectedJobFilter, setSelectedJobFilter] = useState('all');
+
   const [query, setQuery] = useState('');
+
   const [draggedId, setDraggedId] = useState(null);
+
   const [dragOverStage, setDragOverStage] = useState(null);
+
   const [collapsed, setCollapsed] = useState({});
+
   const [stagePages, setStagePages] = useState({});
+
   const columnRefs = useRef({});
+
   const CARDS_PER_PAGE = 5;
 
-  const jobFiltered = candidates.filter((candidate) => {
-    if (selectedJobFilter === 'all') return true;
+  /*
+   * ------------------------------------------------
+   * FILTER BY ROLE
+   * ------------------------------------------------
+   */
 
-    const savedIds = savedRoleCandidates[selectedJobFilter] || [];
+  const jobFiltered = candidates.filter((candidate) => {
+    if (selectedJobFilter === 'all') {
+      return true;
+    }
+
+    const savedIds =
+      savedRoleCandidates[selectedJobFilter] || [];
 
     return (
       savedIds.includes(candidate.id) ||
@@ -137,24 +186,46 @@ export function KanbanPipeline({
     );
   });
 
+  /*
+   * ------------------------------------------------
+   * SEARCH
+   * ------------------------------------------------
+   */
+
   const filteredCandidates = query.trim()
     ? jobFiltered.filter((candidate) => {
-        const q = query.toLowerCase();
+      const q = query.toLowerCase();
 
-        const skills = Array.isArray(candidate.skills)
-          ? candidate.skills.join(' ')
-          : candidate.skills || '';
+      const skills = Array.isArray(candidate.skills)
+        ? candidate.skills.join(' ')
+        : candidate.skills || '';
 
-        return (
-          candidate.fullName?.toLowerCase().includes(q) ||
-          candidate.headline?.toLowerCase().includes(q) ||
-          skills.toLowerCase().includes(q)
-        );
-      })
+      return (
+        candidate.fullName
+          ?.toLowerCase()
+          .includes(q) ||
+        candidate.headline
+          ?.toLowerCase()
+          .includes(q) ||
+        skills.toLowerCase().includes(q)
+      );
+    })
     : jobFiltered;
+
+  /*
+   * ------------------------------------------------
+   * CANDIDATE STAGE
+   * ------------------------------------------------
+   */
 
   const getCandidateStage = (id) =>
     candidatePipelineStage[id] || 'new';
+
+  /*
+   * ------------------------------------------------
+   * SCROLL TO STAGE
+   * ------------------------------------------------
+   */
 
   function scrollToStage(stageId) {
     columnRefs.current[stageId]?.scrollIntoView({
@@ -164,12 +235,24 @@ export function KanbanPipeline({
     });
   }
 
+  /*
+   * ------------------------------------------------
+   * COLLAPSE / EXPAND
+   * ------------------------------------------------
+   */
+
   function toggleCollapse(stageId) {
     setCollapsed((prev) => ({
       ...prev,
       [stageId]: !prev[stageId],
     }));
   }
+
+  /*
+   * ------------------------------------------------
+   * PAGINATION
+   * ------------------------------------------------
+   */
 
   function handleStagePageChange(stageId, newPage) {
     setStagePages((prev) => ({
@@ -178,17 +261,27 @@ export function KanbanPipeline({
     }));
   }
 
-  function getPaginatedStageCandidates(stageCandidates, stageId) {
+  function getPaginatedStageCandidates(
+    stageCandidates,
+    stageId
+  ) {
     const currentPage = stagePages[stageId] || 0;
+
     const totalPages = Math.ceil(
       stageCandidates.length / CARDS_PER_PAGE
     );
-    const validPage = Math.min(
-      currentPage,
-      totalPages - 1
+
+    const validPage = Math.max(
+      0,
+      Math.min(
+        currentPage,
+        Math.max(0, totalPages - 1)
+      )
     );
 
-    if (totalPages <= 1) return stageCandidates;
+    if (totalPages <= 1) {
+      return stageCandidates;
+    }
 
     return stageCandidates.slice(
       validPage * CARDS_PER_PAGE,
@@ -196,14 +289,26 @@ export function KanbanPipeline({
     );
   }
 
+  /*
+   * ------------------------------------------------
+   * DRAG & DROP
+   * ------------------------------------------------
+   */
+
   function handleDragStart(e, candidateId) {
-    e.dataTransfer.setData('text/plain', candidateId);
+    e.dataTransfer.setData(
+      'text/plain',
+      candidateId
+    );
+
     e.dataTransfer.effectAllowed = 'move';
+
     setDraggedId(candidateId);
   }
 
   function handleDragOver(e, stageId) {
     e.preventDefault();
+
     e.dataTransfer.dropEffect = 'move';
 
     if (dragOverStage !== stageId) {
@@ -221,13 +326,18 @@ export function KanbanPipeline({
     e.preventDefault();
 
     const candidateId =
-      e.dataTransfer.getData('text/plain') || draggedId;
+      e.dataTransfer.getData('text/plain') ||
+      draggedId;
 
     if (candidateId) {
-      onUpdateStage(candidateId, targetStageId);
+      onUpdateStage(
+        candidateId,
+        targetStageId
+      );
     }
 
     setDraggedId(null);
+
     setDragOverStage(null);
   }
 
@@ -239,6 +349,7 @@ export function KanbanPipeline({
             opacity: 0;
             transform: translateY(4px);
           }
+
           to {
             opacity: 1;
             transform: translateY(0);
@@ -249,6 +360,7 @@ export function KanbanPipeline({
           0%, 100% {
             border-color: #D8DEE5;
           }
+
           50% {
             border-color: #0BA5C9;
           }
@@ -927,24 +1039,36 @@ export function KanbanPipeline({
 
         <div className="kb-header-right">
           <div className="kb-search">
-            <Search size={13} color="#9B9C9E" />
+            <Search
+              size={13}
+              color="#9B9C9E"
+            />
 
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) =>
+                setQuery(e.target.value)
+              }
               placeholder={t.searchPh}
+              aria-label={t.searchPh}
             />
           </div>
 
           <div className="kb-filter-wrap">
-            <Filter size={13} color="#9B9C9E" />
+            <Filter
+              size={13}
+              color="#9B9C9E"
+            />
 
             <select
               className="kb-filter-select"
               value={selectedJobFilter}
               onChange={(e) =>
-                setSelectedJobFilter(e.target.value)
+                setSelectedJobFilter(
+                  e.target.value
+                )
               }
+              aria-label={t.allRoles}
             >
               <option value="all">
                 {t.allRoles}
@@ -970,20 +1094,41 @@ export function KanbanPipeline({
           <div className="kb-stage-track-line" />
 
           {STAGES.map((stage) => {
-            const count = filteredCandidates.filter(
-              (candidate) =>
-                getCandidateStage(candidate.id) === stage.id
-            ).length;
+            const count =
+              filteredCandidates.filter(
+                (candidate) =>
+                  getCandidateStage(
+                    candidate.id
+                  ) === stage.id
+              ).length;
 
             const isActive = count > 0;
+
+            const stageLabel = isFR
+              ? stage.labelFR
+              : stage.labelEN;
 
             return (
               <div
                 key={stage.id}
-                className={`kb-stage-item${
-                  isActive ? ' active' : ''
-                }`}
-                onClick={() => scrollToStage(stage.id)}
+                className={`kb-stage-item${isActive ? ' active' : ''
+                  }`}
+                onClick={() =>
+                  scrollToStage(stage.id)
+                }
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === 'Enter' ||
+                    e.key === ' '
+                  ) {
+                    e.preventDefault();
+
+                    scrollToStage(stage.id);
+                  }
+                }}
+                aria-label={`${stageLabel}: ${count}`}
               >
                 <div className="kb-stage-dot">
                   <span className="kb-stage-count">
@@ -992,9 +1137,7 @@ export function KanbanPipeline({
                 </div>
 
                 <span className="kb-stage-name">
-                  {isFR
-                    ? stage.labelFR
-                    : stage.labelEN}
+                  {stageLabel}
                 </span>
               </div>
             );
@@ -1009,7 +1152,9 @@ export function KanbanPipeline({
           const stageCandidates =
             filteredCandidates.filter(
               (candidate) =>
-                getCandidateStage(candidate.id) === stage.id
+                getCandidateStage(
+                  candidate.id
+                ) === stage.id
             );
 
           const isOver =
@@ -1020,43 +1165,64 @@ export function KanbanPipeline({
 
           const Icon = stage.icon;
 
+          const stageLabel = isFR
+            ? stage.labelFR
+            : stage.labelEN;
+
           /* COLLAPSED COLUMN */
 
           if (isCollapsed) {
             return (
               <div
                 key={stage.id}
-                ref={(el) =>
-                  (columnRefs.current[stage.id] = el)
-                }
-                className={`kb-col collapsed${
-                  isOver ? ' over' : ''
-                }`}
+                ref={(el) => {
+                  columnRefs.current[
+                    stage.id
+                  ] = el;
+                }}
+                className={`kb-col collapsed${isOver ? ' over' : ''
+                  }`}
                 onDragOver={(e) =>
-                  handleDragOver(e, stage.id)
+                  handleDragOver(
+                    e,
+                    stage.id
+                  )
                 }
                 onDrop={(e) =>
-                  handleDrop(e, stage.id)
+                  handleDrop(
+                    e,
+                    stage.id
+                  )
                 }
               >
                 <button
+                  type="button"
                   className="kb-col-collapse-btn"
                   onClick={() =>
-                    toggleCollapse(stage.id)
+                    toggleCollapse(
+                      stage.id
+                    )
                   }
-                  aria-label="Expand column"
+                  aria-label={
+                    t.expandColumn
+                  }
+                  title={
+                    t.expandColumn
+                  }
                 >
-                  <ChevronDown size={14} />
+                  <ChevronDown
+                    size={14}
+                  />
                 </button>
 
                 <div className="kb-col-vertical">
-                  {isFR
-                    ? stage.labelFR
-                    : stage.labelEN}
+                  {stageLabel}
                 </div>
 
                 <span className="kb-col-count">
-                  {stageCandidates.length}
+                  {
+                    stageCandidates.length
+                  }
                 </span>
               </div>
             );
@@ -1067,21 +1233,30 @@ export function KanbanPipeline({
           return (
             <div
               key={stage.id}
-              ref={(el) =>
-                (columnRefs.current[stage.id] = el)
-              }
+              ref={(el) => {
+                columnRefs.current[
+                  stage.id
+                ] = el;
+              }}
               onDragOver={(e) =>
-                handleDragOver(e, stage.id)
+                handleDragOver(
+                  e,
+                  stage.id
+                )
               }
               onDragLeave={() =>
-                handleDragLeave(stage.id)
+                handleDragLeave(
+                  stage.id
+                )
               }
               onDrop={(e) =>
-                handleDrop(e, stage.id)
+                handleDrop(
+                  e,
+                  stage.id
+                )
               }
-              className={`kb-col${
-                isOver ? ' over' : ''
-              }`}
+              className={`kb-col${isOver ? ' over' : ''
+                }`}
             >
               <div className="kb-col-head">
                 <span className="kb-col-title">
@@ -1091,30 +1266,41 @@ export function KanbanPipeline({
                   />
 
                   <span>
-                    {isFR
-                      ? stage.labelFR
-                      : stage.labelEN}
+                    {stageLabel}
                   </span>
                 </span>
 
                 <div className="kb-col-right">
                   <span className="kb-col-count">
-                    {stageCandidates.length}
+                    {
+                      stageCandidates.length
+                    }
                   </span>
 
                   <button
+                    type="button"
                     className="kb-col-collapse-btn"
                     onClick={() =>
-                      toggleCollapse(stage.id)
+                      toggleCollapse(
+                        stage.id
+                      )
                     }
-                    aria-label="Collapse column"
+                    aria-label={
+                      t.collapseColumn
+                    }
+                    title={
+                      t.collapseColumn
+                    }
                   >
-                    <ChevronUp size={14} />
+                    <ChevronUp
+                      size={14}
+                    />
                   </button>
                 </div>
               </div>
 
-              {stageCandidates.length === 0 ? (
+              {stageCandidates.length ===
+                0 ? (
                 <div className="kb-empty-drop">
                   {t.dropHere}
                 </div>
@@ -1126,13 +1312,16 @@ export function KanbanPipeline({
                       stage.id
                     );
 
-                  const totalPages = Math.ceil(
-                    stageCandidates.length /
+                  const totalPages =
+                    Math.ceil(
+                      stageCandidates.length /
                       CARDS_PER_PAGE
-                  );
+                    );
 
                   const currentPage =
-                    stagePages[stage.id] || 0;
+                    stagePages[
+                    stage.id
+                    ] || 0;
 
                   return (
                     <>
@@ -1144,34 +1333,44 @@ export function KanbanPipeline({
                             )
                               ? candidate.skills
                               : (
-                                  candidate.skills ||
-                                  ''
-                                )
-                                  .split(',')
-                                  .map((skill) =>
+                                candidate.skills ||
+                                ''
+                              )
+                                .split(',')
+                                .map(
+                                  (
+                                    skill
+                                  ) =>
                                     skill.trim()
-                                  )
-                                  .filter(Boolean);
+                                )
+                                .filter(
+                                  Boolean
+                                );
 
                           return (
                             <div
-                              key={candidate.id}
+                              key={
+                                candidate.id
+                              }
                               draggable
-                              onDragStart={(e) =>
+                              onDragStart={(
+                                e
+                              ) =>
                                 handleDragStart(
                                   e,
                                   candidate.id
                                 )
                               }
                               onDragEnd={() =>
-                                setDraggedId(null)
+                                setDraggedId(
+                                  null
+                                )
                               }
-                              className={`kb-card${
-                                draggedId ===
-                                candidate.id
+                              className={`kb-card${draggedId ===
+                                  candidate.id
                                   ? ' dragging'
                                   : ''
-                              }`}
+                                }`}
                             >
                               <div
                                 className="kb-card-top"
@@ -1180,15 +1379,40 @@ export function KanbanPipeline({
                                     candidate
                                   )
                                 }
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(
+                                  e
+                                ) => {
+                                  if (
+                                    e.key ===
+                                    'Enter' ||
+                                    e.key ===
+                                    ' '
+                                  ) {
+                                    e.preventDefault();
+
+                                    onViewDetails(
+                                      candidate
+                                    );
+                                  }
+                                }}
+                                aria-label={
+                                  t.viewProfile
+                                }
                               >
                                 <div className="kb-person">
                                   <img
                                     className="kb-avatar"
                                     src={getAvatarUrl(
-                                      candidate.fullName
+                                      candidate.fullName ||
+                                      'Candidate'
                                     )}
                                     alt={
-                                      candidate.fullName
+                                      candidate.fullName ||
+                                      (isFR
+                                        ? 'Candidat'
+                                        : 'Candidate')
                                     }
                                   />
 
@@ -1219,82 +1443,111 @@ export function KanbanPipeline({
 
                                 {candidate.matchScore !=
                                   null && (
-                                  <span className="kb-score">
-                                    {
-                                      candidate.matchScore
-                                    }
-                                    %
-                                  </span>
-                                )}
-                              </div>
-
-                              {skills.length > 0 && (
-                                <div className="kb-skills">
-                                  {skills
-                                    .slice(0, 2)
-                                    .map(
-                                      (skill, i) => (
-                                        <span
-                                          className="kb-skill"
-                                          key={i}
-                                        >
-                                          {skill}
-                                        </span>
-                                      )
-                                    )}
-
-                                  {skills.length > 2 && (
-                                    <span className="kb-skill">
-                                      +
-                                      {skills.length -
-                                        2}
+                                    <span className="kb-score">
+                                      {
+                                        candidate.matchScore
+                                      }
+                                      %
                                     </span>
                                   )}
-                                </div>
-                              )}
+                              </div>
+
+                              {skills.length >
+                                0 && (
+                                  <div className="kb-skills">
+                                    {skills
+                                      .slice(0, 2)
+                                      .map(
+                                        (
+                                          skill,
+                                          i
+                                        ) => (
+                                          <span
+                                            className="kb-skill"
+                                            key={i}
+                                          >
+                                            {
+                                              skill
+                                            }
+                                          </span>
+                                        )
+                                      )}
+
+                                    {skills.length >
+                                      2 && (
+                                        <span className="kb-skill">
+                                          +
+                                          {skills.length -
+                                            2}
+                                        </span>
+                                      )}
+                                  </div>
+                                )}
 
                               <div className="kb-card-foot">
                                 <button
                                   type="button"
                                   draggable={false}
-                                  onMouseDown={(e) =>
+                                  onMouseDown={(
+                                    e
+                                  ) =>
                                     e.stopPropagation()
                                   }
-                                  onClick={(e) => {
+                                  onClick={(
+                                    e
+                                  ) => {
                                     e.stopPropagation();
+
                                     onViewDetails(
                                       candidate
                                     );
                                   }}
                                   className="kb-action-btn"
+                                  aria-label={
+                                    t.viewProfile
+                                  }
+                                  title={
+                                    t.viewProfile
+                                  }
                                 >
-                                  <Eye size={11} />
+                                  <Eye
+                                    size={11}
+                                  />
 
                                   <span>
-                                    {t.viewProfile}
+                                    {
+                                      t.viewProfile
+                                    }
                                   </span>
                                 </button>
 
                                 {stage.id !==
                                   'hired' &&
                                   stage.id !==
-                                    'rejected' && (
+                                  'rejected' && (
                                     <button
                                       type="button"
-                                      draggable={false}
-                                      onMouseDown={(e) =>
+                                      draggable={
+                                        false
+                                      }
+                                      onMouseDown={(
+                                        e
+                                      ) =>
                                         e.stopPropagation()
                                       }
-                                      onClick={(e) => {
+                                      onClick={(
+                                        e
+                                      ) => {
                                         e.stopPropagation();
 
-                                        const order = [
-                                          'new',
-                                          'contacted',
-                                          'interview',
-                                          'offer',
-                                          'hired',
-                                        ];
+                                        const order =
+                                          [
+                                            'new',
+                                            'contacted',
+                                            'interview',
+                                            'offer',
+                                            'hired',
+                                          ];
 
                                         const idx =
                                           order.indexOf(
@@ -1302,27 +1555,39 @@ export function KanbanPipeline({
                                           );
 
                                         if (
-                                          idx !== -1 &&
+                                          idx !==
+                                          -1 &&
                                           idx <
-                                            order.length -
-                                              1
+                                          order.length -
+                                          1
                                         ) {
                                           onUpdateStage(
                                             candidate.id,
                                             order[
-                                              idx + 1
+                                            idx +
+                                            1
                                             ]
                                           );
                                         }
                                       }}
                                       className="kb-action-btn"
+                                      aria-label={
+                                        t.advanceNext
+                                      }
+                                      title={
+                                        t.advanceNext
+                                      }
                                     >
                                       <span>
-                                        {t.advanceNext}
+                                        {
+                                          t.advanceNext
+                                        }
                                       </span>
 
                                       <ChevronRight
-                                        size={11}
+                                        size={
+                                          11
+                                        }
                                       />
                                     </button>
                                   )}
@@ -1332,93 +1597,130 @@ export function KanbanPipeline({
                         }
                       )}
 
-                      {/* Pagination Controls for Stage */}
+                      {/* PAGINATION */}
 
                       {totalPages > 1 && (
                         <div
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            display:
+                              'flex',
+                            alignItems:
+                              'center',
+                            justifyContent:
+                              'center',
                             gap: 8,
-                            padding: '12px 8px',
-                            marginTop: '8px',
+                            padding:
+                              '12px 8px',
+                            marginTop:
+                              '8px',
                           }}
                         >
+                          {/* PREVIOUS */}
+
                           <button
+                            type="button"
                             onClick={() =>
                               handleStagePageChange(
                                 stage.id,
                                 Math.max(
                                   0,
-                                  currentPage - 1
+                                  currentPage -
+                                  1
                                 )
                               )
                             }
                             disabled={
-                              currentPage === 0
+                              currentPage ===
+                              0
+                            }
+                            aria-label={
+                              t.previousPage
+                            }
+                            title={
+                              t.previousPage
                             }
                             style={{
-                              display: 'flex',
-                              alignItems: 'center',
+                              display:
+                                'flex',
+                              alignItems:
+                                'center',
                               gap: 4,
-                              padding: '6px 10px',
+                              padding:
+                                '6px 10px',
                               border:
                                 '1px solid #E4E1D9',
                               borderRadius: 6,
                               background:
-                                currentPage === 0
+                                currentPage ===
+                                  0
                                   ? '#F7F5F1'
                                   : '#FFFFFF',
                               color:
-                                currentPage === 0
+                                currentPage ===
+                                  0
                                   ? '#9B9C9E'
                                   : '#12151B',
                               fontSize: 11,
                               fontWeight: 600,
                               cursor:
-                                currentPage === 0
+                                currentPage ===
+                                  0
                                   ? 'not-allowed'
                                   : 'pointer',
                               transition:
                                 'all 0.15s ease',
                             }}
-                            onMouseEnter={(e) => {
+                            onMouseEnter={(
+                              e
+                            ) => {
                               if (
-                                currentPage !== 0
+                                currentPage !==
+                                0
                               ) {
                                 e.target.style.background =
                                   '#F7F5F1';
+
                                 e.target.style.borderColor =
                                   '#D8D4CA';
                               }
                             }}
-                            onMouseLeave={(e) => {
+                            onMouseLeave={(
+                              e
+                            ) => {
                               if (
-                                currentPage !== 0
+                                currentPage !==
+                                0
                               ) {
                                 e.target.style.background =
                                   '#FFFFFF';
+
                                 e.target.style.borderColor =
                                   '#E4E1D9';
                               }
                             }}
                           >
-                            <ChevronLeft size={12} />
+                            <ChevronLeft
+                              size={12}
+                            />
                           </button>
+
+                          {/* PAGE NUMBERS */}
 
                           <div
                             style={{
-                              display: 'flex',
+                              display:
+                                'flex',
                               gap: 4,
                             }}
                           >
                             {Array.from(
                               {
-                                length: totalPages,
+                                length:
+                                  totalPages,
                               },
                               (_, i) => (
                                 <button
+                                  type="button"
                                   key={i}
                                   onClick={() =>
                                     handleStagePageChange(
@@ -1426,8 +1728,13 @@ export function KanbanPipeline({
                                       i
                                     )
                                   }
+                                  aria-label={`${t.page} ${i + 1
+                                    }`}
+                                  title={`${t.page} ${i + 1
+                                    }`}
                                   style={{
-                                    display: 'flex',
+                                    display:
+                                      'flex',
                                     alignItems:
                                       'center',
                                     justifyContent:
@@ -1436,44 +1743,51 @@ export function KanbanPipeline({
                                     height: 28,
                                     border:
                                       currentPage ===
-                                      i
+                                        i
                                         ? '1px solid #0E7C8C'
                                         : '1px solid #E4E1D9',
                                     borderRadius: 6,
                                     background:
                                       currentPage ===
-                                      i
+                                        i
                                         ? '#0E7C8C'
                                         : '#FFFFFF',
                                     color:
                                       currentPage ===
-                                      i
+                                        i
                                         ? '#FFFFFF'
                                         : '#12151B',
                                     fontSize: 11,
                                     fontWeight: 600,
-                                    cursor: 'pointer',
+                                    cursor:
+                                      'pointer',
                                     transition:
                                       'all 0.15s ease',
                                   }}
-                                  onMouseEnter={(e) => {
+                                  onMouseEnter={(
+                                    e
+                                  ) => {
                                     if (
                                       currentPage !==
                                       i
                                     ) {
                                       e.target.style.background =
                                         '#F7F5F1';
+
                                       e.target.style.borderColor =
                                         '#D8D4CA';
                                     }
                                   }}
-                                  onMouseLeave={(e) => {
+                                  onMouseLeave={(
+                                    e
+                                  ) => {
                                     if (
                                       currentPage !==
                                       i
                                     ) {
                                       e.target.style.background =
                                         '#FFFFFF';
+
                                       e.target.style.borderColor =
                                         '#E4E1D9';
                                     }
@@ -1485,13 +1799,18 @@ export function KanbanPipeline({
                             )}
                           </div>
 
+                          {/* NEXT */}
+
                           <button
+                            type="button"
                             onClick={() =>
                               handleStagePageChange(
                                 stage.id,
                                 Math.min(
-                                  totalPages - 1,
-                                  currentPage + 1
+                                  totalPages -
+                                  1,
+                                  currentPage +
+                                  1
                                 )
                               )
                             }
@@ -1499,58 +1818,75 @@ export function KanbanPipeline({
                               currentPage >=
                               totalPages - 1
                             }
+                            aria-label={
+                              t.nextPage
+                            }
+                            title={
+                              t.nextPage
+                            }
                             style={{
-                              display: 'flex',
-                              alignItems: 'center',
+                              display:
+                                'flex',
+                              alignItems:
+                                'center',
                               gap: 4,
-                              padding: '6px 10px',
+                              padding:
+                                '6px 10px',
                               border:
                                 '1px solid #E4E1D9',
                               borderRadius: 6,
                               background:
                                 currentPage >=
-                                totalPages - 1
+                                  totalPages - 1
                                   ? '#F7F5F1'
                                   : '#FFFFFF',
                               color:
                                 currentPage >=
-                                totalPages - 1
+                                  totalPages - 1
                                   ? '#9B9C9E'
                                   : '#12151B',
                               fontSize: 11,
                               fontWeight: 600,
                               cursor:
                                 currentPage >=
-                                totalPages - 1
+                                  totalPages - 1
                                   ? 'not-allowed'
                                   : 'pointer',
                               transition:
                                 'all 0.15s ease',
                             }}
-                            onMouseEnter={(e) => {
+                            onMouseEnter={(
+                              e
+                            ) => {
                               if (
                                 currentPage <
                                 totalPages - 1
                               ) {
                                 e.target.style.background =
                                   '#F7F5F1';
+
                                 e.target.style.borderColor =
                                   '#D8D4CA';
                               }
                             }}
-                            onMouseLeave={(e) => {
+                            onMouseLeave={(
+                              e
+                            ) => {
                               if (
                                 currentPage <
                                 totalPages - 1
                               ) {
                                 e.target.style.background =
                                   '#FFFFFF';
+
                                 e.target.style.borderColor =
                                   '#E4E1D9';
                               }
                             }}
                           >
-                            <ChevronRight size={12} />
+                            <ChevronRight
+                              size={12}
+                            />
                           </button>
                         </div>
                       )}
