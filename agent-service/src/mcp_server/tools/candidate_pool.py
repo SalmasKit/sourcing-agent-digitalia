@@ -198,7 +198,7 @@ async def rerank_pool(job_query: str, limit: int = 10) -> list[dict[str, Any]]:
             where_clause = " OR ".join(conditions) or "TRUE"
             params.append(limit)
             rows = await conn.fetch(
-                f"""
+                f"""  # nosec B608 — where_clause built from hardcoded column+operator only; values go through parameterized *params
                 SELECT profile_json, 0.75 AS similarity
                 FROM candidate_embeddings
                 WHERE {where_clause}

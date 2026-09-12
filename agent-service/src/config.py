@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     )
 
     # Service
-    app_host: str = "0.0.0.0"
+    app_host: str = "0.0.0.0"  # nosec B104 — required for Docker; restricted by container network/firewall
     app_port: int = 8001
     app_env: str = "development"
     debug: bool = True

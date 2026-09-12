@@ -720,7 +720,7 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
     exp_years = _estimate_experience_years(role, full_text)
 
     unique_key = (url or f"{name}-{role}").encode("utf-8")
-    profile_hash = hashlib.md5(unique_key).hexdigest()[:8]
+    profile_hash = hashlib.md5(unique_key, usedforsecurity=False).hexdigest()[:8]  # nosec B324 — non-security deduplication ID
     unique_id = f"cand-{profile_hash}"
 
     email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", full_text)
