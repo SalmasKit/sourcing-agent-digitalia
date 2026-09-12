@@ -44,7 +44,7 @@ jobs:
           output-file: 'sourcing-agent-project-sbom.cyclonedx.json'
 
       - name: Upload SBOM Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: project-sbom
           path: sourcing-agent-project-sbom.cyclonedx.json
