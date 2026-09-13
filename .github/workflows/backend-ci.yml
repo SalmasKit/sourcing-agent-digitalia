@@ -114,11 +114,11 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build with Maven (needed for sonar.java.binaries)
+      - name: Build and Test with Maven (generate JaCoCo coverage report)
         if: env.SONAR_TOKEN != ''
         run: |
           cd backend-spring
-          mvn -B clean verify -DskipTests
+          mvn -B clean verify
 
       - name: SonarCloud Scan
         if: env.SONAR_TOKEN != ''
