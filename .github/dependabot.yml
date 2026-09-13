@@ -17,6 +17,12 @@ updates:
         versions: ["5.x", "6.x", "7.x"]
       - dependency-name: "actions/cache"
         versions: ["5.x", "6.x"]
+      - dependency-name: "SonarSource/sonarcloud-github-action"
+        versions: ["4.x", "5.x"]
+      - dependency-name: "gitleaks/gitleaks-action"
+        versions: ["3.x"]
+      - dependency-name: "docker/login-action"
+        versions: ["4.x"]
     open-pull-requests-limit: 3
 
   # Maintain dependencies for Maven (Spring Boot backend)
@@ -29,6 +35,8 @@ updates:
       # Pin major version upgrades that require code changes
       - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
         versions: ["4.x"]
+      - dependency-name: "org.flywaydb:flyway-core"
+        versions: ["11.x", "12.x", "13.x"]
 
   # Maintain dependencies for npm (React frontend)
   - package-ecosystem: "npm"
