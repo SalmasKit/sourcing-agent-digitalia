@@ -1,0 +1,11 @@
+[run]
+relative_files = true
+source = src
+omit =
+    tests/*
+    */__pycache__/*
+    .venv/*
+
+[report]
+show_missing = true
+skip_covered = false

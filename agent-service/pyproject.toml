@@ -69,3 +69,11 @@ extraPaths = [".", "src"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.coverage.run]
+relative_files = true
+source = ["src"]
+omit = [
+    "tests/*",
+    "*/__pycache__/*",
+]
