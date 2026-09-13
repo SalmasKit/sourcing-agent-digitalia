@@ -6,23 +6,42 @@ updates:
     schedule:
       interval: "weekly"
     ignore:
-      # Pin actions/setup-java to v4 for stability with SonarCloud
+      # Pin critical GitHub Actions to stable versions
       - dependency-name: "actions/setup-java"
         versions: ["5.x", "6.x"]
+      - dependency-name: "actions/checkout"
+        versions: ["5.x", "6.x", "7.x"]
+      - dependency-name: "actions/setup-python"
+        versions: ["6.x", "7.x"]
+      - dependency-name: "actions/upload-artifact"
+        versions: ["5.x", "6.x", "7.x"]
+      - dependency-name: "actions/cache"
+        versions: ["5.x", "6.x"]
+    open-pull-requests-limit: 3
 
   # Maintain dependencies for Maven (Spring Boot backend)
   - package-ecosystem: "maven"
     directory: "/backend-spring"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
+    ignore:
+      # Pin major version upgrades that require code changes
+      - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
+        versions: ["4.x"]
 
   # Maintain dependencies for npm (React frontend)
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
+    ignore:
+      # Pin major React version upgrades that require code changes
+      - dependency-name: "react"
+        versions: ["19.x"]
+      - dependency-name: "react-dom"
+        versions: ["19.x"]
 
   # Maintain dependencies for Python pip (Agent Service)
   - package-ecosystem: "pip"
