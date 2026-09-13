@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -19,11 +20,11 @@ class JwtServiceTest {
     @BeforeEach
     void setUp() {
         jwtService = new JwtService();
-        // 256-bit secret key encoded in Base64
-        String base64SecretKey = Base64.getEncoder().encodeToString(
-                "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970".getBytes()
-        );
-        ReflectionTestUtils.setField(jwtService, "secretKey", base64SecretKey);
+        byte[] randomKeyBytes = new byte[32];
+        new SecureRandom().nextBytes(randomKeyBytes);
+        String base64Key = Base64.getEncoder().encodeToString(randomKeyBytes);
+
+        ReflectionTestUtils.setField(jwtService, "secretKey", base64Key);
         ReflectionTestUtils.setField(jwtService, "jwtExpiration", 3600000L); // 1 hour
 
         testUser = User.builder()
@@ -69,7 +70,9 @@ class JwtServiceTest {
     @Test
     void validateConfiguration_shouldFailWhenDevSecretUsedInProduction() {
         JwtService service = new JwtService();
-        ReflectionTestUtils.setField(service, "secretKey", "9a4f2c5d6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c");
+        // Sample development key to verify prevention in production
+        String sampleDevKey = "9a4f2c5d6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c";
+        ReflectionTestUtils.setField(service, "secretKey", sampleDevKey);
         org.springframework.mock.env.MockEnvironment env = new org.springframework.mock.env.MockEnvironment();
         env.setActiveProfiles("prod");
         ReflectionTestUtils.setField(service, "environment", env);
@@ -83,4 +86,3 @@ class JwtServiceTest {
         assertDoesNotThrow(() -> jwtService.validateConfiguration());
     }
 }
-
