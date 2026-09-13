@@ -99,7 +99,11 @@ public class MetricsSecurityConfig {
     public SecurityFilterChain metricsSecurityFilterChain(HttpSecurity http, PasswordEncoder passwordEncoder) throws Exception {
         http
                 .securityMatcher("/actuator/prometheus")
-                .csrf(AbstractHttpConfigurer::disable)
+                // CSRF is intentionally disabled: this chain is stateless (no session, no cookies).
+                // Prometheus scraping uses HTTP Basic over a dedicated service account; there is no
+                // browser-initiated session that an attacker could exploit via CSRF. Enabling CSRF here
+                // would break all Prometheus scrape jobs without providing any security benefit.
+                .csrf(AbstractHttpConfigurer::disable) // NOSONAR: stateless Basic-Auth scraper endpoint, no session cookies
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.anyRequest().hasRole("METRICS_SCRAPER"))
                 .httpBasic(withDefaults())

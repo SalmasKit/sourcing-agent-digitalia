@@ -46,7 +46,13 @@ public class SecurityConfig {
                 // This ensures preflight OPTIONS requests from the browser are
                 // processed by our CorsConfigurationSource without requiring a JWT token.
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
-                .csrf(AbstractHttpConfigurer::disable)
+                // CSRF is intentionally disabled: this API is fully stateless (JWT bearer tokens, no
+                // server-side session or session cookies). CSRF attacks require a session cookie to be
+                // silently forwarded by the browser; that vector does not exist here.
+                // All authentication flows use Authorization: Bearer <token> headers, which browsers
+                // never send automatically, making CSRF protection both unnecessary and harmful to
+                // non-browser API clients (mobile apps, Python agent service, etc.).
+                .csrf(AbstractHttpConfigurer::disable) // NOSONAR: stateless JWT API, no session cookies
                 .headers(headers -> headers
                         .contentTypeOptions(org.springframework.security.config.Customizer.withDefaults())
                         .frameOptions(org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig::deny)
