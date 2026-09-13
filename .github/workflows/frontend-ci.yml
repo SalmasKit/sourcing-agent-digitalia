@@ -2,14 +2,24 @@ name: Frontend React CI
 
 on:
   push:
+    branches:
+      - main
+      - develop
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-ci.yml'
   pull_request:
+    branches:
+      - main
+      - develop
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-ci.yml'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:

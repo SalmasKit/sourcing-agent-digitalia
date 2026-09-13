@@ -13,6 +13,8 @@ updates:
         versions: ["5.x", "6.x", "7.x"]
       - dependency-name: "actions/setup-python"
         versions: ["6.x", "7.x"]
+      - dependency-name: "actions/setup-node"
+        versions: ["5.x", "6.x", "7.x"]
       - dependency-name: "actions/upload-artifact"
         versions: ["5.x", "6.x", "7.x"]
       - dependency-name: "actions/cache"
