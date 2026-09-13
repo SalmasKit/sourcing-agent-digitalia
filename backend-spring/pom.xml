@@ -281,8 +281,7 @@
 						<exclude>jdk.*</exclude>
 						<exclude>**/dto/**</exclude>
 						<exclude>**/model/**</exclude>
-						<exclude>**/config/**</exclude>
-					</excludes>
+							</excludes>
 				</configuration>
 				<executions>
 					<execution>
