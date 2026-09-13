@@ -5,6 +5,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Pin actions/setup-java to v4 for stability with SonarCloud
+      - dependency-name: "actions/setup-java"
+        versions: ["5.x", "6.x"]
 
   # Maintain dependencies for Maven (Spring Boot backend)
   - package-ecosystem: "maven"
