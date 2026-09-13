@@ -408,7 +408,7 @@ export function JobDescriptionModal({
   }
 
   const previewVisible = title.trim() || skills.length > 0;
-  const seniorityYears = (seniority || '').match(/\([^)]+\)/)?.[0]?.replace(/[()]/g, '') || '';
+  const seniorityYears = (seniority || '').match(/\([^)]+\)/)?.[0]?.replace(/\(|\)/g, '') || '';
 
   return (
     <div className="jd-overlay">

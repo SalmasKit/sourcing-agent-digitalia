@@ -1160,7 +1160,7 @@ def _build_fallback_criteria(query: str) -> dict:
 
     clean_chunk = re.sub(r"^(?:candidates?|profils?|recherche|seeking|looking for|hiring|we are looking for)\s*(?:for\s+|de\s+|d'\s*|a\s+|an\s+)?", "", query_clean, flags=re.IGNORECASE).strip()
 
-    clean_chunk = re.split(r"[.(,;]|\s+(?:based\s+|basé\s+|in\s+|with\s+|avec\s+)", clean_chunk, flags=re.IGNORECASE)[0].strip()
+    clean_chunk = re.split(r"[.(,;]|\s+(?:based|basé|in|with|avec)\s*", clean_chunk, flags=re.IGNORECASE)[0].strip()
 
     words = [w for w in clean_chunk.split() if w.lower() not in ("a", "an", "the", "for", "in", "at", "to", "senior", "junior", "lead", "mid", "manager")]
 

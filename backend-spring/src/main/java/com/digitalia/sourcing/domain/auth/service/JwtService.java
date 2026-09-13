@@ -29,14 +29,18 @@ public class JwtService {
     // SHA-256 digest of sample development key to forbid in production environments
     private static final String INSECURE_SAMPLE_DIGEST = "438664e1ff7481677e0eccd327d0bc3b734e20d7943c8ff10aaecceb3d17e27f";
 
-    @Value("${app.jwt.secret:}")
-    private String secretKey;
+    private final String secretKey;
+    private final long jwtExpiration;
+    private final Environment environment;
 
-    @Value("${app.jwt.access-token-expiration-ms:900000}")
-    private long jwtExpiration;
-
-    @Autowired(required = false)
-    private Environment environment;
+    public JwtService(
+            @Value("${app.jwt.secret:}") String secretKey,
+            @Value("${app.jwt.access-token-expiration-ms:900000}") long jwtExpiration,
+            @Autowired(required = false) Environment environment) {
+        this.secretKey = secretKey;
+        this.jwtExpiration = jwtExpiration;
+        this.environment = environment;
+    }
 
     @PostConstruct
     public void validateConfiguration() {

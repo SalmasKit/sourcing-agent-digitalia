@@ -441,7 +441,7 @@ def _build_search_query(criteria: dict) -> tuple[str, str, str]:
 
     if not title_clause and clean_title:
         # Strip long sentences or punctuation if present
-        split_result = re.split(r"[.(,;]|\s+(?:based\s+|in\s+)", clean_title, flags=re.IGNORECASE)
+        split_result = re.split(r"[.(,;]|\s+(?:based|in)\s*", clean_title, flags=re.IGNORECASE)
         short_title = split_result[0].strip() if split_result else clean_title.strip()
         title_words = [w for w in short_title.split() if w.lower() not in ("a", "an", "the", "for", "in", "at", "to", "senior", "junior", "lead", "mid", "manager", "head")]
         if title_words:

@@ -3,7 +3,6 @@ package com.digitalia.sourcing.config;
 import com.digitalia.sourcing.domain.auth.service.JwtService;
 import io.netty.channel.ChannelOption;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,17 +18,21 @@ import java.time.Duration;
 @Configuration
 public class AgentClientConfig {
 
-    @Value("${app.agent.url}")
-    private String agentUrl;
+    private final String agentUrl;
+    private final int timeoutMs;
+    private final int connectTimeoutMs;
+    private final JwtService jwtService;
 
-    @Value("${app.agent.timeout-ms}")
-    private int timeoutMs;
-
-    @Value("${app.agent.connect-timeout-ms:5000}")
-    private int connectTimeoutMs;
-
-    @Autowired
-    private JwtService jwtService;
+    public AgentClientConfig(
+            @Value("${app.agent.url}") String agentUrl,
+            @Value("${app.agent.timeout-ms}") int timeoutMs,
+            @Value("${app.agent.connect-timeout-ms:5000}") int connectTimeoutMs,
+            JwtService jwtService) {
+        this.agentUrl = agentUrl;
+        this.timeoutMs = timeoutMs;
+        this.connectTimeoutMs = connectTimeoutMs;
+        this.jwtService = jwtService;
+    }
 
     @Bean
     public WebClient agentWebClient() {

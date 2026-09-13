@@ -746,7 +746,7 @@ export const cancelInvitationApi = async (invitationId) => {
     const saved = JSON.parse(localStorage.getItem('digitalia_mock_invitations') || '[]');
     const updated = saved.filter(inv => inv.id !== invitationId);
     localStorage.setItem('digitalia_mock_invitations', JSON.stringify(updated));
-    return true;
+    return saved.length !== updated.length;
   }
 };
 
@@ -758,7 +758,8 @@ export const updateMemberPrivilegesApi = async (memberId, privileges) => {
     const saved = JSON.parse(localStorage.getItem('digitalia_mock_team_members') || JSON.stringify(DEFAULT_TEAM_MEMBERS));
     const updated = saved.map(m => m.id === memberId ? { ...m, privileges } : m);
     localStorage.setItem('digitalia_mock_team_members', JSON.stringify(updated));
-    return updated.find(m => m.id === memberId);
+    const member = updated.find(m => m.id === memberId);
+    return member || null;
   }
 };
 
@@ -768,9 +769,13 @@ export const toggleMemberStatusApi = async (memberId) => {
     return true;
   } catch (error) {
     const saved = JSON.parse(localStorage.getItem('digitalia_mock_team_members') || JSON.stringify(DEFAULT_TEAM_MEMBERS));
-    const updated = saved.map(m => m.id === memberId ? { ...m, enabled: !m.enabled } : m);
-    localStorage.setItem('digitalia_mock_team_members', JSON.stringify(updated));
-    return true;
+    const member = saved.find(m => m.id === memberId);
+    if (member) {
+      const updated = saved.map(m => m.id === memberId ? { ...m, enabled: !m.enabled } : m);
+      localStorage.setItem('digitalia_mock_team_members', JSON.stringify(updated));
+      return true;
+    }
+    return false;
   }
 };
 
@@ -780,9 +785,10 @@ export const removeTeamMemberApi = async (memberId) => {
     return true;
   } catch (error) {
     const saved = JSON.parse(localStorage.getItem('digitalia_mock_team_members') || JSON.stringify(DEFAULT_TEAM_MEMBERS));
+    const memberExists = saved.some(m => m.id === memberId);
     const updated = saved.filter(m => m.id !== memberId);
     localStorage.setItem('digitalia_mock_team_members', JSON.stringify(updated));
-    return true;
+    return memberExists;
   }
 };
 

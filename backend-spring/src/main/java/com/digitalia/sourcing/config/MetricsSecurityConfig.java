@@ -1,7 +1,6 @@
 package com.digitalia.sourcing.config;
 
 import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -51,8 +50,11 @@ public class MetricsSecurityConfig {
     @Value("${app.metrics.scraper.password}")
     private String scraperPassword;
 
-    @Autowired(required = false)
-    private Environment environment;
+    private final Environment environment;
+
+    public MetricsSecurityConfig(@org.springframework.beans.factory.annotation.Autowired(required = false) Environment environment) {
+        this.environment = environment;
+    }
 
     /**
      * Refuse le démarrage si le mot de passe scraper est vide — tous profils inclus sauf test.

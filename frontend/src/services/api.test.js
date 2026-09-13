@@ -2,6 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   isValidJwt,
   storage,
+  inviteRecruiterApi,
+  cancelInvitationApi,
+  updateMemberPrivilegesApi,
+  toggleMemberStatusApi,
+  removeTeamMemberApi,
 } from './api.js'
 
 describe('API Service', () => {
@@ -158,6 +163,54 @@ describe('API Service', () => {
         const match = text.match(pattern)
         expect(match).toBeNull()
       })
+    })
+  })
+
+  describe('Team Management API (localStorage fallback)', () => {
+    it('should cancel invitation from localStorage', async () => {
+      const invitations = [{ id: 'inv-1', email: 'test@example.com' }]
+      localStorage.setItem('digitalia_mock_invitations', JSON.stringify(invitations))
+
+      const result = await cancelInvitationApi('inv-1')
+      expect(result).toBe(true)
+      const saved = JSON.parse(localStorage.getItem('digitalia_mock_invitations'))
+      expect(saved).toHaveLength(0)
+    })
+
+    it('should update member privileges in localStorage', async () => {
+      const members = [{ id: 'm1', email: 'test@example.com', privileges: ['view'] }]
+      localStorage.setItem('digitalia_mock_team_members', JSON.stringify(members))
+
+      const result = await updateMemberPrivilegesApi('m1', ['view', 'edit'])
+      expect(result.privileges).toEqual(['view', 'edit'])
+    })
+
+    it('should toggle member status in localStorage', async () => {
+      const members = [{ id: 'm1', email: 'test@example.com', enabled: true }]
+      localStorage.setItem('digitalia_mock_team_members', JSON.stringify(members))
+
+      const result = await toggleMemberStatusApi('m1')
+      expect(result).toBe(true)
+      const saved = JSON.parse(localStorage.getItem('digitalia_mock_team_members'))
+      expect(saved[0].enabled).toBe(false)
+    })
+
+    it('should remove team member from localStorage', async () => {
+      const members = [{ id: 'm1', email: 'test@example.com' }]
+      localStorage.setItem('digitalia_mock_team_members', JSON.stringify(members))
+
+      const result = await removeTeamMemberApi('m1')
+      expect(result).toBe(true)
+      const saved = JSON.parse(localStorage.getItem('digitalia_mock_team_members'))
+      expect(saved).toHaveLength(0)
+    })
+
+    it('should return false when removing non-existent member', async () => {
+      const members = [{ id: 'm1', email: 'test@example.com' }]
+      localStorage.setItem('digitalia_mock_team_members', JSON.stringify(members))
+
+      const result = await removeTeamMemberApi('m2')
+      expect(result).toBe(false)
     })
   })
 })

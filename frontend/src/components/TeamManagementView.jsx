@@ -1060,6 +1060,7 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
         >
           <div
             className="jd-modal"
+            role="dialog"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="jd-header">
@@ -1143,9 +1144,16 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
                       className={`jd-step${step === i ? ' active' : ''
                         }${step > i ? ' done' : ''
                         }`}
+                      role="button"
+                      tabIndex={0}
                       onClick={() =>
                         goToStep(i)
                       }
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          goToStep(i);
+                        }
+                      }}
                     >
                       <div className="jd-step-dot">
                         {step > i ? (

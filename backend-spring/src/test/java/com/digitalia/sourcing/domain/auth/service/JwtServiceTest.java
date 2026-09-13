@@ -4,7 +4,6 @@ import com.digitalia.sourcing.domain.auth.model.Role;
 import com.digitalia.sourcing.domain.auth.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -19,13 +18,11 @@ class JwtServiceTest {
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService();
         byte[] randomKeyBytes = new byte[32];
         new SecureRandom().nextBytes(randomKeyBytes);
         String base64Key = Base64.getEncoder().encodeToString(randomKeyBytes);
 
-        ReflectionTestUtils.setField(jwtService, "secretKey", base64Key);
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 3600000L); // 1 hour
+        jwtService = new JwtService(base64Key, 3600000L, null);
 
         testUser = User.builder()
                 .id(UUID.randomUUID())
@@ -62,20 +59,17 @@ class JwtServiceTest {
 
     @Test
     void validateConfiguration_shouldFailWhenSecretBlank() {
-        JwtService service = new JwtService();
-        ReflectionTestUtils.setField(service, "secretKey", "   ");
+        JwtService service = new JwtService("   ", 3600000L, null);
         assertThrows(IllegalStateException.class, service::validateConfiguration);
     }
 
     @Test
     void validateConfiguration_shouldFailWhenDevSecretUsedInProduction() {
-        JwtService service = new JwtService();
         // Sample development key to verify prevention in production
         String sampleDevKey = "9a4f2c5d6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c";
-        ReflectionTestUtils.setField(service, "secretKey", sampleDevKey);
         org.springframework.mock.env.MockEnvironment env = new org.springframework.mock.env.MockEnvironment();
         env.setActiveProfiles("prod");
-        ReflectionTestUtils.setField(service, "environment", env);
+        JwtService service = new JwtService(sampleDevKey, 3600000L, env);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, service::validateConfiguration);
         assertTrue(ex.getMessage().contains("default development JWT secret cannot be used in production"));
