@@ -82,6 +82,7 @@ jobs:
             -Dsonar.organization=salmaskit
             -Dsonar.scm.revision=${{ github.sha }}
             -Dsonar.scm.branch=${{ github.ref_name }}
+            -Dsonar.projectKey=digitalia-sourcing-frontend
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
