@@ -115,9 +115,7 @@ jobs:
       - name: Build, Test & Run SonarCloud Scanner
         run: |
           cd backend-spring
-          mvn -B clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-            -Dsonar.projectKey=digitalia-sourcing-backend \
-            -Dsonar.projectName="Digitalia Sourcing Backend" \
+          mvn -B clean verify -Psonar org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.organization=salmaskit \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.token=${{ secrets.SONAR_TOKEN }}
