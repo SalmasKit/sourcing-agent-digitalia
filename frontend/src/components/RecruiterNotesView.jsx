@@ -46,7 +46,7 @@ export function formatNoteTimestamp(n, isFR = false) {
       ? new Date(n.id)
       : null;
 
-  if (dateObj && !isNaN(dateObj.getTime())) {
+  if (dateObj && !Number.isNaN(dateObj.getTime())) {
     const day = dateObj.toLocaleDateString(isFR ? 'fr-FR' : 'en-US', {
       day: '2-digit',
       month: 'short',
@@ -266,10 +266,10 @@ export function RecruiterNotesView({
         const sortedNotes = matchingNotes
           .map((note, idx) => ({ note, idx })) // idx = original chronological position
           .sort((a, b) => {
-            const aTime = a.note.createdAt ? new Date(a.note.createdAt).getTime() : NaN;
-            const bTime = b.note.createdAt ? new Date(b.note.createdAt).getTime() : NaN;
+            const aTime = a.note.createdAt ? new Date(a.note.createdAt).getTime() : Number.NaN;
+            const bTime = b.note.createdAt ? new Date(b.note.createdAt).getTime() : Number.NaN;
 
-            if (!isNaN(aTime) && !isNaN(bTime)) {
+            if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) {
               return bTime - aTime; // newest createdAt first
             }
 
@@ -1369,7 +1369,7 @@ export function RecruiterNotesView({
             </div>
 
             <div className="rn-stat-label">
-              {isFR ? 'Notes' : 'Notes'}
+              Notes
             </div>
           </div>
 
@@ -1680,7 +1680,6 @@ export function RecruiterNotesView({
                               value={newNoteText}
                               onChange={e => setNewNoteText(e.target.value)}
                               placeholder={isFR ? 'Écrire une note...' : 'Write a note...'}
-                              autoFocus
                             />
                             <div className="rn-new-note-actions">
                               <button

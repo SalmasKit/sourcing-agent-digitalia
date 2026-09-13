@@ -408,7 +408,7 @@ export function JobDescriptionModal({
   }
 
   const previewVisible = title.trim() || skills.length > 0;
-  const seniorityYears = (seniority || '').match(/\((.*?)\)/)?.[1] || '';
+  const seniorityYears = (seniority || '').match(/\([^)]+\)/)?.[0]?.replace(/[()]/g, '') || '';
 
   return (
     <div className="jd-overlay">
@@ -522,7 +522,8 @@ export function JobDescriptionModal({
         <div className="jd-stepper">
           {t.stepLabels.map((label, i) => (
             <React.Fragment key={label}>
-              <div
+              <button
+                type="button"
                 className={`jd-step${step === i ? ' active' : ''}${step > i ? ' done' : ''}`}
                 onClick={() => goToStep(i)}
               >
@@ -530,7 +531,7 @@ export function JobDescriptionModal({
                   {step > i ? <Check size={12} /> : i + 1}
                 </div>
                 <div className="jd-step-label">{label}</div>
-              </div>
+              </button>
               {i < t.stepLabels.length - 1 && (
                 <div className={`jd-step-line${step > i ? ' done' : ''}`} />
               )}
@@ -560,7 +561,7 @@ export function JobDescriptionModal({
                 <div className="jd-pick-grid4">
                   {t.seniorityOpts.map((opt, idx) => {
                     const Icon = SENIORITY_ICONS[idx] || User;
-                    const years = opt.match(/\((.*?)\)/)?.[1] || '';
+                    const years = opt.match(/\([^)]+\)/)?.[0]?.replace(/[()]/g, '') || '';
 
                     return (
                       <button
@@ -568,6 +569,8 @@ export function JobDescriptionModal({
                         key={opt}
                         className={`jd-pick${seniority === opt ? ' active' : ''}`}
                         onClick={() => setSeniority(opt)}
+                        role="button"
+                        tabIndex={0}
                       >
                         <Icon size={16} />
                         <span style={{ fontSize: 10, fontWeight: 600 }}>{t.seniorityShort[idx]}</span>

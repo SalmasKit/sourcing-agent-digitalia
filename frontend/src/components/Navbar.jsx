@@ -125,7 +125,7 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
         .nb-container { max-width:1380px; margin:0 auto; padding:0 20px; }
         .nb-bar { background:#fff; border:1px solid #E4E1D9; border-radius:18px; padding:4px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 2px 10px -4px rgba(18,21,27,0.06); }
 
-        .nb-brand { display:flex; align-items:center; cursor:pointer; transition: transform .15s ease; flex-shrink:0; }
+        .nb-brand { display:flex; align-items:center; cursor:pointer; transition: transform .15s ease; flex-shrink:0; background:none; border:none; padding:0; }
         .nb-brand:hover { transform: scale(1.02); }
         .nb-logo-icon { height:70px; width:auto; object-fit:contain; flex-shrink:0; }
 
@@ -178,9 +178,9 @@ export function Navbar({ activeTab = 'dashboard', setActiveTab = () => { }, onOp
 
       <div className="nb-container">
         <div className="nb-bar">
-          <div className="nb-brand" onClick={() => selectTab('dashboard')}>
+          <button className="nb-brand" onClick={() => selectTab('dashboard')} aria-label="Go to dashboard">
             <img src={targetalentLogo} alt="Targetalent" className="nb-logo-icon" />
-          </div>
+          </button>
 
           <nav className="nb-nav" ref={navRef}>
             <div className="nb-nav-indicator" style={{ left: indicator.left, width: indicator.width }} />

@@ -1050,6 +1050,13 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
         <div
           className="jd-overlay"
           onClick={closeInviteModal}
+          role="button"
+          tabIndex={0}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              closeInviteModal();
+            }
+          }}
         >
           <div
             className="jd-modal"
@@ -1288,7 +1295,8 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
 
                       <div className="tm-role-selector">
                         {/* RECRUITER */}
-                        <div
+                        <button
+                          type="button"
                           className={`tm-role-card ${inviteRole ===
                             'RECRUITER'
                             ? 'tm-role-card-selected'
@@ -1317,19 +1325,19 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
                                   ? 'Recruteur'
                                   : 'Recruiter'}
                               </span>
-                            </div>
 
-                            <div
-                              className={`tm-role-check ${inviteRole ===
-                                'RECRUITER'
-                                ? 'tm-role-check-active'
-                                : ''
-                                }`}
-                            >
-                              {inviteRole ===
-                                'RECRUITER' && (
-                                  <Check size={11} />
-                                )}
+                              <div
+                                className={`tm-role-check ${inviteRole ===
+                                  'RECRUITER'
+                                  ? 'tm-role-check-active'
+                                  : ''
+                                  }`}
+                              >
+                                {inviteRole ===
+                                  'RECRUITER' && (
+                                    <Check size={11} />
+                                  )}
+                              </div>
                             </div>
                           </div>
 
@@ -1338,10 +1346,11 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
                               ? 'Sourcing IA, évaluation des profils, notes et gestion du pipeline de recrutement.'
                               : 'AI sourcing scans, candidate evaluations, notes, and pipeline management.'}
                           </div>
-                        </div>
+                        </button>
 
                         {/* HR ADMIN */}
-                        <div
+                        <button
+                          type="button"
                           className={`tm-role-card ${inviteRole ===
                             'HR_ADMIN'
                             ? 'tm-role-card-selected'
@@ -1370,19 +1379,19 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
                                   ? 'Admin RH (Co-Admin)'
                                   : 'HR Admin (Co-Admin)'}
                               </span>
-                            </div>
 
-                            <div
-                              className={`tm-role-check ${inviteRole ===
-                                'HR_ADMIN'
-                                ? 'tm-role-check-active'
-                                : ''
-                                }`}
-                            >
-                              {inviteRole ===
-                                'HR_ADMIN' && (
-                                  <Check size={11} />
-                                )}
+                              <div
+                                className={`tm-role-check ${inviteRole ===
+                                  'HR_ADMIN'
+                                  ? 'tm-role-check-active'
+                                  : ''
+                                  }`}
+                              >
+                                {inviteRole ===
+                                  'HR_ADMIN' && (
+                                    <Check size={11} />
+                                  )}
+                              </div>
                             </div>
                           </div>
 
@@ -1391,7 +1400,7 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
                               ? 'Gestion de l’équipe, invitations, attribution des droits et supervision complète de l’espace.'
                               : 'Team management, co-admin permissions, invites, and full workspace oversight.'}
                           </div>
-                        </div>
+                        </button>
                       </div>
                     </div>
 
@@ -1422,7 +1431,6 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
                             ? 'ex. collegue@entreprise.com'
                             : 'e.g. colleague@example.com'
                         }
-                        autoFocus
                       />
 
                       {emailErr && (
@@ -1484,7 +1492,8 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
                           const Icon = def.icon;
 
                           return (
-                            <div
+                            <button
+                              type="button"
                               key={def.id}
                               className={`tm-priv-option ${isSelected
                                 ? 'tm-priv-option-selected'
@@ -1519,7 +1528,7 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
                                     : def.descEN}
                                 </div>
                               </div>
-                            </div>
+                            </button>
                           );
                         }
                       )}

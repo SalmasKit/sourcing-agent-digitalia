@@ -297,7 +297,7 @@ export const logoutApi = async () => {
 };
 
 function parseExperienceYears(val, headline = '', summary = '') {
-  if (typeof val === 'number' && !isNaN(val) && val >= 0) return val;
+  if (typeof val === 'number' && !Number.isNaN(val) && val >= 0) return val;
   const text = `${headline} ${summary}`.toLowerCase();
   if (text.includes('intern') || text.includes('stagiaire') || text.includes('stage') || text.includes('student') || text.includes('etudiant')) {
     return 0;
@@ -311,8 +311,10 @@ function parseExperienceYears(val, headline = '', summary = '') {
   if (text.includes('lead') || text.includes('principal') || text.includes('architect') || text.includes('manager')) {
     return 8;
   }
-  const match = text.match(/(\d+)\+?\s*(years?|yrs?|ans)/i);
-  if (match) return parseInt(match[1], 10);
+  const match = text.match(/\d+/);
+  if (match && (text.includes('year') || text.includes('yr') || text.includes('an'))) {
+    return Number.parseInt(match[0], 10);
+  }
   return 3;
 }
 
@@ -330,7 +332,7 @@ async function searchTalentPoolApi(searchQuery, filters = {}) {
       const uniqueId = p.id && !p.id.startsWith('serpapi-')
         ? p.id
         : `cand-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Math.abs(name.split('').reduce((a, c) => a + c.charCodeAt(0), 0))}`;
-      const exp = typeof p.experience_years === 'number' && !isNaN(p.experience_years)
+      const exp = typeof p.experience_years === 'number' && !Number.isNaN(p.experience_years)
         ? p.experience_years
         : parseExperienceYears(p.experience_years, p.headline, p.summary);
       const candEmail = (p.email && !p.email.endsWith('@talent-candidate.ma'))
@@ -419,16 +421,16 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
   try {
     let limit = Number(filters.maxResults || filters.limit);
     // Only fall back to regex extraction when maxResults was NOT explicitly provided
-    if (!limit || isNaN(limit)) {
-      const countMatch = fullPrompt.match(/\b(?:top|find|source|get|first)?\s*(\d{1,2})\s*(?:candidates?|profils?|profiles?|développeurs?|developpeurs?|engineers?|candidats?)\b/i);
+    if (!limit || Number.isNaN(limit)) {
+      const countMatch = fullPrompt.match(/\b\d{1,2}\s*(?:candidates?|profils?|profiles?|développeurs?|developpeurs?|engineers?|candidats?)\b/i);
       if (countMatch) {
-        const extracted = parseInt(countMatch[1], 10);
+        const extracted = Number.parseInt(countMatch[1], 10);
         if (extracted >= 1 && extracted <= 50) {
           limit = extracted;
         }
       }
     }
-    if (!limit || isNaN(limit)) {
+    if (!limit || Number.isNaN(limit)) {
       limit = 10;
     }
 
