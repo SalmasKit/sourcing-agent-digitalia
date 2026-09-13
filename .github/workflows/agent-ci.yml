@@ -87,6 +87,10 @@ jobs:
         uses: SonarSource/sonarcloud-github-action@v3.1.0
         with:
           projectBaseDir: agent-service
+          args: >
+            -Dsonar.organization=salmaskit
+            -Dsonar.scm.revision=${{ github.sha }}
+            -Dsonar.scm.branch=${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
