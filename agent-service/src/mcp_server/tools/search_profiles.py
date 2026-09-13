@@ -100,7 +100,7 @@ def _parse_json_from_llm(raw: str) -> Any:
     except Exception:
         pass
 
-    fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
+    fence = re.search(r"```(?:json)?\n?([\s\S]*?)```", cleaned)
     if fence:
         try:
             return json.loads(fence.group(1).strip())
@@ -441,7 +441,7 @@ def _build_search_query(criteria: dict) -> tuple[str, str, str]:
 
     if not title_clause and clean_title:
         # Strip long sentences or punctuation if present
-        split_result = re.split(r"[\.\(\,\;]|\s+based\s+|\s+in\s+", clean_title, flags=re.IGNORECASE)
+        split_result = re.split(r"[.(,;]|\s+(?:based\s+|in\s+)", clean_title, flags=re.IGNORECASE)
         short_title = split_result[0].strip() if split_result else clean_title.strip()
         title_words = [w for w in short_title.split() if w.lower() not in ("a", "an", "the", "for", "in", "at", "to", "senior", "junior", "lead", "mid", "manager", "head")]
         if title_words:
@@ -586,7 +586,7 @@ async def _serpapi_search(criteria: dict, limit: int = 10, offset: int = 0) -> l
 
 def _estimate_experience_years(headline: str, snippet: str) -> int:
     text = f"{headline} {snippet}".lower()
-    match = re.search(r"(\d+)\+?\s*(years?|yrs?|ans)", text)
+    match = re.search(r"\b(\d{1,2})\+?\s*(?:y(?:ea)?rs?|ans)\b", text)
     if match:
         try:
             return int(match.group(1))
@@ -723,7 +723,7 @@ def _parse_serpapi_result(idx: int, result: dict, criteria: dict, requested_loca
     profile_hash = hashlib.md5(unique_key, usedforsecurity=False).hexdigest()[:8]  # non-security deduplication ID
     unique_id = f"cand-{profile_hash}"
 
-    email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", full_text)
+    email_match = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b", full_text)
     if email_match:
         cand_email = email_match.group(0)
         email_is_verified = True

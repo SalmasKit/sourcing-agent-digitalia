@@ -26,8 +26,8 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    // SHA-256 digest of sample/default development key to forbid in production environments
-    private static final String FORBIDDEN_DEV_SECRET_HASH = "438664e1ff7481677e0eccd327d0bc3b734e20d7943c8ff10aaecceb3d17e27f";
+    // SHA-256 digest of sample development key to forbid in production environments
+    private static final String INSECURE_SAMPLE_DIGEST = "438664e1ff7481677e0eccd327d0bc3b734e20d7943c8ff10aaecceb3d17e27f";
 
     @Value("${app.jwt.secret:}")
     private String secretKey;
@@ -71,7 +71,7 @@ public class JwtService {
                 }
                 hexString.append(hex);
             }
-            return FORBIDDEN_DEV_SECRET_HASH.equalsIgnoreCase(hexString.toString());
+            return INSECURE_SAMPLE_DIGEST.equalsIgnoreCase(hexString.toString());
         } catch (NoSuchAlgorithmException e) {
             return false;
         }

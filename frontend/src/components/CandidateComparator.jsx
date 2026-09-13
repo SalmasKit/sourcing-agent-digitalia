@@ -1084,9 +1084,7 @@ export function CandidateComparator({
 
                     {sharedSkills.size > 0 && (
                       <div className="cp-skills-count">
-                        {isFrench
-                          ? `${shared.length} ${text.sharedSkills}`
-                          : `${shared.length} ${text.sharedSkills}`}
+                        {`${shared.length} ${text.sharedSkills}`}
                       </div>
                     )}
 

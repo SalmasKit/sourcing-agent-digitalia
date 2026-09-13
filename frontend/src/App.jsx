@@ -17,6 +17,8 @@ import SearchMergeModal from './components/SearchMergeModal';
 import AuthPage from './components/AuthPage';
 import { searchCandidatesApi, getTeamActivitiesApi, logActivityApi } from './services/api';
 import { Sparkles } from 'lucide-react';
+ 
+const DEFAULT_JOB_OPTIONS = Object.freeze({ autoSource: true });
 
 function getEmptyWorkspaceState() {
   return {
@@ -538,7 +540,7 @@ function DashboardContent() {
     }
   };
 
-  const handleCreateJob = async (newJob, options = { autoSource: true }) => {
+  const handleCreateJob = async (newJob, options = DEFAULT_JOB_OPTIONS) => {
     if (!hasPrivilege('create_roles')) {
       await showAlert({
         title: lang === 'FR' ? 'Action restreinte' : 'Action Restricted',

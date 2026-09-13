@@ -118,10 +118,11 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
             {!isLogin && (
               <>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                  <label htmlFor="auth-modal-name" className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
                   <div className="relative">
                     <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                     <input
+                      id="auth-modal-name"
                       type="text"
                       required
                       value={name}
@@ -133,8 +134,9 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Account Role</label>
+                  <label htmlFor="auth-modal-role" className="block text-xs font-semibold text-slate-700 mb-1">Account Role</label>
                   <select
+                    id="auth-modal-role"
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-600"
@@ -147,10 +149,11 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Corporate Email</label>
+              <label htmlFor="auth-modal-email" className="block text-xs font-semibold text-slate-700 mb-1">Corporate Email</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
+                  id="auth-modal-email"
                   type="email"
                   required
                   value={email}
@@ -163,7 +166,7 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
 
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-xs font-semibold text-slate-700">Password</label>
+                <label htmlFor="auth-modal-password" className="block text-xs font-semibold text-slate-700">Password</label>
                 {isLogin && (
                   <button
                     type="button"
@@ -177,6 +180,7 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
+                  id="auth-modal-password"
                   type="password"
                   required
                   value={password}

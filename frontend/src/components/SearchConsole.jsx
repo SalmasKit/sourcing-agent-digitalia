@@ -438,11 +438,11 @@ const SearchConsole = ({
     }
 
     const current = [...selectedTech]
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .join("|");
 
     const defaults = [...defaultSkills]
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .join("|");
 
     if (current !== defaults) {

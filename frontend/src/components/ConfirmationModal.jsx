@@ -83,6 +83,8 @@ export default function ConfirmationModal({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
+        role="presentation"
+        aria-hidden="true"
         className="fixed inset-0 bg-[#12151B]/40 backdrop-blur-sm transition-opacity animate-fadeIn"
         onClick={onCancel}
       />

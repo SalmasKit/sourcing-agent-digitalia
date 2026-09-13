@@ -147,7 +147,15 @@ export function ChangePasswordModal({
   const strInfo = getStrengthLabel();
 
   return (
-    <div className="cpm-overlay" onClick={onClose}>
+    <div
+      className="cpm-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <style>{`
         .cpm-overlay {
           position: fixed;
@@ -701,7 +709,8 @@ export function ChangePasswordModal({
 
       <div
         className="cpm-card"
-        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
       >
         <div className="cpm-head">
           <div className="cpm-title-box">

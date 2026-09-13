@@ -751,7 +751,7 @@ export function ActivityLogPanel({
                 handleFilterChange('NOTES')
               }
             >
-              {isFR ? 'Notes' : 'Notes'}
+              Notes
             </button>
 
             <button

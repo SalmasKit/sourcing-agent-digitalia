@@ -766,8 +766,9 @@ export function DashboardView({
     onSelectJob?.(id);
   }
 
-  function handleRangeClick() {
-    return;
+  function handleRangeClick(rangeKey) {
+    if (!rangeKey) return;
+    setSelectedRange((current) => (current === rangeKey ? null : rangeKey));
   }
 
   function clearFilters() {

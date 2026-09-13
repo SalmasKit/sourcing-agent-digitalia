@@ -3,7 +3,7 @@
 useDefault = true
 
 [allowlist]
-description = "Global allowlist for dummy/test secrets"
+description = "Global allowlist for dummy/test secrets and digests"
 paths = [
     '''\.env\.example$''',
     '''backend-spring/src/test/.*''',
@@ -13,5 +13,7 @@ paths = [
 regexes = [
     '''sqa_[a-f0-9]{40}''', # Sonar local demo token
     '''sourcing_password''',
-    '''postgres:5432'''
+    '''postgres:5432''',
+    '''438664e1ff7481677e0eccd327d0bc3b734e20d7943c8ff10aaecceb3d17e27f'''
 ]
+

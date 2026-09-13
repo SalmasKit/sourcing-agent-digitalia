@@ -94,9 +94,7 @@ export default function CandidateGridView({
       ? 'Suivant'
       : 'Next',
 
-    sortScore: isFrench
-      ? 'Score'
-      : 'Score',
+    sortScore: 'Score',
 
     defaultSort: isFrench
       ? 'Ordre par défaut'

@@ -82,7 +82,15 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
   };
 
   return (
-    <div className="fpm-overlay" onClick={handleClose}>
+    <div
+      className="fpm-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          handleClose();
+        }
+      }}
+    >
       <style>{`
         .fpm-overlay {
           position: fixed; inset: 0; background: rgba(18,21,27,0.7);
@@ -184,7 +192,7 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
         .fpm-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
       `}</style>
 
-      <div className="fpm-card" onClick={e => e.stopPropagation()}>
+      <div className="fpm-card" role="dialog" aria-modal="true">
         <div className="fpm-head">
           <div className="fpm-title-box">
             <div className="fpm-icon"><KeyRound size={18} /></div>

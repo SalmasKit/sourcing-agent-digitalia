@@ -25,7 +25,7 @@ jobs:
 
       - name: Run Checkov IaC Security Scanner
         run: |
-          pip install --no-cache-dir checkov==3.2.378 --quiet
+          pip install --no-cache-dir --only-binary :all: checkov==3.2.378 --quiet
           checkov -d . --framework dockerfile --soft-fail --compact
 
 
@@ -62,4 +62,3 @@ jobs:
       - name: Verify Cosign Installation
         run: |
           cosign version
-

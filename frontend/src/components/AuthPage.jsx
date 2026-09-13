@@ -451,8 +451,17 @@ function InteractiveAppTutorial({ lang, onOpenAuth }) {
                     return (
                       <div
                         key={st}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
                         className={`dg-kanban-col ${isSelected ? 'selected' : ''}`}
                         onClick={() => setInteractiveKanbanStage(st)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setInteractiveKanbanStage(st);
+                          }
+                        }}
                       >
                         <div className="dg-kanban-col-head">
                           <span>{st}</span>
@@ -555,8 +564,12 @@ function GuidedTourModal({ isOpen, onClose, lang, onOpenAuth }) {
   const currentStep = t.tutorialSteps[slide];
 
   return (
-    <div className="dg-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="dg-tour-modal-card">
+    <div
+      className="dg-modal-overlay"
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="dg-tour-modal-card" role="dialog" aria-modal="true">
         <button type="button" className="dg-modal-close" onClick={onClose} aria-label="Close">
           <X size={16} />
         </button>
@@ -579,13 +592,15 @@ function GuidedTourModal({ isOpen, onClose, lang, onOpenAuth }) {
 
           <div className="dg-tour-stepper">
             {t.tutorialSteps.map((s, idx) => (
-              <div
+              <button
+                type="button"
                 key={s.id}
+                aria-label={`Step ${s.step}: ${s.title}`}
                 className={`dg-tour-step-dot ${idx === slide ? 'active' : ''} ${idx < slide ? 'completed' : ''}`}
                 onClick={() => setSlide(idx)}
               >
                 <span>{s.step}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -1336,8 +1351,12 @@ export default function AuthPage({ onAccepted, onClearInvite }) {
 
       {/* Auth Modal */}
       {isAuthModalOpen && (
-        <div className="dg-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeAuth(); }}>
-          <div className="dg-modal-card">
+        <div
+          className="dg-modal-overlay"
+          role="presentation"
+          onClick={(e) => { if (e.target === e.currentTarget) closeAuth(); }}
+        >
+          <div className="dg-modal-card" role="dialog" aria-modal="true">
             <button type="button" className="dg-modal-close" onClick={closeAuth} aria-label="Close">
               <X size={16} />
             </button>

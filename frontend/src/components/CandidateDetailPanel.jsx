@@ -552,6 +552,7 @@ export default function CandidateDetailPanel({
 
   return (
     <div
+      role="presentation"
       className={`cdp-overlay cdp-overlay-${resolvedSide}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
