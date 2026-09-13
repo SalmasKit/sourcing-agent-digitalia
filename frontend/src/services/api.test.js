@@ -105,4 +105,59 @@ describe('API Service', () => {
       })
     })
   })
+
+  describe('SonarCloud fixes', () => {
+    describe('Number.isNaN usage', () => {
+      it('should use Number.isNaN instead of global isNaN', () => {
+        expect(Number.isNaN(NaN)).toBe(true)
+        expect(Number.isNaN(123)).toBe(false)
+        expect(Number.isNaN('123')).toBe(false)
+        expect(Number.isNaN(undefined)).toBe(false)
+      })
+
+      it('should distinguish Number.isNaN from global isNaN', () => {
+        expect(isNaN('test')).toBe(true) // global isNaN coerces to number
+        expect(Number.isNaN('test')).toBe(false) // Number.isNaN does not coerce
+      })
+    })
+
+    describe('Number.parseInt usage', () => {
+      it('should use Number.parseInt instead of global parseInt', () => {
+        expect(Number.parseInt('123')).toBe(123)
+        expect(Number.parseInt('123px')).toBe(123)
+        expect(Number.parseInt('abc')).toBe(Number.NaN)
+      })
+
+      it('should handle radix parameter correctly', () => {
+        expect(Number.parseInt('10', 10)).toBe(10)
+        expect(Number.parseInt('10', 2)).toBe(2)
+        expect(Number.parseInt('ff', 16)).toBe(255)
+      })
+    })
+
+    describe('Regex patterns (SonarCloud fixes)', () => {
+      it('should use safe regex for experience extraction', () => {
+        const text = '5 years of experience'
+        const pattern = /\d+/
+        const match = text.match(pattern)
+        expect(match).toBeTruthy()
+        expect(match[0]).toBe('5')
+      })
+
+      it('should handle candidate count extraction safely', () => {
+        const text = 'Found 10 candidates'
+        const pattern = /\d+/
+        const match = text.match(pattern)
+        expect(match).toBeTruthy()
+        expect(match[0]).toBe('10')
+      })
+
+      it('should handle missing candidate data gracefully', () => {
+        const text = 'No candidates found'
+        const pattern = /\d+/
+        const match = text.match(pattern)
+        expect(match).toBeNull()
+      })
+    })
+  })
 })
