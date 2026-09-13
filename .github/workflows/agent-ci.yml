@@ -67,19 +67,16 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - name: Checkout repository
-        if: env.SONAR_TOKEN != ''
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        if: env.SONAR_TOKEN != ''
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install dependencies & generate coverage
-        if: env.SONAR_TOKEN != ''
         run: |
           cd agent-service
           python -m pip install --upgrade --no-cache-dir --only-binary :all: pip==24.3.1
@@ -87,7 +84,6 @@ jobs:
           pytest --cov=src --cov-report=xml --cov-report=term
 
       - name: SonarCloud Scan
-        if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarcloud-github-action@v3.1.0
         with:
           projectBaseDir: agent-service

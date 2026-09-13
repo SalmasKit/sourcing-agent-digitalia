@@ -101,13 +101,11 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - name: Checkout repository
-        if: env.SONAR_TOKEN != ''
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up JDK 21
-        if: env.SONAR_TOKEN != ''
         uses: actions/setup-java@v4
         with:
           java-version: '21'
@@ -115,7 +113,6 @@ jobs:
           cache: maven
 
       - name: Build, Test & Run SonarCloud Scanner
-        if: env.SONAR_TOKEN != ''
         run: |
           cd backend-spring
           mvn -B clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
