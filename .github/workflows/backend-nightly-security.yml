@@ -10,7 +10,7 @@ jobs:
     name: OWASP Dependency-Check Deep Scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache OWASP Dependency-Check database
         uses: actions/cache@v4
