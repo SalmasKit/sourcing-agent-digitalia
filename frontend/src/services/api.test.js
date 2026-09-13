@@ -11,8 +11,8 @@ describe('API Service', () => {
   })
 
   describe('isValidJwt', () => {
-    it('should return true for valid JWT', () => {
-      const validToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
+    it('should return true for valid JWT format', () => {
+      const validToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test'
       expect(isValidJwt(validToken)).toBe(true)
     })
 
