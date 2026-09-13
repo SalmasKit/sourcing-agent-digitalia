@@ -20,7 +20,7 @@ jobs:
           restore-keys: |
             owasp-nvd-data-${{ runner.os }}-
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           java-version: '21'
           distribution: 'temurin'
