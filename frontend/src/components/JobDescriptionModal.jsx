@@ -561,7 +561,10 @@ export function JobDescriptionModal({
                 <div className="jd-pick-grid4">
                   {t.seniorityOpts.map((opt, idx) => {
                     const Icon = SENIORITY_ICONS[idx] || User;
-                    const years = opt.match(/\([^)]+\)/)?.[0]?.replace(/[()]/g, '') || '';
+                    const parenIndex = opt.indexOf('(');
+                    const years = parenIndex !== -1 
+                      ? opt.substring(parenIndex + 1, opt.indexOf(')', parenIndex))
+                      : '';
 
                     return (
                       <button
