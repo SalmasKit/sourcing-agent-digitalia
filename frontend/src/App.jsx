@@ -20,7 +20,7 @@ import { Sparkles } from 'lucide-react';
  
 const DEFAULT_JOB_OPTIONS = Object.freeze({ autoSource: true });
 
-function getEmptyWorkspaceState() {
+export function getEmptyWorkspaceState() {
   return {
     jobDescriptions: [],
     savedRoleCandidates: {},
@@ -31,7 +31,7 @@ function getEmptyWorkspaceState() {
   };
 }
 
-function loadInitialWorkspaceData(teamKey, userKey) {
+export function loadInitialWorkspaceData(teamKey, userKey) {
   // Try team key first, fallback to user key migration if available
   const getVal = (suffix) => {
     const teamVal = localStorage.getItem(`targetalent_team_${teamKey}_${suffix}`) || localStorage.getItem(`digitalia_team_${teamKey}_${suffix}`);
@@ -55,7 +55,7 @@ function loadInitialWorkspaceData(teamKey, userKey) {
   };
 }
 
-function mergeCandidateResults(existingList = [], newResults = []) {
+export function mergeCandidateResults(existingList = [], newResults = []) {
   const existingMap = new Map();
   const existingNameMap = new Map();
 
@@ -129,7 +129,7 @@ function mergeCandidateResults(existingList = [], newResults = []) {
   return merged;
 }
 
-function tagFreshResults(results = []) {
+export function tagFreshResults(results = []) {
   return results.map((c) => ({
     ...c,
     isNew: true,

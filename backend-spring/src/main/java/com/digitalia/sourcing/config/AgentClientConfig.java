@@ -36,6 +36,7 @@ public class AgentClientConfig {
 
     @Bean
     public WebClient agentWebClient() {
+        @SuppressWarnings("null")
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMs)
                 .responseTimeout(Duration.ofMillis(timeoutMs));
@@ -54,6 +55,7 @@ public class AgentClientConfig {
         return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
             try {
                 String token = jwtService.generateSystemToken();
+                @SuppressWarnings("null")
                 org.springframework.web.reactive.function.client.ClientRequest authorizedRequest =
                         org.springframework.web.reactive.function.client.ClientRequest.from(clientRequest)
                                 .header("Authorization", "Bearer " + token)
