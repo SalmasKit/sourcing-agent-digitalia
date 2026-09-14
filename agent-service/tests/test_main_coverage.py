@@ -32,7 +32,15 @@ class TestMainConfiguration:
         if app is None:
             pytest.skip("App not importable in test environment")
         # Check if health endpoint is registered
-        routes = [route.path for route in app.routes]
+        routes = []
+        for route in app.routes:
+            if hasattr(route, 'path'):
+                routes.append(route.path)
+            elif hasattr(route, 'routes'):
+                # Handle included routers
+                for r in route.routes:
+                    if hasattr(r, 'path'):
+                        routes.append(r.path)
         assert "/health" in routes or "/actuator/health" in routes
 
 
@@ -110,7 +118,15 @@ class TestRoutesRegistration:
         """Test API routes are registered."""
         if app is None:
             pytest.skip("App not importable in test environment")
-        routes = [route.path for route in app.routes]
+        routes = []
+        for route in app.routes:
+            if hasattr(route, 'path'):
+                routes.append(route.path)
+            elif hasattr(route, 'routes'):
+                # Handle included routers
+                for r in route.routes:
+                    if hasattr(r, 'path'):
+                        routes.append(r.path)
         
         # Check for common API routes
         api_routes = [r for r in routes if r.startswith("/api")]
@@ -120,7 +136,15 @@ class TestRoutesRegistration:
         """Test MCP routes are registered."""
         if app is None:
             pytest.skip("App not importable in test environment")
-        routes = [route.path for route in app.routes]
+        routes = []
+        for route in app.routes:
+            if hasattr(route, 'path'):
+                routes.append(route.path)
+            elif hasattr(route, 'routes'):
+                # Handle included routers
+                for r in route.routes:
+                    if hasattr(r, 'path'):
+                        routes.append(r.path)
         
         # Check for MCP routes
         mcp_routes = [r for r in routes if "mcp" in r.lower()]
@@ -190,7 +214,15 @@ class TestMetricsConfiguration:
         if app is None:
             pytest.skip("App not importable in test environment")
         # Check if metrics endpoint is available
-        routes = [route.path for route in app.routes]
+        routes = []
+        for route in app.routes:
+            if hasattr(route, 'path'):
+                routes.append(route.path)
+            elif hasattr(route, 'routes'):
+                # Handle included routers
+                for r in route.routes:
+                    if hasattr(r, 'path'):
+                        routes.append(r.path)
         metrics_routes = [r for r in routes if "metrics" in r.lower() or "prometheus" in r.lower()]
         # Metrics might be optional
         assert True
