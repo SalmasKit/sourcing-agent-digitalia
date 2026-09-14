@@ -10,14 +10,14 @@ const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 // ─────────────────────────────────────────────
 // Storage helpers
 // ─────────────────────────────────────────────
-const TOKEN_KEY   = 'digitalia_auth_token';
+const TOKEN_KEY = 'digitalia_auth_token';
 const REFRESH_KEY = 'digitalia_refresh_token';
-const USER_KEY    = 'digitalia_auth_user';
+const USER_KEY = 'digitalia_auth_user';
 
 export const isValidJwt = (token) => typeof token === 'string' && token.split('.').length === 3;
 
 export const storage = {
-  getAccessToken:  () => {
+  getAccessToken: () => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) return null;
     if (!DEMO_MODE && !isValidJwt(token)) {
@@ -29,7 +29,7 @@ export const storage = {
     return token;
   },
   getRefreshToken: () => localStorage.getItem(REFRESH_KEY),
-  getUser:         () => {
+  getUser: () => {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
       if (!DEMO_MODE && (!token || !isValidJwt(token))) {
@@ -41,9 +41,9 @@ export const storage = {
     }
   },
   setSession: (accessToken, refreshToken, user) => {
-    localStorage.setItem(TOKEN_KEY,   accessToken);
+    localStorage.setItem(TOKEN_KEY, accessToken);
     localStorage.setItem(REFRESH_KEY, refreshToken);
-    localStorage.setItem(USER_KEY,    JSON.stringify(user));
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
   },
   clearSession: () => {
     localStorage.removeItem(TOKEN_KEY);
@@ -158,7 +158,7 @@ apiClient.interceptors.response.use(
         storage.setSession(accessToken, newRefreshToken, user);
 
         apiClient.defaults.headers['Authorization'] = `Bearer ${accessToken}`;
-        originalRequest.headers['Authorization']    = `Bearer ${accessToken}`;
+        originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
 
         processPendingQueue(null, accessToken);
         return apiClient(originalRequest);
@@ -219,12 +219,12 @@ export const loginApi = async (email, password) => {
       console.warn('[DEMO_MODE] Backend login unavailable, falling back to local session:', error.message);
       const mockToken = 'mock_token_' + Date.now();
       const detectedRole = (email.toLowerCase().includes('admin') || email.toLowerCase().includes('hr')) ? 'HR_ADMIN' : 'RECRUITER';
-      
+
       // Look up if this user exists in mock team storage to keep privileges
       const mockTeam = JSON.parse(localStorage.getItem('digitalia_mock_team_members') || '[]');
       const existingMember = mockTeam.find(m => m.email.toLowerCase() === email.toLowerCase());
       const role = existingMember?.role || detectedRole;
-      
+
       const mockUser = {
         id: existingMember?.id || ('usr-' + Date.now()),
         email: email,
@@ -445,7 +445,7 @@ export const searchCandidatesApi = async (searchQuery, filters = {}) => {
     const profiles = rawProfiles.slice(0, limit);
 
     // Notify Spring Boot backend in background to record search request
-    apiClient.post('/searches', { rawDescription: fullPrompt }).catch(() => {});
+    apiClient.post('/searches', { rawDescription: fullPrompt }).catch(() => { });
 
     if (profiles.length > 0) {
       return profiles.map(p => {
@@ -691,7 +691,7 @@ export const getTeamMembersApi = async () => {
   } catch (error) {
     const saved = localStorage.getItem('digitalia_mock_team_members');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try { return JSON.parse(saved); } catch (e) { }
     }
     return [];
   }
@@ -805,7 +805,7 @@ export const getTeamActivitiesApi = async (limit = 30) => {
   } catch (error) {
     const saved = localStorage.getItem('digitalia_shared_team_activities');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try { return JSON.parse(saved); } catch (e) { }
     }
     return [];
   }
