@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
-import { LanguageProvider, useLanguage } from './LanguageContext.jsx'
+import { LanguageProvider, useLanguage } from '../context/LanguageContext.jsx'
 import { translations } from '../locales/index.js'
 
 // Mock translations

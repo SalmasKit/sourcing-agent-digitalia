@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { useLanguage } from '../context/LanguageContext'
-import AgentStatusWidget from './AgentStatusWidget'
+import AgentStatusWidget from '../components/AgentStatusWidget.jsx'
 
 // Mock LanguageContext
 vi.mock('../context/LanguageContext', () => ({

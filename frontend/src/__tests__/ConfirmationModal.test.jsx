@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useLanguage } from '../context/LanguageContext'
-import ConfirmationModal from './ConfirmationModal'
+import ConfirmationModal from '../components/ConfirmationModal'
 
 // Mock LanguageContext
 vi.mock('../context/LanguageContext', () => ({

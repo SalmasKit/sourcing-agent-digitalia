@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { Navbar } from './Navbar.jsx'
+import { Navbar } from '../components/Navbar.jsx'
 
 // Mock the contexts
 const mockLogout = vi.fn()
@@ -28,7 +28,7 @@ vi.mock('../context/ConfirmDialogContext', () => ({
   })
 }))
 
-vi.mock('./ChangePasswordModal', () => ({
+vi.mock('../components/ChangePasswordModal', () => ({
   ChangePasswordModal: ({ isOpen, onClose }) => isOpen ? <div data-testid="password-modal">Password Modal</div> : null
 }))
 

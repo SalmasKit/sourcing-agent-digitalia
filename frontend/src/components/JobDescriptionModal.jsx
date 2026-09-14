@@ -408,7 +408,14 @@ export function JobDescriptionModal({
   }
 
   const previewVisible = title.trim() || skills.length > 0;
-  const seniorityYears = (seniority || '').match(/\([^)]+\)/)?.[0]?.replace(/\(|\)/g, '') || '';
+  // Linear-time extraction — no regex backtracking (Sonar S5852)
+  const seniorityYears = (() => {
+    const s = String(seniority || '');
+    const open = s.indexOf('(');
+    if (open === -1) return '';
+    const close = s.indexOf(')', open + 1);
+    return close === -1 ? '' : s.slice(open + 1, close);
+  })();
 
   return (
     <div className="jd-overlay">
@@ -509,7 +516,7 @@ export function JobDescriptionModal({
           <div className="jd-preview">
             <Sparkles size={12} color="#0A7E96" style={{ flexShrink: 0, marginTop: 1 }} />
             <span>
-              <strong>{t.previewLabel}:</strong> site:linkedin.com/in {(seniority || '').split(' ')[0]} "{title || '...'}"
+              <strong>{t.previewLabel}:</strong> site:linkedin.com/in {(() => { const s = seniority || ''; const sp = s.indexOf(' '); return sp === -1 ? s : s.slice(0, sp); })()} "{title || '...'}"
               {skills.length > 0 && ` (${skills.slice(0, 3).join(' AND ')})`}
               {niceToHaveSkills.length > 0 && ` (${niceToHaveSkills.slice(0, 3).join(' OR ')})`}
               {location ? ` ${location}` : ''}

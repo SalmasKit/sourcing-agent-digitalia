@@ -4,7 +4,7 @@ import {
   loadInitialWorkspaceData, 
   mergeCandidateResults, 
   tagFreshResults 
-} from './App.jsx'
+} from '../App.jsx'
 
 describe('App Utility Functions', () => {
   beforeEach(() => {

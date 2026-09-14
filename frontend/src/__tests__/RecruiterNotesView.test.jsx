@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { formatNoteTimestamp, RecruiterNotesView } from './RecruiterNotesView.jsx'
+import { formatNoteTimestamp, RecruiterNotesView } from '../components/RecruiterNotesView.jsx'
 
 // Mock contexts
 vi.mock('../context/LanguageContext', () => ({

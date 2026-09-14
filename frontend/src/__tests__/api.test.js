@@ -7,7 +7,7 @@ import {
   updateMemberPrivilegesApi,
   toggleMemberStatusApi,
   removeTeamMemberApi,
-} from './api.js'
+} from '../services/api.js'
 
 describe('API Service', () => {
   beforeEach(() => {
