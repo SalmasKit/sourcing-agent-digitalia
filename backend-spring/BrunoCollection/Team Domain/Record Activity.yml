@@ -1,0 +1,26 @@
+info:
+  name: Record Activity
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/team/activities"
+  body:
+    type: json
+    data: |
+      {
+        "actionType": "SOURCE_SEARCH",
+        "description": "Initiated search for Java Developer",
+        "metadata": {
+          "searchId": "{{searchId}}",
+          "query": "Java Developer"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

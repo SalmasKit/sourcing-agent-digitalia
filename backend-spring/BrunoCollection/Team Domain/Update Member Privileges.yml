@@ -1,0 +1,21 @@
+info:
+  name: Update Member Privileges
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/v1/team/members/{{memberId}}/privileges"
+  body:
+    type: json
+    data: |
+      {
+        "privileges": ["source_candidates", "shortlist_candidates", "manage_notes", "export_data"]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

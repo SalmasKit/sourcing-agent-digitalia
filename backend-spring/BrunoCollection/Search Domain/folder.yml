@@ -1,14 +1,3 @@
-info:
+folder:
   name: Search Domain
-  type: folder
-  seq: 2
-
-request:
-  auth: inherit
-  scripts:
-    - type: after-response
-      code: |-
-        if (res.status === 200 && res.body.data) {
-          bru.setEnvVar("accessToken", res.body.data.accessToken);
-          bru.setEnvVar("refreshToken", res.body.data.refreshToken);
-        }
+  description: Search orchestration and management endpoints

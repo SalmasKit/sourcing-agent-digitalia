@@ -1,0 +1,23 @@
+info:
+  name: Retry Search
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/searches/{{searchId}}/retry"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 200 && res.body.data) {
+          bru.setEnvVar("searchId", res.body.data.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

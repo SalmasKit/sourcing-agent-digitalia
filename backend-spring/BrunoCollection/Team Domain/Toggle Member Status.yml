@@ -1,0 +1,15 @@
+info:
+  name: Toggle Member Status
+  type: http
+  seq: 6
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/v1/team/members/{{memberId}}/toggle-status"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

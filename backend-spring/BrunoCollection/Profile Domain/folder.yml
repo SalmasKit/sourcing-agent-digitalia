@@ -1,14 +1,3 @@
-info:
+folder:
   name: Profile Domain
-  type: folder
-  seq: 3
-
-request:
-  auth: inherit
-  scripts:
-    - type: after-response
-      code: |-
-        if (res.status === 200 && res.body.data) {
-          bru.setEnvVar("accessToken", res.body.data.accessToken);
-          bru.setEnvVar("refreshToken", res.body.data.refreshToken);
-        }
+  description: Candidate profile management endpoints
