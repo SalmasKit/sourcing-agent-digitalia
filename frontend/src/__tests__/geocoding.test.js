@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { formatLocationLabel, searchLocations } from './geocoding.js'
+import { formatLocationLabel, searchLocations } from '../utils/geocoding.js'
 
 // Mock fetch
 global.fetch = vi.fn()

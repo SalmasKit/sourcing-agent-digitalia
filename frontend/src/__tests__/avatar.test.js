@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getAvatarUrl } from './avatar.js'
+import { getAvatarUrl } from '../utils/avatar.js'
 
 describe('avatar.js', () => {
   describe('getAvatarUrl', () => {
