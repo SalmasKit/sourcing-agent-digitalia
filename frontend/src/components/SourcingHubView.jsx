@@ -65,6 +65,7 @@ const SourcingHubView = ({
   onEditDescription,
   onNewDescription,
   onDeleteJob,
+  onClearJobSelection,
   onToggleSaveForJob,
   onViewDetails,
   onEdit,
@@ -83,6 +84,12 @@ const SourcingHubView = ({
    * The role opened in the sourcing workspace.
    */
   const [workspaceJobId, setWorkspaceJobId] = useState(null);
+
+  /*
+   * Tracks when the user explicitly closes the workspace so that a
+   * selectedJobId prop does not keep the workspace open.
+   */
+  const [userClosedWorkspace, setUserClosedWorkspace] = useState(false);
 
   /*
    * Search/filter for the role library.
@@ -167,7 +174,9 @@ const SourcingHubView = ({
   }, [roleSearch]);
 
   const activeJob = useMemo(() => {
-    const id = workspaceJobId || selectedJobId;
+    // userClosedWorkspace prevents selectedJobId from re-opening the workspace
+    // after the user has explicitly navigated back to the library.
+    const id = workspaceJobId || (userClosedWorkspace ? null : selectedJobId);
 
     return jobDescriptions.find(
       (job) => String(job.id) === String(id)
@@ -176,6 +185,7 @@ const SourcingHubView = ({
     jobDescriptions,
     workspaceJobId,
     selectedJobId,
+    userClosedWorkspace,
   ]);
 
   const getJobCandidates = (jobId) => {
@@ -195,7 +205,8 @@ const SourcingHubView = ({
       return cached.candidates;
     }
 
-    return [];
+    // Fall back to the candidates prop when no cache entry exists for this job.
+    return candidates;
   };
 
   const displayCandidates = activeJob
@@ -280,6 +291,7 @@ const SourcingHubView = ({
   const openRole = (job) => {
     setWorkspaceJobId(job.id);
     setWorkspaceTab("sourced");
+    setUserClosedWorkspace(false);
 
     if (onSelectJob) {
       onSelectJob(job);
@@ -288,6 +300,7 @@ const SourcingHubView = ({
 
   const closeWorkspace = () => {
     setWorkspaceJobId(null);
+    setUserClosedWorkspace(true);
     if (onClearJobSelection) {
       onClearJobSelection();
     }
@@ -372,7 +385,7 @@ const SourcingHubView = ({
   /*
    * Library mode
    */
-  if (!workspaceJobId) {
+  if (!activeJob) {
     return (
       <div className="sourcing-shell">
         <style>{styles}</style>
