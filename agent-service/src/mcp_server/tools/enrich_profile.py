@@ -142,7 +142,7 @@ class EnrichedProfile(BaseModel):
 
     email_status: str | None = None
 
-    extrapolated_email_confidence: int | None = None
+    extrapolated_email_confidence: float | None = None
 
     match_confidence: str | None = None
 
@@ -1116,7 +1116,7 @@ def _parse_apollo_person(person: dict, snippet_hint: str = "") -> EnrichedProfil
 
         email_status=person.get("email_status"),
 
-        extrapolated_email_confidence=person.get("extrapolated_email_confidence"),
+        extrapolated_email_confidence=int(person.get("extrapolated_email_confidence", 0) * 100) if person.get("extrapolated_email_confidence") else None,
 
         match_confidence=person.get("match_confidence"),
 

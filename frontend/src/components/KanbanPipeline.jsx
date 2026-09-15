@@ -28,9 +28,13 @@ import {
 
 import { useLanguage } from '../context/LanguageContext';
 
-function getAvatarUrl(name) {
+function getAvatarUrl(name, avatar) {
+  if (avatar) {
+    return avatar;
+  }
+
   return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-    name
+    name || 'Candidate'
   )}&backgroundColor=12151B&textColor=ffffff&fontWeight=600&fontSize=38`;
 }
 
@@ -1406,7 +1410,8 @@ export function KanbanPipeline({
                                     className="kb-avatar"
                                     src={getAvatarUrl(
                                       candidate.fullName ||
-                                      'Candidate'
+                                      'Candidate',
+                                      candidate.avatarUrl
                                     )}
                                     alt={
                                       candidate.fullName ||

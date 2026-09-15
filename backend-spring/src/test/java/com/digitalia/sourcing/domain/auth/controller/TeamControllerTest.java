@@ -97,6 +97,7 @@ class TeamControllerTest {
         TeamInvitationDto inv = new TeamInvitationDto(
                 UUID.randomUUID(),
                 "recruit@digitalia.ma",
+                "John Doe",
                 "digitalia_workspace",
                 Role.RECRUITER,
                 List.of("shortlist_candidates"),
@@ -127,6 +128,7 @@ class TeamControllerTest {
         TeamInvitationDto inv = new TeamInvitationDto(
                 UUID.randomUUID(),
                 request.email(),
+                request.fullName(),
                 "digitalia_workspace",
                 Role.RECRUITER,
                 request.privileges(),

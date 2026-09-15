@@ -8,6 +8,7 @@ import java.util.UUID;
 public record TeamInvitationDto(
     UUID id,
     String email,
+    String fullName,
     String teamId,
     Role role,
     List<String> privileges,

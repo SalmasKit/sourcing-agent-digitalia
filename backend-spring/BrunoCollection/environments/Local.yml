@@ -1,0 +1,10 @@
+name: Local
+variables:
+  - name: baseUrl
+    value: http://localhost:8081
+  - name: searchId
+    value: ""
+  - name: profileId
+    value: ""
+  - name: resetToken
+    value: 5df980f8-b836-4af9-8564-fbeb48167086

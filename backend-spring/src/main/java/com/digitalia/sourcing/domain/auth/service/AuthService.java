@@ -58,12 +58,12 @@ public class AuthService {
                 .fullName(request.fullName())
                 .role(assignedRole)
                 .enabled(true)
-                .teamId("targetalent_workspace")
-                .privileges("create_roles,shortlist_candidates,manage_notes,source_candidates,export_data")
+                .teamId(null)
+                .privileges("")
                 .build();
 
         User savedUser = userRepository.save(user);
-        log.info("Registered user with email: {}", savedUser.getEmail());
+        log.info("Registered user with email: {} (no team assigned - awaiting invitation)", savedUser.getEmail());
         return mapToDto(savedUser);
     }
 
@@ -237,8 +237,8 @@ public class AuthService {
                 user.getFullName(),
                 user.getRole(),
                 user.isEnabled(),
-                user.getTeamId() != null ? user.getTeamId() : "targetalent_workspace",
-                user.getPrivileges() != null ? user.getPrivileges() : "create_roles,shortlist_candidates,manage_notes,source_candidates,export_data"
+                user.getTeamId(),
+                user.getPrivileges()
         );
     }
 

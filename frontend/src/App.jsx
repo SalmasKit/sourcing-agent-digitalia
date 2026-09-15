@@ -52,6 +52,7 @@ export function loadInitialWorkspaceData(teamKey, userKey) {
     shortlist: getVal('shortlist') || [],
     candidatePipelineStage: getVal('pipeline_stages') || {},
     searchHistory: getVal('search_history') || [],
+    selectedJobId: getVal('selected_job_id') || null,
   };
 }
 
@@ -145,13 +146,14 @@ function DashboardContent() {
   const userKey = user?.email ? user.email.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'guest';
 
   const [activeTab, setActiveTab] = useState(() => {
-    const saved = localStorage.getItem(`digitalia_team_${teamKey}_active_tab`);
+    // Use user-specific tab storage to prevent new users from inheriting admin's tab
+    const saved = localStorage.getItem(`digitalia_user_${userKey}_active_tab`);
     return saved || 'dashboard';
   });
 
   useEffect(() => {
-    localStorage.setItem(`digitalia_team_${teamKey}_active_tab`, activeTab);
-  }, [activeTab, teamKey]);
+    localStorage.setItem(`digitalia_user_${userKey}_active_tab`, activeTab);
+  }, [activeTab, userKey]);
 
   // Shared Team Workspace Datasets
   const [jobResultsCache, setJobResultsCache] = useState(() => {
@@ -178,9 +180,15 @@ function DashboardContent() {
     return loadInitialWorkspaceData(teamKey, userKey).searchHistory;
   });
 
+  const [selectedJobId, setSelectedJobId] = useState(() => {
+    const data = loadInitialWorkspaceData(teamKey, userKey);
+    return data.selectedJobId || null;
+  });
+
   const [candidates, setCandidates] = useState(() => {
-    const defaultJobId = jobDescriptions[0]?.id;
-    return (defaultJobId && jobResultsCache[defaultJobId]) || [];
+    const data = loadInitialWorkspaceData(teamKey, userKey);
+    const savedJobId = data.selectedJobId;
+    return (savedJobId && data.jobResultsCache[savedJobId]) || [];
   });
 
   const [teamActivities, setTeamActivities] = useState([]);
@@ -201,10 +209,16 @@ function DashboardContent() {
     setShortlist(data.shortlist);
     setCandidatePipelineStage(data.candidatePipelineStage);
     setSearchHistory(data.searchHistory);
-
-    const defaultJobId = data.jobDescriptions[0]?.id;
-    setCandidates((defaultJobId && data.jobResultsCache[defaultJobId]) || []);
-    setSelectedJobId(defaultJobId || null);
+    
+    // Preserve selectedJobId if it was saved, otherwise don't auto-select
+    setSelectedJobId(data.selectedJobId);
+    
+    // Load candidates for the saved job if it exists
+    if (data.selectedJobId && data.jobResultsCache[data.selectedJobId]) {
+      setCandidates(data.jobResultsCache[data.selectedJobId]);
+    } else {
+      setCandidates([]);
+    }
   }, [teamKey]);
 
   // Persist shared team datasets to localStorage on change
@@ -232,6 +246,8 @@ function DashboardContent() {
     localStorage.setItem(`targetalent_team_${teamKey}_search_history`, JSON.stringify(searchHistory));
   }, [searchHistory, teamKey]);
 
+
+
   // Audit Logging Helper
   const recordActivity = async (actionType, targetTitle, details = '', targetId = '') => {
     try {
@@ -243,8 +259,6 @@ function DashboardContent() {
       console.warn('Could not record activity:', e);
     }
   };
-
-  const [selectedJobId, setSelectedJobId] = useState(() => jobDescriptions[0]?.id || null);
 
   // Derive all unique known candidates across cache and shortlist
   const allKnownCandidates = useMemo(() => {
@@ -530,6 +544,9 @@ function DashboardContent() {
     const job = typeof jobOrId === 'object' ? jobOrId : jobDescriptions.find((j) => String(j.id) === String(jobOrId));
     if (!job) return;
     setSelectedJobId(job.id);
+    
+    // Save to localStorage only when user explicitly selects a job
+    localStorage.setItem(`targetalent_team_${teamKey}_selected_job_id`, JSON.stringify(job.id));
 
     const targetKey = searchMode === 'pool' ? `${job.id}:pool` : job.id;
     const cached = jobResultsCache[targetKey] || jobResultsCache[job.id];
@@ -538,6 +555,11 @@ function DashboardContent() {
     } else {
       setCandidates([]);
     }
+  };
+
+  const handleClearJobSelection = () => {
+    setSelectedJobId(null);
+    localStorage.setItem(`targetalent_team_${teamKey}_selected_job_id`, JSON.stringify(null));
   };
 
   const handleCreateJob = async (newJob, options = DEFAULT_JOB_OPTIONS) => {
@@ -634,6 +656,7 @@ function DashboardContent() {
         setShortlist([]);
         setCandidates([]);
         setSelectedJobId(null);
+        localStorage.setItem(`targetalent_team_${teamKey}_selected_job_id`, JSON.stringify(null));
       } else if (selectedJobId === jobId) {
         handleSelectJob(updated[0]);
       }
@@ -804,6 +827,21 @@ function DashboardContent() {
       updated = shortlist.filter(c => c.id !== candidate.id);
       recordActivity('CANDIDATE_UNSHORTLISTED', candidate.fullName, 'Removed candidate from team shortlist');
       triggerToast(lang === 'FR' ? `${candidate.fullName} retiré de la sélection.` : `Removed ${candidate.fullName} from shortlist.`);
+      
+      // Also remove from pipeline stages and saved role candidates
+      setCandidatePipelineStage(prev => {
+        const next = { ...prev };
+        delete next[candidate.id];
+        return next;
+      });
+      
+      setSavedRoleCandidates(prev => {
+        const next = {};
+        Object.entries(prev).forEach(([jobId, ids]) => {
+          next[jobId] = Array.isArray(ids) ? ids.filter(candId => candId !== candidate.id) : [];
+        });
+        return next;
+      });
     } else {
       updated = [...shortlist, candidate];
       recordActivity('CANDIDATE_SHORTLISTED', candidate.fullName, `Shortlisted candidate (${candidate.matchScore || 85}% match)`);
@@ -1155,6 +1193,7 @@ function DashboardContent() {
             onToggleSaveForJob={handleToggleSaveForJob}
             onViewDetails={handleViewDetails}
             onEdit={handleOpenEditCandidate}
+            onClearJobSelection={handleClearJobSelection}
             onDelete={handleDeleteCandidate}
             onOpenJobModal={() => setIsJobModalOpen(true)}
             onOpenEditJobModal={(job) => { setEditingJob(job); setIsJobModalOpen(true); }}

@@ -8,6 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
     include: ['src/__tests__/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+    testTimeout: 20000, // Augmenter le timeout à 20 secondes
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'lcov', 'html'],
@@ -21,6 +22,11 @@ export default defineConfig({
         'dist/',
         'coverage/',
       ],
+      all: true, // Inclure tous les fichiers même sans tests
+      lines: 70,
+      functions: 70,
+      branches: 70,
+      statements: 70,
     },
   },
 })

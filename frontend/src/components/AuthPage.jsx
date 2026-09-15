@@ -731,6 +731,9 @@ export default function AuthPage({ onAccepted, onClearInvite }) {
         if (success) {
           if (typeof window !== 'undefined') {
             window.history.replaceState({}, document.title, window.location.pathname);
+            // Clear any team-specific tab storage to prevent inheriting admin's tab
+            const teamKey = 'targetalent_workspace'; // Will be updated after auth context updates
+            localStorage.removeItem(`digitalia_team_${teamKey}_active_tab`);
           }
           if (onAccepted) onAccepted();
           setIsAuthModalOpen(false);

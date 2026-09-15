@@ -103,6 +103,7 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
   const [members, setMembers] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [noTeamAccess, setNoTeamAccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [toast, setToast] = useState(null);
@@ -170,11 +171,15 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
     } catch (err) {
       console.error('Failed to load team data:', err);
 
-      triggerToast(
-        isFR
-          ? 'Impossible de charger les données de l’équipe'
-          : 'Failed to load team data'
-      );
+      if (err.response?.status === 403 || err.message?.includes('team')) {
+        setNoTeamAccess(true);
+      } else {
+        triggerToast(
+          isFR
+            ? 'Impossible de charger les données de l\'équipe'
+            : 'Failed to load team data'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -622,10 +627,31 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
       {toast && <div className="tm-toast">{toast}</div>}
 
       {/* ---------------------------------------------------------------- */}
+      {/* NO TEAM ACCESS MESSAGE                                           */}
+      {/* ---------------------------------------------------------------- */}
+
+      {noTeamAccess && (
+        <div className="tm-no-team-access">
+          <ShieldCheck size={48} />
+          <h2>
+            {isFR
+              ? 'Aucun accès à une équipe'
+              : 'No Team Access'}
+          </h2>
+          <p>
+            {isFR
+              ? 'Vous devez être invité à rejoindre une équipe pour accéder à cette fonctionnalité. Contactez votre administrateur pour obtenir une invitation.'
+              : 'You must be invited to join a team to access this feature. Contact your administrator for an invitation.'}
+          </p>
+        </div>
+      )}
+
+      {/* ---------------------------------------------------------------- */}
       {/* PAGE HEADER                                                       */}
       {/* ---------------------------------------------------------------- */}
 
-      <header className="sourcing-page-header">
+      {!noTeamAccess && (
+        <header className="sourcing-page-header">
         <div>
           <h1>
             {isFR
@@ -688,12 +714,14 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
           </button>
         </div>
       </header>
+      )}
 
       {/* ---------------------------------------------------------------- */}
       {/* STAT RAIL                                                         */}
       {/* ---------------------------------------------------------------- */}
 
-      <div className="library-summary">
+      {!noTeamAccess && (
+        <div className="library-summary">
         <div className="summary-item">
           <span className="summary-icon">
             <Users size={14} />
@@ -740,12 +768,14 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
           </span>
         </div>
       </div>
+      )}
 
       {/* ---------------------------------------------------------------- */}
       {/* MEMBERS                                                           */}
       {/* ---------------------------------------------------------------- */}
 
-      <section className="role-library">
+      {!noTeamAccess && (
+        <section className="role-library">
         <div className="tm-table-head">
           <div className="tm-table-title">
             {isFR
@@ -936,12 +966,13 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
             )}
         </div>
       </section>
+      )}
 
       {/* ---------------------------------------------------------------- */}
       {/* PENDING INVITATIONS                                               */}
       {/* ---------------------------------------------------------------- */}
 
-      {invitations.length > 0 && (
+      {!noTeamAccess && invitations.length > 0 && (
         <section
           className="role-library"
           style={{ marginTop: 14 }}
@@ -977,6 +1008,10 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
 
                   <div>
                     <div className="tm-name">
+                      {inv.fullName || inv.email}
+                    </div>
+
+                    <div className="tm-email">
                       {inv.email}
                     </div>
 
@@ -1053,7 +1088,8 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
           role="button"
           tabIndex={0}
           onKeyPress={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            // Only close if the overlay itself is targeted, not child elements
+            if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
               closeInviteModal();
             }
           }}
@@ -1062,6 +1098,7 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
             className="jd-modal"
             role="dialog"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
           >
             <div className="jd-header">
               <span className="jd-header-title">
@@ -1286,6 +1323,7 @@ export function TeamManagementView({ onNavigateToDashboard = () => { } }) {
                 className="jd-form"
                 key={step}
                 onSubmit={handleSendInvite}
+                onKeyDown={(e) => e.stopPropagation()}
               >
                 {/* ------------------------------------------------------ */}
                 {/* STEP 1                                                  */}
@@ -2189,6 +2227,36 @@ const styles = `
   font-size: 13px;
   font-weight: 600;
   box-shadow: 0 10px 25px -5px rgba(0,0,0,.3);
+}
+
+.tm-no-team-access {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 40px;
+  gap: 20px;
+  color: var(--muted);
+}
+
+.tm-no-team-access svg {
+  color: var(--cyan);
+  margin-bottom: 12px;
+}
+
+.tm-no-team-access h2 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 24px;
+  color: var(--ink);
+}
+
+.tm-no-team-access p {
+  max-width: 500px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 /* ---------------------------------------------------------------------- */

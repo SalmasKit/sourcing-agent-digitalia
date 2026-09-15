@@ -195,13 +195,6 @@ const SourcingHubView = ({
       return cached.candidates;
     }
 
-    if (
-      String(jobId) === String(selectedJobId) &&
-      Array.isArray(candidates)
-    ) {
-      return candidates;
-    }
-
     return [];
   };
 
@@ -295,6 +288,9 @@ const SourcingHubView = ({
 
   const closeWorkspace = () => {
     setWorkspaceJobId(null);
+    if (onClearJobSelection) {
+      onClearJobSelection();
+    }
   };
 
   /*
@@ -317,17 +313,7 @@ const SourcingHubView = ({
     workspaceJobId,
   ]);
 
-  /*
-   * Keep workspace open to selectedJobId when it changes externally.
-   */
-  useEffect(() => {
-    if (
-      selectedJobId &&
-      selectedJobId !== workspaceJobId
-    ) {
-      setWorkspaceJobId(selectedJobId);
-    }
-  }, [selectedJobId]);
+
 
   /*
    * Keep pagination valid when roles are deleted or filtered.

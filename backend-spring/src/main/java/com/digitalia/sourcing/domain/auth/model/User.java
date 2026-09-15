@@ -42,12 +42,10 @@ public class User extends AuditableEntity implements UserDetails {
     private boolean enabled = true;
 
     @Column(name = "team_id")
-    @Builder.Default
-    private String teamId = "digitalia_workspace";
+    private String teamId;
 
     @Column(length = 500)
-    @Builder.Default
-    private String privileges = "create_roles,shortlist_candidates,manage_notes,source_candidates,export_data";
+    private String privileges;
 
     @Column(name = "password_reset_token")
     private String passwordResetToken;

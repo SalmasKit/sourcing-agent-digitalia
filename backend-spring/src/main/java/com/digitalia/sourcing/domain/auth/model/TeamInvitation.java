@@ -25,6 +25,9 @@ public class TeamInvitation extends AuditableEntity {
     @Column(nullable = false)
     private String email;
 
+    @Column(name = "full_name")
+    private String fullName;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "invited_by")
     private User invitedBy;

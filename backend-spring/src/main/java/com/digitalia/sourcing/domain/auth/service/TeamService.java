@@ -36,14 +36,11 @@ public class TeamService {
     private String frontendUrl;
 
     public List<TeamMemberDto> getTeamMembers(User currentUser) {
-        String teamId = currentUser.getTeamId() != null ? currentUser.getTeamId() : "targetalent_workspace";
-        List<User> members = userRepository.findByTeamId(teamId);
-        
-        // If list is empty (e.g. legacy user without teamId initialized), include currentUser
-        if (members.isEmpty() || members.stream().noneMatch(u -> u.getId().equals(currentUser.getId()))) {
-            members = new ArrayList<>(members);
-            members.add(currentUser);
+        if (currentUser.getTeamId() == null) {
+            return List.of();
         }
+
+        List<User> members = userRepository.findByTeamId(currentUser.getTeamId());
 
         return members.stream()
                 .map(this::mapToMemberDto)
@@ -51,8 +48,11 @@ public class TeamService {
     }
 
     public List<TeamInvitationDto> getPendingInvitations(User currentUser) {
-        String teamId = currentUser.getTeamId() != null ? currentUser.getTeamId() : "targetalent_workspace";
-        return invitationRepository.findByTeamIdAndStatusOrderByCreatedAtDesc(teamId, "PENDING").stream()
+        if (currentUser.getTeamId() == null) {
+            return List.of();
+        }
+
+        return invitationRepository.findByTeamIdAndStatusOrderByCreatedAtDesc(currentUser.getTeamId(), "PENDING").stream()
                 .map(this::mapToInvitationDto)
                 .collect(Collectors.toList());
     }
@@ -61,7 +61,11 @@ public class TeamService {
     public TeamInvitationDto inviteRecruiter(User currentUser, InviteRecruiterRequest request) {
         verifyAdminAccess(currentUser);
 
-        String teamId = currentUser.getTeamId() != null ? currentUser.getTeamId() : "targetalent_workspace";
+        if (currentUser.getTeamId() == null) {
+            throw new AccessDeniedException("You must be a member of a team to invite others.");
+        }
+
+        String teamId = currentUser.getTeamId();
         Role inviteRole = request.role() != null ? request.role() : Role.RECRUITER;
         String defaultPrivileges = inviteRole == Role.HR_ADMIN
                 ? "create_roles,shortlist_candidates,manage_notes,source_candidates,export_data"
@@ -82,6 +86,7 @@ public class TeamService {
         TeamInvitation invitation = TeamInvitation.builder()
                 .teamId(teamId)
                 .email(request.email())
+                .fullName(request.fullName())
                 .invitedBy(currentUser)
                 .role(inviteRole)
                 .privileges(privileges)
@@ -120,11 +125,14 @@ public class TeamService {
     public void cancelInvitation(User currentUser, UUID invitationId) {
         verifyAdminAccess(currentUser);
 
+        if (currentUser.getTeamId() == null) {
+            throw new AccessDeniedException("You must be a member of a team to cancel invitations.");
+        }
+
         TeamInvitation invitation = invitationRepository.findById(invitationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Invitation not found"));
 
-        String teamId = currentUser.getTeamId() != null ? currentUser.getTeamId() : "targetalent_workspace";
-        if (!teamId.equals(invitation.getTeamId())) {
+        if (!currentUser.getTeamId().equals(invitation.getTeamId())) {
             throw new AccessDeniedException("Cannot cancel invitation for a different team.");
         }
 
@@ -147,11 +155,14 @@ public class TeamService {
     public TeamMemberDto updateMemberPrivileges(User currentUser, UUID memberId, UpdatePrivilegesRequest request) {
         verifyAdminAccess(currentUser);
 
+        if (currentUser.getTeamId() == null) {
+            throw new AccessDeniedException("You must be a member of a team to modify privileges.");
+        }
+
         User member = userRepository.findById(memberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Team member not found"));
 
-        String teamId = currentUser.getTeamId() != null ? currentUser.getTeamId() : "targetalent_workspace";
-        if (!teamId.equals(member.getTeamId())) {
+        if (!currentUser.getTeamId().equals(member.getTeamId())) {
             throw new AccessDeniedException("Cannot modify privileges for users outside your team.");
         }
 
@@ -173,11 +184,14 @@ public class TeamService {
     public void toggleMemberStatus(User currentUser, UUID memberId) {
         verifyAdminAccess(currentUser);
 
+        if (currentUser.getTeamId() == null) {
+            throw new AccessDeniedException("You must be a member of a team to modify member status.");
+        }
+
         User member = userRepository.findById(memberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Team member not found"));
 
-        String teamId = currentUser.getTeamId() != null ? currentUser.getTeamId() : "targetalent_workspace";
-        if (!teamId.equals(member.getTeamId())) {
+        if (!currentUser.getTeamId().equals(member.getTeamId())) {
             throw new AccessDeniedException("Cannot modify status for users outside your team.");
         }
 
@@ -224,16 +238,21 @@ public class TeamService {
     }
 
     public List<ActivityLogDto> getTeamActivities(User currentUser, int limit) {
-        String teamId = currentUser.getTeamId() != null ? currentUser.getTeamId() : "targetalent_workspace";
+        if (currentUser.getTeamId() == null) {
+            return List.of();
+        }
+
         int size = Math.min(Math.max(limit, 1), 100);
-        return activityLogRepository.findByTeamIdOrderByCreatedAtDesc(teamId, PageRequest.of(0, size)).stream()
+        return activityLogRepository.findByTeamIdOrderByCreatedAtDesc(currentUser.getTeamId(), PageRequest.of(0, size)).stream()
                 .map(this::mapToActivityDto)
                 .collect(Collectors.toList());
     }
 
     @Transactional
     public ActivityLogDto recordActivity(User currentUser, RecordActivityRequest request) {
-        String teamId = currentUser.getTeamId() != null ? currentUser.getTeamId() : "targetalent_workspace";
+        if (currentUser.getTeamId() == null) {
+            throw new AccessDeniedException("You must be a member of a team to record activity.");
+        }
 
         String safeTargetTitle = request.targetTitle() != null && request.targetTitle().length() > 250
                 ? request.targetTitle().substring(0, 247) + "..."
@@ -243,7 +262,7 @@ public class TeamService {
                 : request.targetId();
 
         ActivityLog logEntry = ActivityLog.builder()
-                .teamId(teamId)
+                .teamId(currentUser.getTeamId())
                 .actor(currentUser)
                 .actorName(currentUser.getFullName() != null ? currentUser.getFullName() : currentUser.getEmail().split("@")[0])
                 .actorEmail(currentUser.getEmail())
@@ -282,6 +301,7 @@ public class TeamService {
         return new TeamInvitationDto(
                 inv.getId(),
                 inv.getEmail(),
+                inv.getFullName(),
                 inv.getTeamId(),
                 inv.getRole(),
                 parsePrivileges(inv.getPrivileges()),
