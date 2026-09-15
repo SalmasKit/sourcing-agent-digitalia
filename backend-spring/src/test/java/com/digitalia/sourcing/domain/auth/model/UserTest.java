@@ -24,6 +24,7 @@ class UserTest {
                 .password(password)
                 .fullName(fullName)
                 .role(role)
+                .teamId("digitalia_workspace")
                 .build();
 
         assertNotNull(user);
@@ -44,7 +45,7 @@ class UserTest {
         assertNull(user.getId());
         assertEquals(Role.RECRUITER, user.getRole());
         assertTrue(user.isEnabled());
-        assertEquals("digitalia_workspace", user.getTeamId());
+        assertNull(user.getTeamId());
     }
 
     @Test

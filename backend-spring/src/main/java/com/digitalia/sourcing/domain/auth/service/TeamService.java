@@ -42,6 +42,11 @@ public class TeamService {
 
         List<User> members = userRepository.findByTeamId(currentUser.getTeamId());
 
+        // If repository returns empty but current user has a teamId, include the current user
+        if (members.isEmpty() && currentUser.getTeamId() != null) {
+            return List.of(mapToMemberDto(currentUser));
+        }
+
         return members.stream()
                 .map(this::mapToMemberDto)
                 .collect(Collectors.toList());

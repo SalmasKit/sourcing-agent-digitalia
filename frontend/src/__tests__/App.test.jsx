@@ -461,6 +461,7 @@ const testUser = {
 };
 
 const TEAM_KEY = "team-1";
+const USER_KEY = "test_example_com";
 
 const seedJobDescriptions = (jobs) => {
   localStorage.setItem(
@@ -586,6 +587,7 @@ describe("loadInitialWorkspaceData", () => {
       shortlist: [],
       candidatePipelineStage: {},
       searchHistory: [],
+      selectedJobId: null,
     });
   });
 
@@ -598,6 +600,7 @@ describe("loadInitialWorkspaceData", () => {
     const data = loadInitialWorkspaceData("team-x", "user-x");
 
     expect(data.jobDescriptions).toEqual([{ id: "j1" }]);
+    expect(data.selectedJobId).toBeNull();
   });
 
   it("falls back to the legacy digitalia_team_ prefix", () => {
@@ -609,6 +612,7 @@ describe("loadInitialWorkspaceData", () => {
     const data = loadInitialWorkspaceData("team-x", "user-x");
 
     expect(data.shortlist).toEqual([{ id: "c1" }]);
+    expect(data.selectedJobId).toBeNull();
   });
 
   it("falls back to per-user keys when no team-level value exists", () => {
@@ -620,6 +624,7 @@ describe("loadInitialWorkspaceData", () => {
     const data = loadInitialWorkspaceData("team-x", "user-x");
 
     expect(data.searchHistory).toEqual(["query one"]);
+    expect(data.selectedJobId).toBeNull();
   });
 
   it("prefers team-level values over user-level values", () => {
@@ -635,6 +640,7 @@ describe("loadInitialWorkspaceData", () => {
     const data = loadInitialWorkspaceData("team-x", "user-x");
 
     expect(data.shortlist).toEqual([{ id: "team-candidate" }]);
+    expect(data.selectedJobId).toBeNull();
   });
 
   it("falls back to defaults when stored JSON is malformed", () => {
@@ -646,6 +652,7 @@ describe("loadInitialWorkspaceData", () => {
     const data = loadInitialWorkspaceData("team-x", "user-x");
 
     expect(data.candidatePipelineStage).toEqual({});
+    expect(data.selectedJobId).toBeNull();
   });
 });
 
@@ -876,7 +883,7 @@ describe("DashboardContent tabs", () => {
 
   it("restores the previously active tab from localStorage", async () => {
     localStorage.setItem(
-      `digitalia_team_${TEAM_KEY}_active_tab`,
+      `digitalia_user_${USER_KEY}_active_tab`,
       "pipeline"
     );
 
@@ -896,7 +903,7 @@ describe("DashboardContent tabs", () => {
 
     expect(screen.getByTestId("sourcing-hub")).toBeInTheDocument();
     expect(
-      localStorage.getItem(`digitalia_team_${TEAM_KEY}_active_tab`)
+      localStorage.getItem(`digitalia_user_${USER_KEY}_active_tab`)
     ).toBe("sourcing");
 
     fireEvent.click(screen.getByText("Go Team"));
@@ -1246,11 +1253,13 @@ describe("job editing", () => {
 describe("job deletion", () => {
   it("does nothing if the confirmation is declined", async () => {
     seedJobDescriptions([sampleJob()]);
+    seedJobResultsCache({ "job-1": [sampleCandidate()] });
     confirmMock.mockResolvedValue(false);
 
     render(<App />);
 
     fireEvent.click(await screen.findByText("Go Sourcing"));
+    fireEvent.click(screen.getByText("Select First Job"));
     fireEvent.click(screen.getByText("Delete First Job"));
 
     await waitFor(() => {
@@ -1302,10 +1311,15 @@ describe("job deletion", () => {
       sampleJob({ id: "job-1" }),
       sampleJob({ id: "job-2", title: "Backend Engineer" }),
     ]);
+    seedJobResultsCache({
+      "job-1": [sampleCandidate()],
+      "job-2": [sampleCandidate({ id: "c2" })],
+    });
 
     render(<App />);
 
     fireEvent.click(await screen.findByText("Go Sourcing"));
+    fireEvent.click(screen.getByText("Select First Job"));
     fireEvent.click(screen.getByText("Delete First Job"));
 
     await waitFor(() => {
