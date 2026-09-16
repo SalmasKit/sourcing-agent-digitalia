@@ -1,6 +1,12 @@
-# Targetalent — AI Sourcing Agent for Digitalia Solutions
+<p align="center">
+  <img src="targetalent.svg" alt="Targetalent Logo" width="420" />
+</p>
 
-*Target the right Talent.*
+<h1 align="center">Targetalent — AI Sourcing Agent for Digitalia Solutions</h1>
+
+<p align="center">
+  <em>Target the right Talent.</em>
+</p>
 
 > **Targetalent** (*Target Talent*) is an AI-powered talent sourcing platform built for **Digitalia Solutions**. It turns a plain-language recruiter query into a ranked, enriched shortlist of qualified candidates in seconds.
 
@@ -268,7 +274,7 @@ The platform adheres to a **5-Pillar Security Lifecycle** implemented through 7 
 | **4. Runtime Security** | Dynamic Testing & Defense | OWASP ZAP • Strict CSP/HSTS headers • BCrypt (Workload 12) • Bucket4j Rate Limiting |
 | **5. Observability** | Security Operations & Auditing | Prometheus Basic Auth • Grafana monitoring • Structured JSON audit logs |
 
-Security gates run automatically across CI/CD pipelines defined in [`.github/workflows/`](./.github/workflows). See [`.github/README.md`](./.github/README.md) for full pipeline specs.
+Security gates run automatically across CI/CD pipelines defined in [`.github/workflows/`](./.github/workflows). See [`.github/workflows/README.md`](./.github/workflows/README.md) for full pipeline specs.
 
 ---
 
@@ -309,9 +315,9 @@ sourcing-agent-project/
 │   └── load/                               # k6 performance, smoke, stress, & soak scripts
 │
 └── .github/                                # CI/CD & DevSecOps Workflows
-    ├── README.md                           # DevSecOps 5-pillar lifecycle & workflow guide
     ├── dependabot.yml                      # Automated dependency update configuration
     └── workflows/                          # 7 GitHub Actions automated security & CI pipelines
+        └── README.md                       # DevSecOps 5-pillar lifecycle & workflow guide
 ```
 
 ---
