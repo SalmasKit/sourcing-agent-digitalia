@@ -37,14 +37,14 @@
 
 ## Overview
 
-**Targetalent** is a full-stack, enterprise-grade AI sourcing platform built for **Digitalia Solutions**. Instead of manual keyword searches across multiple sourcing channels, recruiters submit natural language queries (e.g. *"Senior Java developer with Spring Boot, Paris, 5+ years experience"*).
+**Targetalent** is a full-stack, enterprise-grade AI sourcing platform built for **Digitalia Solutions**. Instead of manual keyword searches across multiple sourcing channels, recruiters submit natural language queries (e.g. *"Senior Java developer with Spring Boot, Rabat, 5+ years experience"*).
 
 The platform autonomously:
 1. **Interprets** the recruiter's prompt using Llama 3.3 70B (via Groq) to extract structured criteria (skills, experience, location, seniority).
 2. **Searches** for live candidate profiles via SerpAPI (Google X-Ray on LinkedIn) and enriches them with verified professional data via Apollo.io.
 3. **Scores** profiles with a **5-dimension hybrid scoring engine** combining skill overlap, experience levels, location matching, local vector embeddings (`all-MiniLM-L6-v2`), and LLM qualitative justifications.
 4. **Enriches** profiles with LinkedIn details and verified contact metadata.
-5. **Presents** ranked results in an interactive React UI featuring candidate comparison, pipeline stage tracking, notes, and export.
+5. **Presents** ranked results in an interactive React UI featuring candidate comRabaton, pipeline stage tracking, notes, and export.
 
 ---
 
@@ -86,7 +86,7 @@ Each service is self-contained with its own dedicated documentation:
 - **Directory:** [`frontend/`](./frontend)
 - **Tech:** React 19, Vite 8, TailwindCSS 4, Lucide React, Vitest, Oxlint
 - **Documentation:** [`frontend/README.md`](./frontend/README.md)
-- **Highlights:** Dynamic Sourcing Hub query console, Candidate Grid, side-by-side comparison modal, drag-and-drop recruitment stage pipeline, and Nginx production server with OWASP security headers.
+- **Highlights:** Dynamic Sourcing Hub query console, Candidate Grid, side-by-side comRabaton modal, drag-and-drop recruitment stage pipeline, and Nginx production server with OWASP security headers.
 
 ### Backend (Spring Boot 3.3 / Java 21)
 - **Directory:** [`backend-spring/`](./backend-spring)

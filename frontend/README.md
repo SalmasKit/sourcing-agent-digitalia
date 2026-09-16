@@ -45,7 +45,7 @@ frontend/
     │   ├── CandidateGridView.jsx      # Paginated candidate cards
     │   ├── CandidateCard.jsx          # Individual candidate card
     │   ├── CandidateDetailPanel.jsx   # Full profile drawer/panel
-    │   ├── CandidateComparator.jsx    # Side-by-side comparison
+    │   ├── CandidateComparator.jsx    # Side-by-side comRabaton
     │   ├── AgentStatusWidget.jsx      # Live LangGraph pipeline status
     │   ├── ActivityLogPanel.jsx       # Search activity timeline
     │   ├── KanbanPipeline.jsx         # Drag-and-drop recruitment pipeline
@@ -123,7 +123,7 @@ The `Dockerfile` automates this — the output is served by Nginx with OWASP-rec
 | Dashboard | `DashboardView.jsx` | KPIs, recent searches, team activity |
 | Sourcing Hub | `SourcingHubView.jsx` | AI query → ranked candidate results |
 | Candidate Detail | `CandidateDetailPanel.jsx` | Full profile, score breakdown, notes |
-| Comparison | `CandidateComparator.jsx` | Side-by-side candidate comparison |
+| ComRabaton | `CandidateComparator.jsx` | Side-by-side candidate comRabaton |
 | Kanban | `KanbanPipeline.jsx` | Drag-and-drop recruitment stages |
 | Team Management | `TeamManagementView.jsx` | User management (HR_ADMIN only) |
 

@@ -71,7 +71,7 @@ class AgentClientTest {
     @SuppressWarnings("unchecked")
     void executeSearch_shouldReturnResponseOnSuccess() {
         AgentClient.AgentProfileResponse profile = new AgentClient.AgentProfileResponse(
-                "LinkedIn", "https://linkedin.com/in/john", "John Doe", "Dev", "Paris",
+                "LinkedIn", "https://linkedin.com/in/john", "John Doe", "Dev", "Rabat",
                 Map.of("Java", 5), (short) 5, Map.of(), new BigDecimal("0.90"), Map.of()
         );
         AgentClient.AgentSearchResponse expected = new AgentClient.AgentSearchResponse(

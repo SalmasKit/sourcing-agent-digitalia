@@ -82,11 +82,11 @@ describe('Utils — avatar + geocoding integration', () => {
 
     it('deduplicates identical city and region', () => {
       const item = {
-        address: { city: 'Paris', state: 'Paris', country: 'France' },
+        address: { city: 'Rabat', state: 'Rabat', country: 'France' },
       }
       const result = formatLocationLabel(item)
-      // "Paris" should not appear twice
-      expect(result.split('Paris').length - 1).toBe(1)
+      // "Rabat" should not appear twice
+      expect(result.split('Rabat').length - 1).toBe(1)
     })
 
     it('falls back to display_name when address is sparse', () => {

@@ -166,9 +166,9 @@ export function CandidateComparator({
       ? 'Cliquer pour comparer'
       : 'Click to compare',
 
-    removeFromComparison: isFrench
+    removeFromComRabaton: isFrench
       ? 'Retirer de la comparaison'
-      : 'Remove from comparison',
+      : 'Remove from comRabaton',
 
     experienceLocation: isFrench
       ? 'Expérience & localisation'
@@ -903,7 +903,7 @@ export function CandidateComparator({
           </div>
         </div>
 
-        {/* COMPARISON BODY */}
+        {/* COMRabatON BODY */}
         <div className="cp-body">
 
           <div className="cp-grid">
@@ -959,8 +959,8 @@ export function CandidateComparator({
                         onClick={() =>
                           removeCandidate(candidate.id)
                         }
-                        title={text.removeFromComparison}
-                        aria-label={text.removeFromComparison}
+                        title={text.removeFromComRabaton}
+                        aria-label={text.removeFromComRabaton}
                       >
                         <X size={12} />
                       </button>

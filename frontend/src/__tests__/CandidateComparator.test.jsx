@@ -321,7 +321,7 @@ describe('CandidateComparator', () => {
       })
 
       // Candidate names can appear both in the selector chips
-      // and in the comparison columns, so do not require uniqueness.
+      // and in the comRabaton columns, so do not require uniqueness.
       expect(
         screen.getAllByText('Candidate c1').length
       ).toBeGreaterThan(0)

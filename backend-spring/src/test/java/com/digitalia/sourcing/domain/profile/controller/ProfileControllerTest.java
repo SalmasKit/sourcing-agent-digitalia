@@ -52,7 +52,7 @@ class ProfileControllerTest {
     void getSourcedProfiles_shouldReturn200AndPage() throws Exception {
         UUID searchId = UUID.randomUUID();
         ProfileSummaryDto summary = new ProfileSummaryDto(
-                UUID.randomUUID(), "LinkedIn", "John Doe", "Senior Dev", "Paris",
+                UUID.randomUUID(), "LinkedIn", "John Doe", "Senior Dev", "Rabat",
                 (short) 5, new BigDecimal("0.95")
         );
 
@@ -64,7 +64,7 @@ class ProfileControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.content[0].fullName").value("John Doe"))
-                .andExpect(jsonPath("$.data.content[0].location").value("Paris"));
+                .andExpect(jsonPath("$.data.content[0].location").value("Rabat"));
     }
 
     @Test

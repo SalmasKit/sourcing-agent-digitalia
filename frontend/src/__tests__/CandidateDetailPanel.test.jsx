@@ -609,7 +609,7 @@ describe("outreach studio", () => {
 
         // draftOutreachApi resolves after ~1100ms — the default waitFor
         // timeout (1000ms) is too short, so give it explicit headroom.
-        // Note: jest-dom's toHaveValue does an exact-value comparison and
+        // Note: jest-dom's toHaveValue does an exact-value comRabaton and
         // doesn't support asymmetric matchers like stringContaining for
         // partial matches, so we check the raw `.value` instead.
         await waitFor(

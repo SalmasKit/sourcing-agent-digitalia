@@ -817,8 +817,8 @@ describe("SearchConsole", () => {
         it("searches locations after typing", async () => {
             searchLocationsMock.mockResolvedValue([
                 {
-                    label: "Paris",
-                    value: "Paris",
+                    label: "Rabat",
+                    value: "Rabat",
                 },
             ]);
 
@@ -848,8 +848,8 @@ describe("SearchConsole", () => {
         it("renders location suggestions", async () => {
             searchLocationsMock.mockResolvedValue([
                 {
-                    label: "Paris",
-                    value: "Paris",
+                    label: "Rabat",
+                    value: "Rabat",
                 },
                 {
                     label: "Parma",
@@ -872,7 +872,7 @@ describe("SearchConsole", () => {
 
             await waitFor(() => {
                 expect(
-                    screen.getByText("Paris", {
+                    screen.getByText("Rabat", {
                         exact: true,
                     })
                 ).toBeInTheDocument();
@@ -882,8 +882,8 @@ describe("SearchConsole", () => {
         it("selects a location suggestion", async () => {
             searchLocationsMock.mockResolvedValue([
                 {
-                    label: "Paris",
-                    value: "Paris",
+                    label: "Rabat",
+                    value: "Rabat",
                 },
             ]);
 
@@ -900,13 +900,13 @@ describe("SearchConsole", () => {
                 },
             });
 
-            const suggestion = await screen.findByText("Paris", {
+            const suggestion = await screen.findByText("Rabat", {
                 exact: true,
             });
 
             fireEvent.click(suggestion);
 
-            expect(locationInput).toHaveValue("Paris");
+            expect(locationInput).toHaveValue("Rabat");
         });
     });
 
@@ -1203,8 +1203,8 @@ describe("SearchConsole", () => {
             await act(async () => {
                 requests[1]([
                     {
-                        label: "Paris",
-                        value: "Paris",
+                        label: "Rabat",
+                        value: "Rabat",
                     },
                 ]);
 
@@ -1212,7 +1212,7 @@ describe("SearchConsole", () => {
             });
 
             expect(
-                screen.getByText("Paris", {
+                screen.getByText("Rabat", {
                     exact: true,
                 })
             ).toBeInTheDocument();
@@ -1229,7 +1229,7 @@ describe("SearchConsole", () => {
             });
 
             expect(
-                screen.getByText("Paris", {
+                screen.getByText("Rabat", {
                     exact: true,
                 })
             ).toBeInTheDocument();

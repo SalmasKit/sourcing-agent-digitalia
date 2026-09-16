@@ -77,7 +77,7 @@ class ProfileRepositoryIT extends AbstractRepositoryIT {
                 .sourceUrl("https://github.com/jane-smith")
                 .fullName("Jane Smith")
                 .headline("Senior Full-Stack Architect")
-                .location("Paris, France")
+                .location("Rabat, France")
                 .skills(Map.of("primary", "React, Java", "secondary", "AWS"))
                 .experienceYears((short) 10)
                 .score(new BigDecimal("97.00"))

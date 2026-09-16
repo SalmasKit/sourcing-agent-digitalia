@@ -27,7 +27,7 @@ Built with **Python 3.12**, **FastAPI**, **LangGraph**, and **FastMCP**, this mi
 The core intelligence is modeled as a compiled `StateGraph` running an asynchronous four-node pipeline:
 
 ```
-Recruiter Query ("Senior React developer with TypeScript, Paris, 5+ yrs")
+Recruiter Query ("Senior React developer with TypeScript, Rabat, 5+ yrs")
                                │
                                ▼
      ┌───────────────────────────────────────────────────┐
@@ -156,7 +156,7 @@ The service listens on port `8001` (configurable via `APP_PORT`).
 ### Example Request (`POST /api/search`)
 ```json
 {
-  "query": "Senior Spring Boot and Java developer in Paris with 5+ years experience",
+  "query": "Senior Spring Boot and Java developer in Rabat with 5+ years experience",
   "job_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
   "max_results": 5
 }

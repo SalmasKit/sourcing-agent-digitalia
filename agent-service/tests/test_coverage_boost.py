@@ -86,18 +86,18 @@ def test_parse_serpapi_result():
 
 
 def test_build_search_query():
-    # Senior Python engineer in Paris → gl=fr
+    # Senior Python engineer in Rabat → gl=fr
     crit1 = {
         "job_title": "Python Engineer",
         "required_skills": ["FastAPI", "PostgreSQL"],
-        "location": "Paris, France",
+        "location": "Rabat, France",
         "seniority": "Senior",
         "exclude_companies": ["OldCorp"],
     }
     q1, gl1, loc1 = _build_search_query(crit1)
     assert "site:linkedin.com/in" in q1
     assert gl1 == "fr"
-    assert "Paris" in loc1 or loc1 == "Paris, France"
+    assert "Rabat" in loc1 or loc1 == "Rabat, France"
 
     # Lead Data Scientist in Morocco → gl=ma
     crit2 = {
@@ -126,7 +126,7 @@ def test_build_job_context():
         "seniority": "Senior",
         "required_skills": ["Python", "FastAPI"],
         "nice_to_have_skills": ["Kubernetes"],
-        "location": "Paris",
+        "location": "Rabat",
         "min_experience_years": 4,
     }
     ctx = _build_job_context(crit)
@@ -144,7 +144,7 @@ def test_build_profile_context():
         "full_name": "Sophie Martin",
         "headline": "Senior Backend Developer",
         "experience_years": 6,
-        "location": "Paris, France",
+        "location": "Rabat, France",
         "skills": ["Python", "FastAPI", "Docker"],
         "summary": "Passionate backend engineer",
     }
@@ -162,7 +162,7 @@ def test_build_candidate_corpus():
         "full_name": "Sophie Martin",
         "headline": "Senior Backend Developer",
         "experience_years": 6,
-        "location": "Paris, France",
+        "location": "Rabat, France",
         "skills": ["Python", "FastAPI", "Docker"],
         "summary": "Passionate backend engineer",
     }

@@ -37,7 +37,7 @@ const COPY = {
     tutorialSteps: [
       { id: 'prompt', icon: 'Search', step: '01', title: 'Define the role', shortDesc: 'Input any job description or a plain-language brief.', tip: 'Supports multi-criteria parameters: seniority, location, tools, and domain expertise.' },
       { id: 'sourcing', icon: 'Zap', step: '02', title: 'Autonomous sourcing', shortDesc: 'The agent scans talent databases and scores fit.', tip: 'Profiles are scored with a precision percentage, skill highlights, and a clear rationale.' },
-      { id: 'compare', icon: 'BarChart3', step: '03', title: 'Compare candidates', shortDesc: 'A side-by-side comparison matrix.', tip: 'Evaluate career trajectory, verified skills, and match strength at a glance.' },
+      { id: 'compare', icon: 'BarChart3', step: '03', title: 'Compare candidates', shortDesc: 'A side-by-side comRabaton matrix.', tip: 'Evaluate career trajectory, verified skills, and match strength at a glance.' },
       { id: 'pipeline', icon: 'Layers', step: '04', title: 'Track the pipeline', shortDesc: 'Move candidates through stages and log shared notes.', tip: 'Keep hiring managers aligned with live stage updates and evaluations.' },
       { id: 'team', icon: 'Users', step: '05', title: 'Bring in your team', shortDesc: 'Set granular privileges and send instant invites.', tip: 'Admins can grant custom rights: sourcing, shortlisting, notes, or outreach.' }
     ],
@@ -60,7 +60,7 @@ const COPY = {
     features: [
       { icon: 'Zap', title: 'Instant matching', desc: 'Generate a tailored shortlist in seconds from a job description or a plain-language prompt.' },
       { icon: 'Users', title: 'Team governance', desc: 'Dedicated permissions for recruiters and HR admins to collaborate securely.' },
-      { icon: 'BarChart3', title: 'Structured comparison', desc: 'Side-by-side candidates with highlighted strengths, fit ratings, and notes.' }
+      { icon: 'BarChart3', title: 'Structured comRabaton', desc: 'Side-by-side candidates with highlighted strengths, fit ratings, and notes.' }
     ],
     cardTitleLogin: 'Sign in to your workspace',
     cardSubLogin: 'Use your work email and password to access Targetalent.',
@@ -356,7 +356,7 @@ function InteractiveAppTutorial({ lang, onOpenAuth }) {
                     "Find 5 senior product designers with B2B SaaS experience, design systems mastery, and track record in scaling cross-functional teams."
                   </div>
                   <div className="dg-mock-chips">
-                    <span className="dg-chip active">Paris / Remote</span>
+                    <span className="dg-chip active">Rabat / Remote</span>
                     <span className="dg-chip active">Figma & Design Systems</span>
                     <span className="dg-chip active">5+ yrs exp</span>
                     <span className="dg-chip">Full-time</span>

@@ -73,7 +73,7 @@ class TestKeywordOverlapSimilarity:
         assert 0.0 < result < 1.0
 
     def test_keyword_overlap_stop_words_removed(self):
-        """Test that stop words are removed from comparison."""
+        """Test that stop words are removed from comRabaton."""
         from src.embeddings.client import _keyword_overlap_similarity
         result = _keyword_overlap_similarity("the python developer", "python developer")
         assert result == 1.0

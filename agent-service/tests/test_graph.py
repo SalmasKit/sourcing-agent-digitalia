@@ -70,7 +70,7 @@ def test_extract_min_experience_from_query():
 
 
 def test_build_fallback_criteria():
-    criteria = _build_fallback_criteria("Senior Python Developer in Paris with Docker")
+    criteria = _build_fallback_criteria("Senior Python Developer in Rabat with Docker")
     assert isinstance(criteria, dict)
     assert "job_title" in criteria or "required_skills" in criteria
 

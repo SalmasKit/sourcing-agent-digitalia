@@ -48,7 +48,7 @@ class SearchResultPersistenceServiceTest {
     @Test
     void saveSearchResults_shouldCompleteSearchAndSaveProfiles() {
         AgentClient.AgentProfileResponse profile1 = new AgentClient.AgentProfileResponse(
-                "LinkedIn", "https://linkedin.com/in/test", "John Doe", "Senior Dev", "Paris",
+                "LinkedIn", "https://linkedin.com/in/test", "John Doe", "Senior Dev", "Rabat",
                 Map.of("Java", 5), (short) 8, Map.of(), new BigDecimal("0.92"), Map.of()
         );
 

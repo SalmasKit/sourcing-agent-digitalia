@@ -219,7 +219,7 @@ class TestLocationScoringLogic:
     def test_location_any(self):
         """Test location score when 'Any'."""
         req_loc = "any"
-        cand_loc = "paris"
+        cand_loc = "Rabat"
         
         if not req_loc or req_loc in ("any", "all locations", "morocco", "maroc"):
             location_score = 95

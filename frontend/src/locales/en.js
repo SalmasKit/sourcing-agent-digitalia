@@ -99,7 +99,7 @@ export const en = {
   comparatorTitle: 'AI Candidate Comparator',
   comparatorDesc: 'Side-by-side technical evaluation for up to 3 candidates',
   selectCandidatesCompare: 'Select candidates to compare (Max 3):',
-  selectAtLeastOne: 'Please select at least 1 candidate to view comparison.',
+  selectAtLeastOne: 'Please select at least 1 candidate to view comRabaton.',
 
   // Notifications & Messages
   candidateMoved: 'Candidate moved to "{stage}"',

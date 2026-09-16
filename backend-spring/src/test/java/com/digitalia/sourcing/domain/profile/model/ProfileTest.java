@@ -48,7 +48,7 @@ class ProfileTest {
     void testProfileBuilder() {
         UUID id = UUID.randomUUID();
         String fullName = "Test User";
-        String location = "Paris";
+        String location = "Rabat";
 
         Profile profile = Profile.builder()
                 .id(id)
