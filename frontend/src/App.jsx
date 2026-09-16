@@ -433,11 +433,19 @@ function DashboardContent() {
         );
       } else {
         finalList = tagFreshResults(results);
-        triggerToast(
-          lang === 'FR'
-            ? `${finalList.length} nouveaux profils sourcés.`
-            : `${finalList.length} fresh candidate profiles sourced.`
-        );
+        if (finalList.length === 0) {
+          triggerToast(
+            lang === 'FR'
+              ? 'Aucun profil candidat trouvé pour ces critères. Essayez d’ajuster les compétences ou la localisation.'
+              : 'No matching candidate profiles found. Try adjusting the skills or location.'
+          );
+        } else {
+          triggerToast(
+            lang === 'FR'
+              ? `${finalList.length} nouveaux profils sourcés.`
+              : `${finalList.length} fresh candidate profiles sourced.`
+          );
+        }
       }
 
       setCandidates(finalList);
@@ -516,6 +524,32 @@ function DashboardContent() {
 
     // Direct search if no previous results exist
     executeSearch(query, filters, activeJobId, 'replace');
+  };
+
+  const handleRefreshSearch = (targetJobId, mode) => {
+    if (!hasPrivilege('source_candidates')) {
+      triggerToast(
+        lang === 'FR'
+          ? 'Privilège requis : Recherche et Sourcing IA.'
+          : 'Action restricted: Requires Sourcing & Search privilege.'
+      );
+      return;
+    }
+
+    const activeJobId = targetJobId || selectedJobId;
+    const activeJob = jobDescriptions.find((j) => String(j.id) === String(activeJobId));
+    const effectiveMode = mode || searchMode || 'ai';
+    const queryText = lastSearch?.query || activeJob?.description || activeJob?.prompt || activeJob?.title || 'Technical Sourcing';
+    const mergedFilters = {
+      location: activeJob?.location && activeJob.location !== 'All Locations' ? activeJob.location : '',
+      minExp: Number(activeJob?.minExperience) || 0,
+      tech: activeJob?.skills || activeJob?.requiredSkills || activeJob?.technologies || [],
+      maxResults: Number(activeJob?.maxResults) || 10,
+      ...(lastSearch?.filters || {}),
+      searchMode: effectiveMode,
+    };
+
+    executeSearch(queryText, mergedFilters, activeJobId, 'replace');
   };
 
   const handleSearchModeChange = (mode) => {
@@ -1187,6 +1221,7 @@ function DashboardContent() {
             lang={lang}
             t={t}
             onSearch={handleSearch}
+            onRefresh={handleRefreshSearch}
             onSelectJob={handleSelectJob}
             onDeleteJob={handleDeleteJob}
             onSearchModeChange={handleSearchModeChange}

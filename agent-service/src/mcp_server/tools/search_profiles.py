@@ -411,7 +411,7 @@ def _build_search_query(criteria: dict) -> tuple[str, str, str]:
     gl_code = "us"
     if any(x in loc_lower for x in ["copenhagen", "denmark", "danmark", "danemark"]):
         gl_code = "dk"
-    elif any(x in loc_lower for x in ["france", "Rabat", "lyon"]):
+    elif any(x in loc_lower for x in ["france", "paris", "lyon"]):
         gl_code = "fr"
     elif any(x in loc_lower for x in ["morocco", "maroc", "casablanca", "rabat", "tanger", "marrakech", "fes"]):
         gl_code = "ma"

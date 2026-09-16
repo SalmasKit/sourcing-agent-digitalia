@@ -139,7 +139,7 @@ class TestBuildSearchQuery:
 
     def test_build_query_french_location_code(self):
         """Test that France locations use 'fr' country code."""
-        criteria = {"job_title": "Software Engineer", "location": "Rabat"}
+        criteria = {"job_title": "Software Engineer", "location": "Paris"}
         from src.mcp_server.tools.search_profiles import _build_search_query
         query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
@@ -161,7 +161,7 @@ class TestBuildSearchQuery:
 
     def test_build_query_data_scientist_synonyms(self):
         """Test French/English synonyms for Data Scientist in MA/FR."""
-        criteria = {"job_title": "Data Scientist", "location": "Rabat"}
+        criteria = {"job_title": "Data Scientist", "location": "Paris"}
         from src.mcp_server.tools.search_profiles import _build_search_query
         query, gl_code, location = _build_search_query(criteria)
         assert "site:linkedin.com/in" in query
