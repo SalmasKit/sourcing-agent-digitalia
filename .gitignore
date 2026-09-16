@@ -25,6 +25,7 @@ wheels/
 node_modules/
 dist/
 build/
+coverage/
 
 # Documentation
 *.md

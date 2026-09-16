@@ -262,6 +262,7 @@ function createProps(overrides = {}) {
         onEditDescription: vi.fn(),
         onNewDescription: vi.fn(),
         onDeleteJob: vi.fn(),
+        onClearJobSelection: vi.fn(),
 
         onToggleSaveForJob: vi.fn(),
 
