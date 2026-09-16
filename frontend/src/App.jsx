@@ -549,7 +549,7 @@ function DashboardContent() {
       searchMode: effectiveMode,
     };
 
-    executeSearch(queryText, mergedFilters, activeJobId, 'replace');
+    handleSearch(queryText, mergedFilters, activeJobId);
   };
 
   const handleSearchModeChange = (mode) => {
