@@ -41,7 +41,7 @@
 
 The platform autonomously:
 1. **Interprets** the recruiter's prompt using Llama 3.3 70B (via Groq) to extract structured criteria (skills, experience, location, seniority).
-2. **Searches** for matching candidate profiles via SerpAPI and Apollo.io (or uses built-in realistic mock data for zero-cost local testing).
+2. **Searches** for live candidate profiles via SerpAPI (Google X-Ray on LinkedIn) and enriches them with verified professional data via Apollo.io.
 3. **Scores** profiles with a **5-dimension hybrid scoring engine** combining skill overlap, experience levels, location matching, local vector embeddings (`all-MiniLM-L6-v2`), and LLM qualitative justifications.
 4. **Enriches** profiles with LinkedIn details and verified contact metadata.
 5. **Presents** ranked results in an interactive React UI featuring candidate comparison, pipeline stage tracking, notes, and export.
@@ -98,7 +98,7 @@ Each service is self-contained with its own dedicated documentation:
 - **Directory:** [`agent-service/`](./agent-service)
 - **Tech:** Python 3.12, FastAPI, LangGraph, Groq (Llama 3.3 70B), sentence-transformers (`all-MiniLM-L6-v2`), FastMCP, SerpAPI, Apollo.io
 - **Documentation:** [`agent-service/README.md`](./agent-service/README.md)
-- **Highlights:** Stateful 4-node `StateGraph` (`interpret_request` → `search_profiles` → `score_profiles` → `format_output`), 5-dimension hybrid scoring engine, MCP server exposing sourcing tools, and realistic mock data fallbacks.
+- **Highlights:** Stateful 4-node `StateGraph` (`interpret_request` → `search_profiles` → `score_profiles` → `format_output`), 5-dimension hybrid scoring engine, and FastMCP tools for real-time candidate search and enrichment.
 
 ### Observability (Prometheus + Grafana)
 - **Directory:** [`observability/`](./observability)
@@ -157,7 +157,7 @@ Key environment variables:
 GROQ_API_KEY=gsk_your_groq_api_key_here
 GROQ_MODEL=llama-3.3-70b-versatile
 
-# Candidate Search & Enrichment (Optional: uses built-in mock candidates if omitted)
+# Candidate Search & Enrichment APIs
 SERPAPI_API_KEY=your_serpapi_api_key
 APOLLO_API_KEY=your_apollo_api_key
 

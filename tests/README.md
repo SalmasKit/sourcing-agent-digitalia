@@ -71,7 +71,7 @@ pytest --cov=src --cov-report=term-missing tests/
 
 - **Graph Tests:** Validates each LangGraph state transition (`interpret_request` → `search_profiles` → `score_profiles` → `format_output`).
 - **Scoring Tests:** Validates mathematical weighting, embedding cosine calculations, and edge cases (e.g., zero skills overlap or remote location bonuses).
-- **Mock Fallback Tests:** Verifies deterministic behavior using the synthetic candidate dataset when SerpAPI or Groq keys are absent.
+- **Tool & Integration Tests:** Verifies SerpAPI profile extraction, Apollo enrichment pipelines, and Groq circuit breaker resilience.
 
 ---
 

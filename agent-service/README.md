@@ -17,7 +17,6 @@ Built with **Python 3.12**, **FastAPI**, **LangGraph**, and **FastMCP**, this mi
 | **Embeddings** | `sentence-transformers` (`all-MiniLM-L6-v2`) | Local, CPU-optimized semantic similarity vectors |
 | **Protocol / Tools** | FastMCP >= 2.0 | Model Context Protocol server exposing tool capabilities |
 | **Sourcing Integration**| SerpAPI / Apollo.io | Google/LinkedIn candidate search & LinkedIn profile enrichment |
-| **Fallback Data** | Built-in Mock Generator | 20 realistic candidate profiles for deterministic local testing without API keys |
 | **Configuration** | Pydantic Settings v2 | Strictly typed configuration loaded from `.env` |
 | **Quality & Security** | Ruff, Pyright, Bandit, Pytest | SAST security scans, static typing, and automated unit test suite |
 
@@ -42,7 +41,7 @@ Recruiter Query ("Senior React developer with TypeScript, Paris, 5+ yrs")
      ┌───────────────────────────────────────────────────┐
      │  Node 2: search_node                              │
      │  • Executes MCP search_profiles tool              │
-     │  • Fetches live candidates (SerpAPI) or mock data │
+     │  • Fetches live candidate profiles via SerpAPI    │
      │  • Returns up to 8 candidate profile objects      │
      └───────────────────────────────────────────────────┘
                                │
@@ -132,13 +131,12 @@ agent-service/
 │   │
 │   └── mcp_server/             # Model Context Protocol (FastMCP) integration
 │       ├── server.py           # FastMCP server runner
-│       ├── mock_data.py        # 20 diverse fallback candidate profiles
 │       └── tools/
-│           ├── search_profiles.py  # SerpAPI / mock search tool
+│           ├── search_profiles.py  # SerpAPI Google X-Ray search tool
 │           ├── score_profile.py    # Hybrid scoring algorithm
 │           └── enrich_profile.py   # Apollo.io profile enrichment
 │
-└── tests/                      # Pytest unit tests, scoring tests, and mock assertions
+└── tests/                      # Pytest unit tests, scoring tests, and pipeline assertions
 ```
 
 ---
@@ -204,7 +202,7 @@ APP_ENV=development
 GROQ_API_KEY=gsk_your_groq_api_key_here
 GROQ_MODEL=llama-3.3-70b-versatile
 
-# External Candidate Search (Optional - mock data used if omitted)
+# External Candidate Search & Enrichment APIs
 SERPAPI_API_KEY=your_serpapi_key_here
 APOLLO_API_KEY=your_apollo_key_here
 
