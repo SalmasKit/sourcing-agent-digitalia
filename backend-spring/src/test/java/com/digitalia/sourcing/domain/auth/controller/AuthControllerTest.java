@@ -148,7 +148,7 @@ class AuthControllerTest {
     }
 
     @Test
-    void forgotPassword_shouldReturn200AndResetToken() throws Exception {
+    void forgotPassword_shouldReturn200WithoutExposingResetToken() throws Exception {
         ForgotPasswordRequest request = new ForgotPasswordRequest("salma@dig.com");
         when(authService.forgotPassword(any(ForgotPasswordRequest.class))).thenReturn("mock-reset-token");
 
@@ -158,7 +158,7 @@ class AuthControllerTest {
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.resetToken").value("mock-reset-token"));
+                .andExpect(jsonPath("$.data.resetToken").doesNotExist());
     }
 
     @Test

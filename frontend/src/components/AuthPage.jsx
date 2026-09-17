@@ -645,7 +645,7 @@ function GuidedTourModal({ isOpen, onClose, lang, onOpenAuth }) {
    Main AuthPage Component
    ------------------------------------------------------------------ */
 
-export default function AuthPage({ onAccepted, onClearInvite }) {
+export default function AuthPage({ onAccepted, onClearInvite, onResetComplete }) {
   const [lang, setLang] = useState(() => {
     try {
       const saved =
@@ -666,6 +666,14 @@ export default function AuthPage({ onAccepted, onClearInvite }) {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       return params.get('invite') || '';
+    }
+    return '';
+  });
+
+  const [resetTokenParam, setResetTokenParam] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('resetToken') || '';
     }
     return '';
   });
@@ -693,7 +701,24 @@ export default function AuthPage({ onAccepted, onClearInvite }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isForgotOpen, setIsForgotOpen] = useState(false);
+  const [isForgotOpen, setIsForgotOpen] = useState(() => Boolean(resetTokenParam));
+
+  const handleCloseForgot = (reopenAuth = true) => {
+    setIsForgotOpen(false);
+    setResetTokenParam('');
+    if (typeof window !== 'undefined' && window.history?.replaceState) {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('resetToken')) {
+        url.searchParams.delete('resetToken');
+        window.history.replaceState({}, document.title, url.pathname + url.search);
+      }
+    }
+    if (reopenAuth && !inviteToken) {
+      setIsAuthModalOpen(true);
+      setIsLogin(true);
+    }
+    onResetComplete?.();
+  };
   const fontsLoaded = useRef(false);
 
   const t = COPY[lang];
@@ -1424,7 +1449,14 @@ export default function AuthPage({ onAccepted, onClearInvite }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <label className="dg-field-label">{t.password}</label>
                   {isLogin && !inviteToken && (
-                    <button type="button" onClick={() => setIsForgotOpen(true)} style={{ background: 'none', border: 'none', color: 'var(--dg-teal-600)', fontSize: '11.5px', fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 5 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAuthModalOpen(false);
+                        setIsForgotOpen(true);
+                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--dg-teal-600)', fontSize: '11.5px', fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 5 }}
+                    >
                       {lang === 'FR' ? 'Mot de passe oublié ?' : 'Forgot password?'}
                     </button>
                   )}
@@ -1514,12 +1546,14 @@ export default function AuthPage({ onAccepted, onClearInvite }) {
 
       <ForgotPasswordModal
         isOpen={isForgotOpen}
-        onClose={() => setIsForgotOpen(false)}
+        onClose={handleCloseForgot}
         lang={lang}
+        initialToken={resetTokenParam}
         onResetSuccess={(em, pwd) => {
-          setEmail(em);
-          setPassword(pwd);
+          if (em) setEmail(em);
+          if (pwd) setPassword(pwd);
           setIsLogin(true);
+          handleCloseForgot();
         }}
       />
 

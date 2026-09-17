@@ -1417,6 +1417,13 @@ function AppContent() {
     }
     return false;
   });
+  const [hasResetToken, setHasResetToken] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return Boolean(params.get('resetToken'));
+    }
+    return false;
+  });
 
   if (loading) {
     return (
@@ -1426,8 +1433,14 @@ function AppContent() {
     );
   }
 
-  if (hasInvite || !user) {
-    return <AuthPage onAccepted={() => setHasInvite(false)} onClearInvite={() => setHasInvite(false)} />;
+  if (hasInvite || hasResetToken || !user) {
+    return (
+      <AuthPage
+        onAccepted={() => setHasInvite(false)}
+        onClearInvite={() => setHasInvite(false)}
+        onResetComplete={() => setHasResetToken(false)}
+      />
+    );
   }
 
   return <DashboardContent />;

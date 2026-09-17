@@ -609,9 +609,8 @@ export const forgotPasswordApi = async (email) => {
     return data.data || data;
   } catch (error) {
     if (DEMO_MODE) {
-      const mockToken = 'mock_reset_' + Date.now();
-      console.log('[DEMO_MODE] Simulated password reset token:', mockToken);
-      return { message: 'Reset instructions generated', resetToken: mockToken };
+      console.log('[DEMO_MODE] Simulated password reset request for:', email);
+      return { message: 'Reset instructions generated' };
     }
     throw error;
   }

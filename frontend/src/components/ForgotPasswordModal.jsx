@@ -1,20 +1,45 @@
-import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, X, KeyRound, ArrowRight, RefreshCw, Send } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, X, KeyRound, ArrowRight, Send, Check } from 'lucide-react';
 import { forgotPasswordApi, resetPasswordApi } from '../services/api';
 
-export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}, lang = 'EN' }) {
+export function ForgotPasswordModal({
+  isOpen,
+  onClose,
+  onResetSuccess = () => {},
+  lang = 'EN',
+  initialToken = ''
+}) {
   const isFR = lang === 'FR';
 
-  const [step, setStep]                       = useState(1); // 1 = enter email, 2 = enter token & new password
+  const [step, setStep]                       = useState(initialToken ? 2 : 1);
   const [email, setEmail]                     = useState('');
-  const [resetToken, setResetToken]           = useState('');
+  const [resetToken, setResetToken]           = useState(initialToken || '');
   const [newPassword, setNewPassword]         = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword]       = useState(false);
   const [loading, setLoading]                 = useState(false);
   const [error, setError]                     = useState('');
   const [successMsg, setSuccessMsg]           = useState('');
-  const [previewToken, setPreviewToken]       = useState('');
+  const [emailSent, setEmailSent]             = useState(false);
+
+  useEffect(() => {
+    if (initialToken) {
+      setResetToken(initialToken);
+      setStep(2);
+      setEmailSent(false);
+      setError('');
+      setSuccessMsg('');
+    } else if (!isOpen) {
+      setStep(1);
+      setEmailSent(false);
+      setEmail('');
+      setResetToken('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setError('');
+      setSuccessMsg('');
+    }
+  }, [initialToken, isOpen]);
 
   if (!isOpen) return null;
 
@@ -24,16 +49,10 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
     setLoading(true);
 
     try {
-      const res = await forgotPasswordApi(email);
-      const token = res.resetToken || ('rst-' + crypto.randomUUID().substring(0, 8));
-      setPreviewToken(token);
-      setResetToken(token);
-      setStep(2);
-      setSuccessMsg(isFR 
-        ? 'Un lien / code de réinitialisation a été généré.' 
-        : 'A password reset token / link has been generated.');
+      await forgotPasswordApi(email.trim());
+      setEmailSent(true);
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || (isFR ? 'Adresse email non trouvée.' : 'No account found with this email.');
+      const msg = err.response?.data?.message || err.message || (isFR ? 'Une erreur est survenue lors de l\'envoi.' : 'An error occurred while sending the reset link.');
       setError(msg);
     } finally {
       setLoading(false);
@@ -62,7 +81,7 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
         handleClose();
       }, 1500);
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || (isFR ? 'Échec de la réinitialisation.' : 'Failed to reset password.');
+      const msg = err.response?.data?.message || err.message || (isFR ? 'Lien ou code de réinitialisation invalide ou expiré.' : 'Invalid or expired reset token.');
       setError(msg);
     } finally {
       setLoading(false);
@@ -71,13 +90,13 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
 
   const handleClose = () => {
     setStep(1);
+    setEmailSent(false);
     setEmail('');
     setResetToken('');
     setNewPassword('');
     setConfirmPassword('');
     setError('');
     setSuccessMsg('');
-    setPreviewToken('');
     onClose();
   };
 
@@ -95,7 +114,7 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
         .fpm-overlay {
           position: fixed; inset: 0; background: rgba(18,21,27,0.7);
           backdrop-filter: blur(8px); display: flex; align-items: center;
-          justify-content: center; z-index: 100; padding: 20px;
+          justify-content: center; z-index: 2000; padding: 20px;
           animation: fpmFadeIn .2s ease;
         }
         @keyframes fpmFadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -151,15 +170,6 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
           outline: none; border-color: #EA580C;
           box-shadow: 0 0 0 3px rgba(234,88,12,0.12);
         }
-        
-        .fpm-token-banner {
-          background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 10px;
-          padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: #334155;
-        }
-        .fpm-token-code {
-          font-family: 'JetBrains Mono', monospace; font-weight: 700;
-          color: #0F172A; background: #E2E8F0; padding: 2px 6px; border-radius: 4px;
-        }
 
         .fpm-error {
           display: flex; align-items: center; gap: 8px;
@@ -200,7 +210,7 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
               <div className="fpm-title">{isFR ? 'Mot de passe oublié' : 'Reset Password'}</div>
               <div className="fpm-subtitle">
                 {step === 1 
-                  ? (isFR ? 'Recevez un lien de réinitialisation' : 'Request a reset token or link')
+                  ? (isFR ? 'Recevez un lien de réinitialisation sécurisé' : 'Receive a secure reset link by email')
                   : (isFR ? 'Définissez votre nouveau mot de passe' : 'Set your new password')}
               </div>
             </div>
@@ -224,62 +234,113 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
           )}
 
           {step === 1 ? (
-            <form onSubmit={handleRequestToken}>
-              <div className="fpm-field">
-                <label className="fpm-label">{isFR ? 'Email professionnel' : 'Work email'}</label>
-                <div className="fpm-input-wrap">
-                  <Mail size={15} className="fpm-input-icon" />
-                  <input
-                    type="email"
-                    className="fpm-input"
-                    required
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    autoFocus
-                  />
+            emailSent ? (
+              <div style={{ textAlign: 'center', padding: '12px 4px 6px' }}>
+                <div style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: '50%',
+                  background: '#ECFDF5',
+                  color: '#059669',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px'
+                }}>
+                  <Mail size={24} />
                 </div>
-              </div>
-
-              <div className="fpm-actions">
-                <button type="button" className="fpm-btn-secondary" onClick={handleClose} disabled={loading}>
-                  {isFR ? 'Annuler' : 'Cancel'}
-                </button>
-                <button type="submit" className="fpm-btn-primary" disabled={loading || !email}>
-                  {loading ? (isFR ? 'Envoi...' : 'Sending...') : (
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#12151B', marginBottom: 8 }}>
+                  {isFR ? 'Consultez votre boîte mail' : 'Check your email'}
+                </h3>
+                <p style={{ fontSize: 13, color: '#4B5563', lineHeight: 1.5, marginBottom: 16 }}>
+                  {isFR ? (
                     <>
-                      <span>{isFR ? 'Envoyer le lien' : 'Send reset link'}</span>
-                      <Send size={13} />
+                      Un lien de réinitialisation sécurisé a été envoyé à <strong>{email}</strong>.
+                      <br /><br />
+                      Veuillez cliquer sur le lien reçu dans l'email pour réinitialiser votre mot de passe.
+                    </>
+                  ) : (
+                    <>
+                      A secure reset link has been sent to <strong>{email}</strong>.
+                      <br /><br />
+                      Please click the link inside that email to set your new password.
                     </>
                   )}
+                </p>
+                <div style={{
+                  background: '#F9FAFB',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontSize: 12,
+                  color: '#6B7280',
+                  marginBottom: 20,
+                  textAlign: 'left'
+                }}>
+                  💡 {isFR 
+                    ? 'Pensez à vérifier votre dossier spams / courriers indésirables si vous ne le recevez pas rapidement.'
+                    : 'Be sure to check your spam/junk folder if you don\'t see the email within a couple of minutes.'}
+                </div>
+                <button
+                  type="button"
+                  className="fpm-btn-primary"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={handleClose}
+                >
+                  {isFR ? 'Compris, fermer' : 'Got it, close'}
                 </button>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleRequestToken}>
+                <div className="fpm-field">
+                  <label className="fpm-label">{isFR ? 'Email de votre compte' : 'Account email'}</label>
+                  <div className="fpm-input-wrap">
+                    <Mail size={15} className="fpm-input-icon" />
+                    <input
+                      type="email"
+                      className="fpm-input"
+                      required
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                <div className="fpm-actions">
+                  <button type="button" className="fpm-btn-secondary" onClick={handleClose} disabled={loading}>
+                    {isFR ? 'Annuler' : 'Cancel'}
+                  </button>
+                  <button type="submit" className="fpm-btn-primary" disabled={loading || !email}>
+                    {loading ? (isFR ? 'Envoi...' : 'Sending...') : (
+                      <>
+                        <span>{isFR ? 'Envoyer le lien par email' : 'Send reset link'}</span>
+                        <Send size={13} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )
           ) : (
             <form onSubmit={handleResetPassword}>
-              {previewToken && (
-                <div className="fpm-token-banner">
-                  <div>{isFR ? 'Code de sécurité généré pour démo :' : 'Security reset code generated:'}</div>
-                  <div style={{ marginTop: 4 }}>
-                    <span className="fpm-token-code">{previewToken}</span>
+              {!resetToken && (
+                <div className="fpm-field">
+                  <label className="fpm-label">{isFR ? 'Code / Token de réinitialisation' : 'Reset token / code'}</label>
+                  <div className="fpm-input-wrap">
+                    <KeyRound size={15} className="fpm-input-icon" />
+                    <input
+                      type="text"
+                      className="fpm-input"
+                      required
+                      value={resetToken}
+                      onChange={e => setResetToken(e.target.value)}
+                      placeholder="Enter reset token from email"
+                    />
                   </div>
                 </div>
               )}
-
-              <div className="fpm-field">
-                <label className="fpm-label">{isFR ? 'Code / Token de réinitialisation' : 'Reset token / code'}</label>
-                <div className="fpm-input-wrap">
-                  <KeyRound size={15} className="fpm-input-icon" />
-                  <input
-                    type="text"
-                    className="fpm-input"
-                    required
-                    value={resetToken}
-                    onChange={e => setResetToken(e.target.value)}
-                    placeholder="Enter reset token"
-                  />
-                </div>
-              </div>
 
               <div className="fpm-field">
                 <label className="fpm-label">{isFR ? 'Nouveau mot de passe' : 'New password'}</label>
@@ -293,8 +354,14 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
                     onChange={e => setNewPassword(e.target.value)}
                     placeholder={isFR ? 'Min. 8 caractères' : 'Min. 8 characters'}
                     style={{ paddingRight: 38 }}
+                    autoFocus
                   />
-                  <button type="button" className="cpm-eye-btn" style={{ position: 'absolute', right: 10, background: 'none', border: 'none', color: '#9B9C9E', cursor: 'pointer' }} onClick={() => setShowPassword(!showPassword)}>
+                  <button
+                    type="button"
+                    className="cpm-eye-btn"
+                    style={{ position: 'absolute', right: 10, background: 'none', border: 'none', color: '#9B9C9E', cursor: 'pointer' }}
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
                     {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
@@ -316,13 +383,13 @@ export function ForgotPasswordModal({ isOpen, onClose, onResetSuccess = () => {}
               </div>
 
               <div className="fpm-actions">
-                <button type="button" className="fpm-btn-secondary" onClick={() => setStep(1)} disabled={loading}>
-                  {isFR ? 'Retour' : 'Back'}
+                <button type="button" className="fpm-btn-secondary" onClick={handleClose} disabled={loading}>
+                  {isFR ? 'Annuler' : 'Cancel'}
                 </button>
                 <button type="submit" className="fpm-btn-primary" disabled={loading || !newPassword || !resetToken}>
                   {loading ? (isFR ? 'Mise à jour...' : 'Resetting...') : (
                     <>
-                      <span>{isFR ? 'Réinitialiser le mot de passe' : 'Reset password'}</span>
+                      <span>{isFR ? 'Enregistrer le nouveau mot de passe' : 'Save new password'}</span>
                       <ArrowRight size={13} />
                     </>
                   )}
